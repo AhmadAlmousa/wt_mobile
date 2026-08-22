@@ -345,6 +345,26 @@ is the **shape** — who descends from whom — and draws it again.
   own tree is a family where that is ordinary — so anything that looked a box
   up by person rather than remembering where it placed it would find the wrong
   one of them.
+- **A relationship is a path, and the path is walkable.** webtrees lays the
+  chart out as a grid of positioned cells — lines drawn in background images,
+  a shape that says nothing on a phone — but it prints *every* cell, empty
+  ones included, so a row and column index is a position rather than a guess.
+  Each step's name sits between the two people it links, one cell away in a
+  straight line or on a diagonal where the path turns a corner, so walking
+  from a known starting box recovers the order. The `<h3>` above the grid
+  carries webtrees' own phrase for the whole relationship — *القرابة: إبن* —
+  which no app should try to compose for itself: Arabic separates an older
+  brother from a younger one, and English has no word for the difference.
+- **`relationships-{ancestors}-{recursion}` decides what counts as related.**
+  With `ancestors` set — as it is on `tree.almou.sa`, which serves
+  `relationships-1-3` — the site searches only through common ancestors, so
+  two people linked by a marriage answer *no link found*. That is a correct
+  answer, and looks like a failure unless the app reads the setting out of the
+  URL and says so.
+- **The relationship route is the one address the app edits.** It ends
+  `…/{xref}` and takes an optional second xref after it, and a page only ever
+  links to one person at a time — so the app appends the other. Every other
+  part of the URL, both settings included, is left as the site wrote it.
 - **Not every chart is a fetch.** A fan chart is an ancestors chart bent round
   a circle, a compact chart is the same one with smaller boxes, and an
   hourglass is the two charts either side of a person stitched at the middle.
@@ -508,7 +528,9 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
 | **6a** | Charts: discovery, ancestors and descendants, drawn natively | ✅ |
 | **6b** | Charts: fan/circle, compact, hourglass — the same data, redrawn | ✅ |
-| **6c** | Tools: relationships, timeline, lifespans, statistics | ⬜ |
+| **6c** | Relationships — how any two people in a tree are connected | ✅ |
+| **6d** | Statistics — the counts, and the datasets behind its charts | ⬜ |
+| **6e** | Timeline and lifespans — events and lives against a scale | ⬜ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -525,7 +547,7 @@ from a box to the person.
 | Circle (fan), Compact | the same ancestors data, laid out differently | ✅ 6b |
 | Hourglass | ancestors *and* descendants of one person, stitched at the subject | ✅ 6b |
 | Family book | the hourglass with every spouse's family drawn too | 6c |
-| Relationships | the server's own path between two people; its grid layout has to be walked | 6c |
+| Relationships | the server's own path between two people, walked out of its grid | ✅ 6c |
 | Timeline | positioned event boxes, with the years in a `<script>` beside them | 6c |
 | Lifespan | years per person, which means reading numerals the server localized | 6c |
 | Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | 6c |
@@ -732,6 +754,42 @@ Released as **0.5.0**. **350 tests** green (331 → 350), analyzer clean, and
 the live check reads both charts and the hourglass stitched from them against
 `tree.almou.sa`. The previews now walk into four charts in each language and
 theme.
+
+### 2026-08-22 (later still) — Phase 6c: how two people are related
+
+The question a family tree gets asked more than any other, and the one the app
+cannot answer for itself: working out kinship means walking a graph a record at
+a time, and webtrees already knows.
+
+**What it knows is a grid, and a grid can be walked.** The relationship chart
+is laid out as positioned cells with the joining lines drawn in background
+images — meaningless on a phone — but every cell is printed, empty ones
+included, so a row and column index is a position rather than a guess. Each
+step's name sits between the two people it links; walking outwards from the
+person whose page it was recovers the order. Four real paths captured from
+`tree.almou.sa` — up three generations, down to a daughter, across to a
+sibling, and a grandmother by two steps — all read correctly the first time.
+
+**The words are the site's.** *القرابة: إبن*, and each step named as webtrees
+names it — including the distinction between an older and a younger brother,
+which Arabic makes and English has no word for. An app that composed these
+sentences itself would be inventing kinship terms in two languages.
+
+**"No link" is sometimes the right answer, and sometimes a setting.** The live
+check compared two people the tree records as married and was told there was
+no link — which turned out to be correct: `relationships-1-3` means this site
+searches only through common ancestors. The app now reads that setting out of
+the URL and says so, rather than leaving the reader with an empty screen and
+no explanation. The check compares blood relatives now, because a comparison
+that cannot find a link proves nothing.
+
+**One URL is edited rather than obeyed.** The relationship route takes an
+optional second xref and a page only ever links to one person, so the app
+appends the other. It is the only address it does not use exactly as it
+arrived, and both of the site's own settings inside it are left alone.
+
+Released as **0.6.0**. **363 tests** green (350 → 363), analyzer clean, and the
+live check reads a real path — *son*, one step — against `tree.almou.sa`.
 
 ---
 
@@ -1070,14 +1128,14 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 350 tests
+flutter test          # 363 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
-# ancestors, descendants, fan and hourglass charts.
+# ancestors, descendants, fan and hourglass charts, and a relationship.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -1123,11 +1181,17 @@ Both tools read the password from the terminal with echo disabled, or from
    generations could ask for thousands. Nothing bounds that yet: no limit on
    what is fetched, no culling of what is off screen. Worth measuring on a
    real device before it is worth solving.
-4. **The charts have been read on 2.2.6 only.** Both parsers run against
+4. **A relationship is read out of a layout, not a structure.** The path is
+   recovered by walking a grid of table cells: robust against the lines and
+   images webtrees draws between them, but not against a theme that changed
+   the grid itself. The parser answers an empty path rather than a wrong one
+   when the walk finds nothing, and the screen says the site found no link —
+   which would be indistinguishable from a theme it could not read.
+5. **The charts have been read on 2.2.6 only.** Both parsers run against
    fixtures for 2.2.6 and 2.3, and the two versions' chart templates differ by
    one attribute — but 2.3 has never answered a real request here, so that is
    an argument from source, not evidence.
-5. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+6. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    tab fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
@@ -1137,21 +1201,21 @@ Both tools read the password from the terminal with echo disabled, or from
    parsers, which read them correctly, including a chart box carrying a whole
    facts dropdown no fixture has. Sanitized real captures in `test/fixtures/`
    are still the right next step.
-6. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
+7. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
-7. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
+8. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
    default tree; consider letting the user enter a tree name manually.
-8. **`local_auth` has no Linux support** — the biometric gate must degrade
+9. **`local_auth` has no Linux support** — the biometric gate must degrade
    gracefully on the development machine.
-9. **Upstream module API churn.** webtrees does not guarantee stability for
+10. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
    is built (v2), isolate volatile core APIs behind one adapter and run CI
    against both 2.2.x and 2.3.
-10. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
+11. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-11. **Nothing has run on a real device.** This is now the largest gap by some
+12. **Nothing has run on a real device.** This is now the largest gap by some
    way: three of the six things Phase 4a changed — resuming through the
    biometric gate at launch, the Android back gesture, and the keystore that
    makes resuming possible at all — are *device* behaviours that a widget test
@@ -1161,7 +1225,7 @@ Both tools read the password from the terminal with echo disabled, or from
    networking still cannot be validated without hardware. Sideloadable builds
    exist (`flutter build apk --release --split-per-abi`, ~20MB for arm64), so
    this is now waiting on a device rather than on the toolchain.
-12. **"Works against any webtrees instance" is a goal, not a tested claim.**
+13. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 **live end to end** — connect, sign in,
    roles, search and its second page, opening a person, facts, relatives and
    family facts across 40 real records, the language switch and the calendar
@@ -1174,7 +1238,7 @@ Both tools read the password from the terminal with echo disabled, or from
    sections an instance offers (`sections offered` in `tool/live_check.dart`),
    which is the raw material for the compatibility matrix this still needs
    before release.
-13. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
+14. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
    on the `cal` parameter of the calendar links webtrees wraps each date in;
    2.3's rewritten `Date::display` emits no links, so nothing states which
    calendar a rendered date is in and the app shows both. Two further 2.3
@@ -1183,13 +1247,13 @@ Both tools read the password from the terminal with echo disabled, or from
    which would drop it from ordinary single dates; and it is bracketed rather
    than parenthesised. Worth reproducing on a 2.3 install and reporting
    upstream before building around it.
-14. **The app writes the account's language preference.** Aligning the server's
+15. **The app writes the account's language preference.** Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
    account with. Disclosed in the settings sheet; an optional module could
    avoid it, nothing stock can.
-15. **The Android compile-SDK override** rewrites every plugin subproject
+16. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.

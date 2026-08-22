@@ -86,6 +86,19 @@
   "chartAncestors": "Ancestors",
   "chartDescendants": "Descendants",
   "chartHourglass": "Hourglass",
+  "chartRelationship": "Relationship",
+  "relationshipPick": "Whose relationship to {name}?",
+  "@relationshipPick": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "relationshipNoLink": "No link between these two could be found in this tree.",
+  "relationshipChoose": "Choose someone else",
+  "relationshipBloodOnly": "This site searches blood relations only, so two people linked by a marriage show no link.",
+  "relationshipPaths": "Found more than one way they are related.",
   "chartView": "How to draw it",
   "chartViewTree": "Tree",
   "chartViewCircle": "Circle",

@@ -105,6 +105,81 @@ void main() {
     });
   });
 
+  group('reading a relationship', () {
+    Map<String, Canned Function(Sent)> withRelationships() => {
+      ...site(),
+      '/tree/main/relationships-1-3/X42/X20': (_) =>
+          Canned(200, body: fixture('v2_2_6', 'relationship_ancestors.html')),
+    };
+
+    test('puts the second person into the address the site gave', () async {
+      // The one URL the app edits. A relationship route takes an optional
+      // second xref, and a site only ever links to one person at a time — so
+      // the second is put there by the app, and everything else about the
+      // address, both settings included, is left alone.
+      serve(withRelationships());
+
+      final paths = await charts.relationship(
+        '/tree/main/relationships-1-3/X42',
+        from: 'X42',
+        to: 'X20',
+      );
+
+      expect(
+        server.requests.single.route,
+        '/tree/main/relationships-1-3/X42/X20',
+      );
+      expect(paths.single.steps.map((step) => step.person.xref), ['X7', 'X20']);
+    });
+
+    test('replaces a second person the site had already chosen', () async {
+      // Where the account has a record of its own, webtrees links to the
+      // relationship with *that* person already in the URL.
+      serve(withRelationships());
+
+      await charts.relationship(
+        '/tree/main/relationships-1-3/X42/X99',
+        from: 'X42',
+        to: 'X20',
+      );
+
+      expect(
+        server.requests.single.route,
+        '/tree/main/relationships-1-3/X42/X20',
+      );
+    });
+
+    test('knows when a site searches blood lines only', () {
+      // The first number in `relationships-{ancestors}-{recursion}` is that
+      // setting. With it on, two people linked only by a marriage answer "no
+      // link" — which is correct, and looks like a failure unless the app
+      // says why.
+      expect(
+        ChartsRepository.bloodLinesOnly('/tree/main/relationships-1-3/X42'),
+        isTrue,
+      );
+      expect(
+        ChartsRepository.bloodLinesOnly('/tree/main/relationships-0-99/X42'),
+        isFalse,
+      );
+      expect(ChartsRepository.bloodLinesOnly('/tree/main/whatever'), isFalse);
+    });
+
+    test('refuses an address it does not recognise', () async {
+      serve(withRelationships());
+
+      await expectLater(
+        charts.relationship(
+          '/tree/main/something-else/X42',
+          from: 'X42',
+          to: 'X20',
+        ),
+        throwsA(isA<ParseFailure>()),
+      );
+      expect(server.routes, isEmpty);
+    });
+  });
+
   group('reading a chart', () {
     test('asks for the chart rather than the page around it', () async {
       serve(site());

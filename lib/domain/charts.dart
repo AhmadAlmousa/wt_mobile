@@ -47,6 +47,7 @@ enum ChartKind {
     ChartKind.ancestors,
     ChartKind.descendants,
     ChartKind.hourglass,
+    ChartKind.relationship,
   };
 
   /// The charts the app can actually draw for a person, given what the site
@@ -192,6 +193,44 @@ final class DescendantNode {
 
   /// The generation this person sits in, counting the subject as one.
   int get depth => '.'.allMatches(number).length + 1;
+}
+
+/// One step along a relationship path: a link, and who it reaches.
+@immutable
+final class RelationshipStep {
+  const RelationshipStep({required this.relationship, required this.person});
+
+  /// How the two are related, in the site's own words — `father`, `أم` —
+  /// already translated, and already knowing whether a brother is older or
+  /// younger, which is a distinction Arabic makes and English does not.
+  final String relationship;
+
+  /// The person this step arrives at.
+  final PersonRef person;
+}
+
+/// One way two people are related.
+///
+/// webtrees can find several: a family where cousins marry links two people
+/// through more than one line, and each is true.
+@immutable
+final class RelationshipPath {
+  RelationshipPath({
+    required this.description,
+    required this.from,
+    required List<RelationshipStep> steps,
+  }) : steps = List.unmodifiable(steps);
+
+  /// The whole relationship as one phrase, as the site put it.
+  final String description;
+
+  /// Where the path starts — the person whose page it was opened from.
+  final PersonRef from;
+
+  final List<RelationshipStep> steps;
+
+  /// The person at the far end.
+  PersonRef? get to => steps.isEmpty ? null : steps.last.person;
 }
 
 /// A chart as the app read it, whichever direction it runs in.

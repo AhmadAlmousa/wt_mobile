@@ -45,6 +45,12 @@ Map<String, Canned Function(Sent)> _browsableSite() {
                 '<span class="NAME" dir="auto">عبد الله '
                 '<span class="SURN">الموسى</span></span>, 1901–1974',
           },
+          {
+            'value': 'X43',
+            'text':
+                '<span class="NAME" dir="auto">نورة '
+                '<span class="SURN">الموسى</span></span>, 1903–1980',
+          },
         ],
         'nextUrl': null,
       }),
@@ -65,6 +71,8 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('chart_ancestors.html')),
     '/tree/main/descendants-tree-3/X42': (_) =>
         Canned(200, body: fixture('chart_descendants.html')),
+    '/tree/main/relationships-1-3/X42/X43': (_) =>
+        Canned(200, body: fixture('relationship_sibling.html')),
   };
 }
 
@@ -166,9 +174,19 @@ Future<void> main() async {
         find.byType(ActionChip).at(switch (steps) {
           7 => 1,
           9 => 2,
+          10 => 3,
           _ => 0,
         }),
       );
+      await tester.pumpAndSettle();
+    }
+    // A relationship needs a second person before there is anything to draw,
+    // so this walk picks one.
+    if (steps == 10) {
+      await tester.enterText(find.byType(TextField), 'الموسى');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('نورة الموسى').last);
       await tester.pumpAndSettle();
     }
     // The fan is the ancestors chart bent round a circle: same fetch, same
@@ -307,6 +325,16 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 9,
+        );
+      });
+
+      testWidgets('relationship $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'relationship-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 10,
         );
       });
     }

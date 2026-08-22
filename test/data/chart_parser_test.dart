@@ -157,6 +157,59 @@ void main() {
         );
       });
     });
+    group('$version relationship chart', () {
+      test('reads the path from one person to the other', () {
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_ancestors.html'),
+          from: 'X42',
+        );
+
+        final path = paths.single;
+        // The site's own phrase for the whole relationship. Arabic separates
+        // kinds of kin English has one word for, so composing this in the app
+        // would mean inventing terms in two languages.
+        expect(path.description, 'القرابة: جد لأب');
+        expect(path.from.xref, 'X42');
+        expect(path.steps.map((step) => step.person.xref), ['X7', 'X20']);
+        expect(path.steps.map((step) => step.relationship), ['أب', 'أب']);
+        expect(path.to?.xref, 'X20');
+      });
+
+      test('starts from the person it was asked about', () {
+        // webtrees prints the grid from the far end down, so the person whose
+        // page this was opened from is the *last* box in the markup.
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_ancestors.html'),
+          from: 'X20',
+        );
+        expect(paths.single.steps.map((step) => step.person.xref), [
+          'X7',
+          'X42',
+        ]);
+      });
+
+      test('walks a path that runs sideways as well as up', () {
+        // A sibling step is drawn across a row rather than down a column.
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_sibling.html'),
+          from: 'X42',
+        );
+        expect(paths.single.steps.single.person.xref, 'X43');
+        expect(paths.single.steps.single.relationship, 'أخت');
+      });
+
+      test('answers nothing when the site found no link', () {
+        // Two people in one tree need not be related at all, and webtrees
+        // says so in a sentence rather than an empty chart.
+        expect(
+          const ChartParser().parseRelationships(
+            fixture(version, 'relationship_none.html'),
+            from: 'X42',
+          ),
+          isEmpty,
+        );
+      });
+    });
   }
 
   group('across versions', () {

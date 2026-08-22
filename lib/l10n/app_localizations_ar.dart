@@ -247,6 +247,28 @@ class AppTextAr extends AppText {
   String get chartHourglass => 'ساعة رملية';
 
   @override
+  String get chartRelationship => 'قرابة';
+
+  @override
+  String relationshipPick(String name) {
+    return 'قرابة من بـ$name؟';
+  }
+
+  @override
+  String get relationshipNoLink =>
+      'لم يُعثر على صلة بين الشخصين في هذه الشجرة.';
+
+  @override
+  String get relationshipChoose => 'اختر شخصاً آخر';
+
+  @override
+  String get relationshipBloodOnly =>
+      'هذا الموقع يبحث في صلات الدم فقط، فلا تظهر صلة بين شخصين تربطهما مصاهرة.';
+
+  @override
+  String get relationshipPaths => 'هناك أكثر من صلة قرابة بينهما.';
+
+  @override
   String get chartView => 'طريقة الرسم';
 
   @override

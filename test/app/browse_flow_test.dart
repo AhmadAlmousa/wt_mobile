@@ -23,6 +23,15 @@ String fixture(String name) =>
 String searchJson(String query, {int page = 1}) => jsonEncode({
   'data': query.contains('nobody')
       ? <Object>[]
+      : query.contains('نورة')
+      ? [
+          {
+            'value': 'X43',
+            'text':
+                '<span class="NAME" dir="auto">نورة '
+                '<span class="SURN">الموسى</span></span>, 1903–1980',
+          },
+        ]
       : [
           if (page == 1)
             {
@@ -98,6 +107,8 @@ void main() {
         Canned(200, body: fixture('chart_ancestors.html')),
     '/tree/main/descendants-tree-3/X42': (_) =>
         Canned(200, body: fixture('chart_descendants.html')),
+    '/tree/main/relationships-1-3/X42/X43': (_) =>
+        Canned(200, body: fixture('relationship_sibling.html')),
     '/tree/main/media-thumbnail/M11/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
     '/tree/main/media-thumbnail/M3/1': (_) =>
@@ -339,6 +350,29 @@ void main() {
       server.routes.where((route) => route.contains('ancestors-tree-4')),
       hasLength(1),
     );
+  });
+
+  testWidgets('says how two people are related', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Relationship'));
+    await tester.pumpAndSettle();
+
+    // A relationship needs a second person before there is anything to show,
+    // so the screen asks for one rather than guessing.
+    expect(find.textContaining('Whose relationship to'), findsOne);
+    await tester.enterText(find.byType(TextField), 'نورة');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('نورة الموسى').last);
+    await tester.pumpAndSettle();
+
+    // The site's own words for the relationship and for each step of it.
+    expect(find.text('القرابة: أخت'), findsOne);
+    expect(find.text('أخت'), findsOne);
+    expect(server.routes, contains('/tree/main/relationships-1-3/X42/X43'));
   });
 
   testWidgets('walks from a chart to the person tapped on it', (tester) async {

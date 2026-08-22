@@ -368,6 +368,52 @@ Future<void> main(List<String> args) async {
           );
         }
 
+        // How two people are related is the one thing the app cannot work out
+        // for itself: it would mean walking a graph a record at a time.
+        final relationshipUrl = person.charts[ChartKind.relationship];
+        if (relationshipUrl == null) {
+          stdout.writeln(
+            '  SKIP  this site does not run the relationships '
+            'chart',
+          );
+        } else {
+          // Somebody this person is certainly related to, because the app has
+          // just read the family that says so. Two people picked out of a
+          // search need not be related at all, and a site that says as much
+          // has answered correctly — which makes for a check that proves
+          // nothing.
+          // Blood first: a site can be set to search only through common
+          // ancestors — this one is, with `relationships-1-3` — and under
+          // that setting a spouse has no link to find, which would make a
+          // check that used one prove nothing.
+          final relative = [
+            ...person.parents,
+            ...person.children,
+            ...person.siblings,
+          ].firstOrNull;
+
+          if (relative == null) {
+            stdout.writeln(
+              '  SKIP  no blood relative on this record to compare with',
+            );
+          } else {
+            final paths = await chartRepository.relationship(
+              relationshipUrl,
+              from: person.xref,
+              to: relative.xref,
+            );
+            report(
+              'relationship to ${relative.xref}',
+              paths.isEmpty
+                  ? 'no link found, though the tree records one'
+                  : '${paths.first.description} · '
+                        '${paths.first.steps.length} step(s) · '
+                        '${paths.length} path(s)',
+              ok: paths.isNotEmpty,
+            );
+          }
+        }
+
         final photo = person.thumbnailUrl;
         if (photo == null) {
           stdout.writeln('  SKIP  no photo on this record');

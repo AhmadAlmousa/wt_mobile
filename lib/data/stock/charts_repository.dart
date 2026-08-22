@@ -77,6 +77,51 @@ final class ChartsRepository {
     };
   }
 
+  /// Reads how two people are related, along the site's own path between them.
+  ///
+  /// This is the one address the app *edits* rather than uses as it arrived.
+  /// A relationship route ends `relationships-{ancestors}-{recursion}/{xref}`
+  /// and takes an optional second xref after it, and the page only ever links
+  /// to one person at a time — so the second is put there by the app. Every
+  /// other part of the URL, the two settings included, is left exactly as the
+  /// site wrote it.
+  Future<List<RelationshipPath>> relationship(
+    String url, {
+    required String from,
+    required String to,
+  }) async {
+    final route = _client.url.routeOf(url);
+    final shape = RegExp(
+      r'^(.*/relationships-[^/]+/)[^/]+(?:/[^/]+)?$',
+    ).firstMatch(route);
+    if (shape == null) {
+      throw ParseFailure(
+        parser: 'relationship chart',
+        expected: 'a route ending relationships-{ancestors}-{recursion}/{xref}',
+        version: _parser.version,
+      );
+    }
+
+    final body = await _fragment(
+      '${shape.group(1)}$from/$to',
+      probe: 'reading how $from and $to are related',
+    );
+    return _parser.parseRelationships(body, from: from);
+  }
+
+  /// Whether a site's own settings keep this chart to blood relations.
+  ///
+  /// The first number in `relationships-{ancestors}-{recursion}` is that
+  /// setting, and this project's own target has it on — so two people linked
+  /// only by a marriage answer "no link", which is correct and would
+  /// otherwise look like a failure.
+  static bool bloodLinesOnly(String url) {
+    final match = RegExp(
+      r'/relationships-(\d+)-\d+',
+    ).firstMatch(Uri.decodeFull(url));
+    return match != null && match.group(1) != '0';
+  }
+
   /// Fetches a chart, asking for the chart alone.
   ///
   /// Every chart route answers the whole page by default and the chart on its

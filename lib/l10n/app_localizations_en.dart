@@ -247,6 +247,28 @@ class AppTextEn extends AppText {
   String get chartHourglass => 'Hourglass';
 
   @override
+  String get chartRelationship => 'Relationship';
+
+  @override
+  String relationshipPick(String name) {
+    return 'Whose relationship to $name?';
+  }
+
+  @override
+  String get relationshipNoLink =>
+      'No link between these two could be found in this tree.';
+
+  @override
+  String get relationshipChoose => 'Choose someone else';
+
+  @override
+  String get relationshipBloodOnly =>
+      'This site searches blood relations only, so two people linked by a marriage show no link.';
+
+  @override
+  String get relationshipPaths => 'Found more than one way they are related.';
+
+  @override
   String get chartView => 'How to draw it';
 
   @override

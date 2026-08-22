@@ -535,6 +535,42 @@ abstract class AppText {
   /// **'Hourglass'**
   String get chartHourglass;
 
+  /// No description provided for @chartRelationship.
+  ///
+  /// In en, this message translates to:
+  /// **'Relationship'**
+  String get chartRelationship;
+
+  /// No description provided for @relationshipPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Whose relationship to {name}?'**
+  String relationshipPick(String name);
+
+  /// No description provided for @relationshipNoLink.
+  ///
+  /// In en, this message translates to:
+  /// **'No link between these two could be found in this tree.'**
+  String get relationshipNoLink;
+
+  /// No description provided for @relationshipChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose someone else'**
+  String get relationshipChoose;
+
+  /// No description provided for @relationshipBloodOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This site searches blood relations only, so two people linked by a marriage show no link.'**
+  String get relationshipBloodOnly;
+
+  /// No description provided for @relationshipPaths.
+  ///
+  /// In en, this message translates to:
+  /// **'Found more than one way they are related.'**
+  String get relationshipPaths;
+
   /// No description provided for @chartView.
   ///
   /// In en, this message translates to:

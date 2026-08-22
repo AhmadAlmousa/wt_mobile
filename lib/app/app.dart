@@ -14,6 +14,7 @@ import '../features/auth/sign_in_screen.dart';
 import '../features/browse/person_screen.dart';
 import '../features/browse/search_screen.dart';
 import '../features/charts/chart_screen.dart';
+import '../features/charts/relationship_screen.dart';
 import '../features/connect/connect_screen.dart';
 import '../features/launch/launch_screen.dart';
 import '../l10n/app_localizations.dart';
@@ -201,12 +202,39 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
                 // can be walked back down again.
                 onOpenPerson: (xref) =>
                     _router.push(Routes.personIn(tree, xref)),
+                // A relationship is not a shape of a family but a path
+                // between two of them, and it needs a second person before
+                // there is anything to draw — so it has a screen of its own.
                 onOpenChart: (kind) => _router.push(
-                  Routes.chartIn(tree, state.pathParameters['xref']!, kind),
+                  kind == ChartKind.relationship
+                      ? Routes.relationshipIn(
+                          tree,
+                          state.pathParameters['xref']!,
+                        )
+                      : Routes.chartIn(
+                          tree,
+                          state.pathParameters['xref']!,
+                          kind,
+                        ),
                 ),
               );
             },
             routes: [
+              GoRoute(
+                path: Routes.relationshipUnderPerson,
+                builder: (context, state) {
+                  final tree = state.pathParameters['tree']!;
+                  return RelationshipScreen(
+                    session: widget.session,
+                    records: _records,
+                    charts: _charts,
+                    tree: tree,
+                    xref: state.pathParameters['xref']!,
+                    onOpenPerson: (xref) =>
+                        _router.push(Routes.personIn(tree, xref)),
+                  );
+                },
+              ),
               // Nested again: a chart is opened from a person, and closing it
               // should put that person back on screen.
               GoRoute(
@@ -294,6 +322,7 @@ abstract final class Routes {
 
   /// Declared relative to the person, for the same reason.
   static const String chartUnderPerson = 'chart/:kind';
+  static const String relationshipUnderPerson = 'relationship';
 
   static String searchIn(String tree) => '/tree/${Uri.encodeComponent(tree)}';
 
@@ -302,4 +331,7 @@ abstract final class Routes {
 
   static String chartIn(String tree, String xref, ChartKind kind) =>
       '${personIn(tree, xref)}/chart/${kind.name}';
+
+  static String relationshipIn(String tree, String xref) =>
+      '${personIn(tree, xref)}/relationship';
 }

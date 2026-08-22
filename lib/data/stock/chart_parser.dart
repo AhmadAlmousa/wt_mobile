@@ -54,6 +54,124 @@ final class ChartParser {
     return node;
   }
 
+  /// Reads a relationship chart: how two people are connected, and by whom.
+  ///
+  /// webtrees lays this one out as a grid of positioned cells with lines drawn
+  /// in background images — a shape that says nothing on a phone. What it does
+  /// state is a path: boxes joined by named steps, laid out so that each step
+  /// sits between the two people it links. Walking that grid recovers the
+  /// order; the heading above it carries webtrees' own phrase for the whole
+  /// relationship, which no app should try to compose for itself.
+  ///
+  /// Several paths may be found — a family where cousins marry connects two
+  /// people by more than one line, and each is true — so this answers a list.
+  List<RelationshipPath> parseRelationships(
+    String fragment, {
+    required String from,
+  }) {
+    final root = html.parseFragment(fragment);
+    final paths = <RelationshipPath>[];
+
+    String heading = '';
+    for (final element in root.querySelectorAll('h3, table')) {
+      if (element.localName == 'h3') {
+        heading = textOf(element) ?? '';
+        continue;
+      }
+
+      final path = _relationshipIn(element, heading: heading, from: from);
+      if (path != null) paths.add(path);
+    }
+    return paths;
+  }
+
+  /// Walks one relationship grid from [from] outwards.
+  RelationshipPath? _relationshipIn(
+    Element table, {
+    required String heading,
+    required String from,
+  }) {
+    // Every cell is printed, empty ones included, so a row and column index
+    // is a position rather than a guess.
+    final grid = <List<Element>>[
+      for (final row in table.querySelectorAll('tr'))
+        row.querySelectorAll('td'),
+    ];
+
+    PersonRef? personAt(int row, int column) {
+      if (row < 0 || row >= grid.length) return null;
+      if (column < 0 || column >= grid[row].length) return null;
+      final box = grid[row][column].querySelector(
+        '.wt-chart-box[data-wt-chart-xref]',
+      );
+      return box == null ? null : personFromChartBox(box);
+    }
+
+    String? labelAt(int row, int column) {
+      if (row < 0 || row >= grid.length) return null;
+      if (column < 0 || column >= grid[row].length) return null;
+      final cell = grid[row][column];
+      if (cell.querySelector('.wt-chart-box') != null) return null;
+      return textOf(cell);
+    }
+
+    var atRow = -1;
+    var atColumn = -1;
+    PersonRef? start;
+    for (var row = 0; row < grid.length && start == null; row++) {
+      for (var column = 0; column < grid[row].length; column++) {
+        final person = personAt(row, column);
+        if (person?.xref == from) {
+          start = person;
+          atRow = row;
+          atColumn = column;
+          break;
+        }
+      }
+    }
+    if (start == null) return null;
+
+    // A step moves two cells: the relationship's name sits between the two
+    // people it links, whether they are stacked, side by side, or — where
+    // webtrees turns a corner — diagonally apart.
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
+    ];
+
+    final steps = <RelationshipStep>[];
+    final seen = <String>{start.xref};
+
+    var moved = true;
+    while (moved) {
+      moved = false;
+      for (final direction in directions) {
+        final label = labelAt(atRow + direction[0], atColumn + direction[1]);
+        if (label == null) continue;
+
+        final next = personAt(
+          atRow + direction[0] * 2,
+          atColumn + direction[1] * 2,
+        );
+        if (next == null || !seen.add(next.xref)) continue;
+
+        steps.add(RelationshipStep(relationship: label, person: next));
+        atRow += direction[0] * 2;
+        atColumn += direction[1] * 2;
+        moved = true;
+        break;
+      }
+    }
+
+    return RelationshipPath(description: heading, from: start, steps: steps);
+  }
+
   /// The elements one recursion of a chart template emits.
   ///
   /// A chart arrives as a run of sibling elements rather than one container —
