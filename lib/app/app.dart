@@ -78,12 +78,12 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     unawaited(widget.session.syncContentLanguage());
   }
 
-  void _openOnlyTree(String tree) {
+  void _openOnlyTree(String name, String? title) {
     if (_openedOnlyTree) return;
     _openedOnlyTree = true;
     // Replaces rather than stacks: with one tree this *is* the home screen,
     // and a back gesture should leave the app, not return to a list of one.
-    _router.go(Routes.searchIn(tree));
+    _router.go(Routes.searchIn(name), extra: title);
   }
 
   late final GoRouter _router = GoRouter(
@@ -118,7 +118,13 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
         path: Routes.launch,
         builder: (context, state) => LaunchScreen(
           session: widget.session,
-          onNothingToResume: () => _router.go(Routes.connect),
+          // A resume that got as far as identifying the site — a password
+          // that has stopped working, an unlock declined — has nothing left
+          // to ask but the password, so it should not ask for the address
+          // again as well.
+          onNothingToResume: () => _router.go(
+            widget.session.instance == null ? Routes.connect : Routes.signIn,
+          ),
         ),
       ),
       GoRoute(
@@ -146,7 +152,8 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           onSignedOut: () => _router.go(Routes.connect),
           // Stacked, so a reader who chose one of several trees can go back
           // to the list with the system back gesture.
-          onBrowseTree: (tree) => _router.push(Routes.searchIn(tree)),
+          onBrowseTree: (name, title) =>
+              _router.push(Routes.searchIn(name), extra: title),
           onOnlyTree: _openOnlyTree,
         ),
       ),
@@ -158,6 +165,9 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
             session: widget.session,
             records: _records,
             tree: tree,
+            // Only ever a label. The route still carries the tree's name,
+            // so a link that arrives without a title still works.
+            title: state.extra as String?,
             onOpenPerson: (xref) => _router.push(Routes.personIn(tree, xref)),
             onShowAccount: () => _router.push(Routes.access),
           );

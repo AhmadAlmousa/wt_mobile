@@ -35,9 +35,14 @@ void main() {
 <input name="email" value="someone@example.com">
 </form>''';
 
-  String treePage({String tree = 'main', bool withMyRecord = true}) =>
+  String treePage({
+    String tree = 'main',
+    bool withMyRecord = true,
+    String? title = 'شجرة الموسى',
+  }) =>
       '''
 <html><body>
+${title == null ? '' : '<h1 class="col wt-site-title">$title</h1>'}
 <a href="/tree/$tree" class="dropdown-item menu-tree-1">Main tree</a>
 ${withMyRecord ? '<a href="/tree/$tree/individual/X42/slug" class="menu-myrecord">My record</a>' : ''}
 </body></html>''';
@@ -223,6 +228,28 @@ ${withMyRecord ? '<a href="/tree/$tree/individual/X42/slug" class="menu-myrecord
       });
 
       expect((await probe.describe()).trees.single.myXref, isNull);
+    });
+  });
+
+  group('the tree’s own title', () {
+    test('is read from the site heading', () async {
+      serve(memberSite());
+
+      // The menu that carries tree titles is only rendered when a site allows
+      // switching trees, and a site with one tree does not — so the heading is
+      // the only place a name better than `main` can be found.
+      expect((await probe.describe()).trees.single.title, 'شجرة الموسى');
+    });
+
+    test('is null when the theme does not print one', () async {
+      serve({
+        ...memberSite(),
+        '/tree/main': (_) => Canned(200, body: treePage(title: null)),
+      });
+
+      // A label, not a capability: losing it costs the interface a nicer word
+      // for the tree, and nothing else.
+      expect((await probe.describe()).trees.single.title, isNull);
     });
   });
 

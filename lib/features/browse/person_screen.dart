@@ -8,6 +8,7 @@ import '../../data/stock/records_repository.dart';
 import '../../domain/dates.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/bidi.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import 'authenticated_image.dart';
@@ -356,7 +357,11 @@ class _Relatives extends StatelessWidget {
               ),
               title: Text(person.name),
               subtitle: Text(
-                [?person.alternateName, ?person.lifespan].join(' · '),
+                [
+                  if (person.alternateName != null)
+                    isolatedRun(person.alternateName),
+                  if (person.lifespan != null) ltrRun(person.lifespan),
+                ].join(' · '),
               ),
               onTap: () => onOpenPerson(person.xref),
             ),

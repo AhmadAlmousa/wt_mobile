@@ -25,6 +25,15 @@ final class FakeSite {
 
   bool signedIn = false;
 
+  /// The language webtrees would render in, which decides the wording of
+  /// every date, month name and fact label it sends.
+  ///
+  /// Seeded from the account's stored preference at sign-in, exactly as
+  /// `Login::doLogin` does — which is why an app in Arabic gets English dates
+  /// until it says otherwise.
+  String accountLanguage = 'en-US';
+  String? language;
+
   /// Every credential submission that reached the password check.
   int signInAttempts = 0;
 
@@ -53,6 +62,13 @@ final class FakeSite {
       signedIn = false;
       return const Canned(204);
     },
+    // CSRF-exempt in both supported versions, and answers 204.
+    for (final tag in const ['ar', 'en-GB', 'en-US'])
+      '/language/$tag': (request) {
+        if (request.method != 'POST') return const Canned(405);
+        language = tag;
+        return const Canned(204);
+      },
     '/my-account': (_) => signedIn
         ? Canned(200, body: _accountPage)
         : const Canned(302, location: 'https://host/login'),
@@ -83,6 +99,7 @@ final class FakeSite {
     if (request.fields['username'] == username &&
         request.fields['password'] == password) {
       signedIn = true;
+      language = accountLanguage;
       return const Canned(302, location: 'https://host/');
     }
     return const Canned(302, location: 'https://host/login?username=x&url=');
@@ -98,6 +115,7 @@ final class FakeSite {
 
   static const String _treeHome = '''
 <html><body>
+<h1 class="col wt-site-title">Family tree</h1>
 <a href="/tree/main" class="dropdown-item menu-tree-1">Family tree</a>
 <a href="/tree/main/individual/X42/slug" class="menu-myrecord">My record</a>
 </body></html>''';

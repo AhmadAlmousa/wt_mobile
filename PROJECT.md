@@ -5,7 +5,7 @@ sites. A real mobile application, not a wrapper around the web interface.
 
 **Living document.** Update the status table and the progress log as work
 happens, and add to *Verified constraints* whenever something new is confirmed
-against a real server.
+against a real server. Every milestone ends with the ritual in §10.
 
 ---
 
@@ -79,6 +79,9 @@ the mismatch is structural, not a matter of missing endpoints:
 | Staying signed in | Password in the OS keystore, biometric-gated, silent re-login on expiry |
 | v1 scope | **Read-only browsing.** Editing, moderation and offline sync deferred to v2 |
 | Finding people (v1) | **Search, not enumeration.** The only JSON endpoint requires a non-empty query (§3), and no stock route paginates a whole tree cheaply |
+| Where the app opens | **The last site, signed in.** An address typed once should not be typed again, and a list of one saved site is not a choice. The launch screen resumes it and steps aside; the connect screen is what you see when there is nothing to resume |
+| Where the tree list goes | **Skipped when there is one tree.** The account screen keeps its diagnostic job and stays one tap away, but it is not a destination when it holds a single card |
+| Which calendar to show | **The reader's, per the markup.** A tree's `CALENDAR_FORMAT` is a manager-level preference no member can change, so the choice is made in the app, over dates the server has already rendered — never by converting anything |
 | Module capability probe | **Deferred** until a module contract exists. Probing for something undefined has nothing to test against; and any future module must reuse the webtrees session or OAuth **authorization code with PKCE** — never client credentials in a shipped binary |
 
 ---
@@ -213,15 +216,34 @@ anonymous `/my-account`.
   `.wt-fact-date-age`, `.wt-fact-place`, `.wt-fact-type`, and `chart-box` with
   `data-wt-chart-xref`, `.wt-chart-box-name`, `-name-alt`, `-lifespan`,
   `-thumbnail`.
-- **Dates stay text.** webtrees has already formatted them in the tree's
-  language and calendar, and appends conversions in brackets — `12 مارس 1901
-  [٢١ ذو القعدة ١٣١٨ هـ]`. Parsing to `DateTime` would drop the second
-  calendar and the `about`/`between` qualifiers.
+- **Dates are never re-formatted.** webtrees has already applied the tree's
+  calendar, the reader's language and its own numerals, and a `DateTime` would
+  drop the second calendar and the `about`/`between` qualifiers. But the
+  *markup* around a date is readable, and the two versions differ completely:
+
+  | | 2.2.6 (live) | 2.3.0-dev |
+  |---|---|---|
+  | Primary date | `<a href="…/calendar/day?cal=@#DGREGORIAN@…">١٢ مارس ١٩٠١</a>` | plain text |
+  | Conversion | `<span dir="rtl">(<a href="…cal=@#DHIJRI@…">٢١ ذو القعدة ١٣١٨</a>)</span>` | ` [٢١ ذو القعدة ١٣١٨]` |
+
+  The `cal` parameter is **the only place a stock site states which calendar a
+  rendered date is in**, which is what makes an honest "show me Hijri only"
+  possible. It must be read from the *undecoded* URL: the escape contains `#`,
+  so decoding first turns the rest of the query into a fragment.
+  A qualified date interleaves the two — `بين ١٩٧٤ (١٣٩٤) و ١٩٧٥ (١٣٩٥)` — so
+  the conversion is dropped per date, in place, never by a regex over the
+  whole string (`interpreted %s (%s)` puts real parentheses in the text).
+  2.3 names no calendar, so the app shows both there rather than guessing.
 - Relatives carry **no machine-readable role**. The family view emits its
   `FAMC`/`FAMS` type only inside editor-only link text, and the `<th>`
   relationship names are translated. Role is therefore derived structurally:
   spouses render before any marriage-fact row, children after, and the family
   is a birth family or the person's own according to which block holds them.
+- **The tree's title is only on its own page.** `<h1 class="wt-site-title">`
+  in the default layout. The menu that carries titles is rendered only when a
+  site allows switching trees, and a site with one tree does not — so for the
+  common case this heading is the only thing standing between the reader and a
+  home screen called `main`. Theme-dependent, so best-effort.
 - **No machine-readable tree list.** Sources, in order: the post-sign-in
   redirect (default tree), the header menu `a[class*=menu-tree-]`, the search
   page `input[name="search_trees[]"]`. The latter two need
@@ -235,6 +257,22 @@ The interface is English and Arabic, and both are first class — the tree this
 was built against is Arabic, so RTL is the case the layout was designed for
 rather than a late adaptation.
 
+- **The server, not the app, writes the dates.** Fact labels, month names and
+  numerals all come from webtrees, in the language held in **its own session**
+  — which `Login::doLogin` seeds from the *account's* stored preference.
+  `Accept-Language` is consulted only before that value exists, so it is
+  useless after sign-in. The app therefore posts `/language/{tag}` after every
+  sign-in and whenever the reader switches: CSRF-exempt in both versions,
+  answers `204`, verified live. **It also writes the account's own preference**
+  — `SelectLanguage` sets both and there is no stock route that sets only the
+  session — so the website greets that user in the same language afterwards.
+  The settings sheet says so rather than letting it be a surprise.
+  `en` maps to `en-GB`, which orders a date day-first as Arabic does.
+- **Latin runs inside Arabic need isolating.** A lifespan is all digits and a
+  dash, so the bidirectional algorithm takes its direction from the paragraph:
+  `1875–1940` renders as `1940–1875`, and the person dies before they are
+  born. `features/shared/bidi.dart` wraps such runs in U+2066/U+2069, which is
+  what webtrees itself does in the markup it sends.
 - **The data layer never writes a sentence.** `domain/notice.dart` carries the
   facts of a caveat and `core/errors.dart` the facts of a failure; both are
   sealed, and `features/shared/messages.dart` turns them into words with
@@ -307,9 +345,15 @@ webtrees_mobile/lib/
              credential_store · session_manager · settings_store
     stock/   dom · record_parser · records_repository · media_cache
     module/  ModuleTransport  (JSON)                           ← v2
-  domain/    instance · access · records · notice
-  features/  connect · auth · access · browse · shared
+  domain/    instance · access · records · dates · notice
+  features/  launch · connect · auth · access · browse · shared
 ```
+
+`domain/dates.dart` is the one place the app reasons *about* a date without
+re-formatting it: webtrees' own rendering is kept verbatim, and the structure
+beside it exists only to drop a calendar the reader did not ask for.
+`features/shared/bidi.dart` is its counterpart for layout — the Latin runs that
+an Arabic paragraph would otherwise reorder.
 
 Repositories depend on a transport **interface**; a capability probe at connect
 time selects the implementation. v1 ships stock only — adding the module later
@@ -347,6 +391,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **3a** | Vertical slice — search → person → facts → relatives → photo | ✅ |
 | **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ⬜ |
 | **4** | Interface (Material 3 Expressive theme, Arabic/RTL, navigation) | ✅ |
+| **4a** | Getting out of the way — resume, one-tree, back stack, calendar choice | ✅ |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
 | **v2** | Offline sync · editing · moderation · charts · PHP module | ⬜ |
 
@@ -433,6 +478,10 @@ turned out to be decidable for private trees (§3).
 | 14 | Search omitted the required `at` parameter — every live search was a `400` | **Live run only** |
 | 15 | A record URL without its slug answers `301`; the app read that as a dead session | **Live run only** |
 | 16 | The 2.2.6 fixture's tab URLs were invented, not what a 2.2.6 server emits | **Live run only** |
+| 17 | The 2.2.6 date fixture was 2.3's markup, so no 2.2.6 date structure had ever been parsed | **Live capture** |
+| 18 | The person route was declared beside the search route, so the first back gesture left the app | **Widget test** |
+| 19 | A lifespan rendered `1940–1875` in Arabic — bidi reordering a run of digits | **Rendered preview** |
+| 20 | The calendar escape was read from a decoded URL, whose `#` swallowed the query | **Parser test** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -442,6 +491,15 @@ server answered a request the real one rejects. A fake that is more permissive
 than the thing it stands for cannot fail. The fake now enforces `at` exactly as
 `AbstractTomSelectHandler` does. Bug 7 is the
 argument for widget tests carrying assertions about *copy*, not just structure.
+
+Bug 17 is bug 16 again, one layer down, and worth the repetition: the 2.2.6
+fixture said `1901 [1318]` as plain text because that is what the *2.3* source
+emits. A real 2.2.6 server sends a calendar link per date — the thing that
+makes choosing a calendar possible at all. The fixture had been written from
+the wrong version's template and agreed with a parser that never looked.
+Bugs 18 and 19 are the two the tests could not have been expected to catch
+from copy alone: one needed the system back button simulated, the other needed
+somebody to look at a picture.
 
 Bugs 9–12 share one cause, and it is the important lesson here: **the suite was
 green for all of them.** Tests were written against the fixtures the code
@@ -653,6 +711,60 @@ that would otherwise only be noticed on a device: that the tree mirrors, that
 a hostname does not, that Arabic drops tracking, and that every sealed error
 and notice has words in both languages.
 
+### 2026-08-22 (later still) — Phase 4a: getting out of the way
+
+Six things stood between the reader and their family tree. All six are fixed,
+and all six turned out to be about the same thing: **the app was asking
+questions it already knew the answers to.**
+
+| Was | Is |
+|---|---|
+| Type the address, then pick the site from a list of one | Launch signs straight back in to the site used last |
+| Choose the only tree the account can reach | Straight into it; the account screen is one tap away from the tree |
+| Back left the app from the first person opened | Back walks the record trail, then the search, then out |
+| Everyone without a photo was the same grey silhouette | The first letter of their name, coloured from it |
+| Arabic interface, English dates | The app tells the server which language to render in |
+| Every date shown twice | Both, Gregorian or Hijri — chosen in settings |
+
+**The back button was a routing bug, not a gesture bug.** `person` was declared
+*beside* `search` rather than inside it, so `go()` built a stack one page deep
+and the first back gesture had nothing to pop. Nesting the route fixes both the
+walk between people and the walk back to the results. The test drives
+`handlePopRoute` — what Android's gesture actually calls — and returns `false`
+against the old code, which is precisely "the app would have exited".
+
+**Dates were never translated because the app never asked.** webtrees renders
+in the language held in *its own* session, seeded from the account's stored
+preference — `Accept-Language` is consulted only before that value exists, so
+after sign-in nothing the app sends in a header can change it. One
+CSRF-exempt `POST /language/{tag}` fixes it, and the same call is what makes
+the reader's language switch reach the dates. It writes the account preference
+too, so the settings sheet says so (§3).
+
+**Choosing a calendar is possible because 2.2.6 says which calendar it used.**
+Each rendered date is a link to its own calendar page, and the `cal` parameter
+carries the GEDCOM escape — `@#DGREGORIAN@`, `@#DHIJRI@`. So the app can drop
+one calendar without ever guessing which half of `١٩٧٧ (١٣٩٧)` is which, and a
+qualified date keeps its words: `بين ١٣٩٤ و ١٣٩٥`, not two bare years. 2.3
+names no calendar at all, and there the app shows both rather than inventing
+an answer (§9).
+
+**The fixture was lying about 2.2.6 again.** Its date markup was 2.3's plain
+`1901 [1318]`, transcribed from the wrong version's source — so no 2.2.6 date
+structure had ever been parsed by anything. Replaced with a sanitized capture
+from the live server. This is bug 16's lesson a second time (§7).
+
+**Two bugs only a picture could have caught.** The rendered previews now walk
+all the way to a person, and showed a lifespan reading `1940–1875` in Arabic —
+a run of digits taking its direction from the paragraph around it. And they
+showed the home screen titled `main`, the identifier webtrees routes on, when
+the tree calls itself `الموسى الصائغ` in the heading of its own page.
+
+Released as **0.2.0**. **234 tests** green (201 → 234; several existing ones had to be updated
+because signing in no longer lands on the account screen), analyzer clean, and `tool/live_check.dart` passes against
+`tree.almou.sa` — now reporting the tree's title, the language switch, and the
+same date in both calendars and each one alone.
+
 ---
 
 ## 8. Tooling
@@ -663,12 +775,14 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 
 # Exercise the app's own data layer end to end
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
+#   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 201 tests
+flutter test          # 234 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
+# Walks connect → sign-in → tree → person → account → settings.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -718,7 +832,11 @@ Both tools read the password from the terminal with echo disabled, or from
 7. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-8. **Nothing has run on a real device.** The screens can now be *seen* —
+8. **Nothing has run on a real device.** This is now the largest gap by some
+   way: three of the six things Phase 4a changed — resuming through the
+   biometric gate at launch, the Android back gesture, and the keystore that
+   makes resuming possible at all — are *device* behaviours that a widget test
+   can only approximate. The screens can be *seen* —
    `tool/preview/render_preview.dart` renders them with the real fonts — but
    secure storage, biometrics, backgrounding, session renewal and cleartext
    networking still cannot be validated without hardware. Sideloadable builds
@@ -726,16 +844,63 @@ Both tools read the password from the terminal with echo disabled, or from
    this is now waiting on a device rather than on the toolchain.
 9. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 **live end to end** — connect, sign in,
-   roles, search, opening a person, facts and relatives across 40 real records
-   — and 2.3.0-dev by source; both URL styles; both tab-route shapes; one
+   roles, search, opening a person, facts and relatives across 40 real records,
+   the language switch and the calendar structure of real dates — and
+   2.3.0-dev by source; both URL styles; both tab-route shapes; one
    private tree; the default theme; one non-stock tab module
    (`_vytux_cousins_`), which discovery handled without changes. Untested:
    non-default themes, subdirectory installs, multiple trees, media, and 2.3
    against a running server. This belongs in an explicit compatibility matrix
    before release.
-10. **The Android compile-SDK override** rewrites every plugin subproject
+10. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
+   on the `cal` parameter of the calendar links webtrees wraps each date in;
+   2.3's rewritten `Date::display` emits no links, so nothing states which
+   calendar a rendered date is in and the app shows both. Two further 2.3
+   observations, unverified against a running server: the conversion is
+   appended only when the date has a *second* part (`$this->date2 !== null`),
+   which would drop it from ordinary single dates; and it is bracketed rather
+   than parenthesised. Worth reproducing on a 2.3 install and reporting
+   upstream before building around it.
+11. **The app writes the account's language preference.** Aligning the server's
+   rendering language is the only way to get Arabic dates on a stock site
+   (§3), and `SelectLanguage` sets the session *and* the user preference
+   together. So using the app in English changes what the website greets that
+   account with. Disclosed in the settings sheet; an optional module could
+   avoid it, nothing stock can.
+12. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
+
+---
+
+## 10. Finishing a milestone
+
+**Standing instruction, agreed 2026-08-22. Do this every time a milestone is
+finished, without being asked.** A milestone is a piece of work worth naming —
+a phase, or a batch of fixes that changes what the app does. Not every edit.
+
+1. **Bump the version**, in `pubspec.yaml` *and* `kAppVersion` in
+   `core/webtrees_client.dart`. Both, always: they have drifted apart before,
+   and the User-Agent is what a site administrator reads in their access log.
+   `test/core/version_test.dart` fails if only one moves.
+   - `0.1.0` — new behaviour, a phase, anything a user would notice.
+   - `0.0.1` — fixes, refactors, documentation, tests.
+   - Raise the build number (`+N`) too, or Android will refuse the upgrade.
+2. **Update this document.** The status table in §5, an entry in the progress
+   log (§6) saying what changed and *why* — not a changelog — plus §3 for
+   anything newly confirmed against a real server, §7 for a bug worth the
+   lesson, and §9 for a risk that opened or closed.
+3. **Verify.** `flutter analyze`, `flutter test`, and — after any change to the
+   transport or the parsers — `tool/live_check.dart` against a real instance.
+   Bug #5 was invisible to unit tests, and bugs 14–16 were invisible to 185 of
+   them.
+4. **Build the APKs.** `flutter build apk --release --split-per-abi`. It is the
+   only thing that exercises the release toolchain, and four separate Android
+   packaging problems in §3 each failed silently or only on a device.
+5. **Commit**, with a message that says what changed and why it mattered.
+
+Release builds are still signed with Flutter's debug key (§3), so the version
+number is for the log and the upgrade check, not yet for distribution.

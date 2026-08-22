@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
+import 'package:webtrees_mobile/data/settings_store.dart';
+
+import 'package:webtrees_mobile/domain/dates.dart';
 
 import '../support/fake_webtrees.dart';
 import '../support/test_app.dart';
@@ -29,6 +32,7 @@ String searchJson(String query) => jsonEncode({
 void main() {
   late FakeWebtrees server;
   late SessionManager session;
+  late SettingsStore settings;
 
   Map<String, Canned Function(Sent)> browsableSite() => {
     ...workingSite(),
@@ -62,11 +66,12 @@ void main() {
 
   Future<void> signIn(WidgetTester tester) async {
     server = FakeWebtrees(browsableSite());
-    session = sessionManagerFor(server);
+    settings = testSettings();
+    session = sessionManagerFor(server, settings: settings);
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: testSettings()),
+      WebtreesMobileApp(session: session, settings: settings),
     );
     await tester.pumpAndSettle();
 
@@ -195,6 +200,98 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(server.routes, contains('/tree/main/individual/X7'));
+  });
+
+  testWidgets('the system back button returns to the previous person', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('محمد الموسى'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('محمد الموسى'));
+    await tester.pumpAndSettle();
+
+    // This is what Android's back gesture does. It used to leave the app
+    // outright, because the person route was declared beside the search route
+    // rather than inside it, so navigating built a stack one page deep.
+    expect(await WidgetsBinding.instance.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    // The page comes back as it was left, scrolled where the reader had it,
+    // so the name has to be scrolled back up to.
+    await tester.scrollUntilVisible(
+      find.text('عبد الله الموسى'),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('عبد الله الموسى'), findsOne);
+
+    expect(await WidgetsBinding.instance.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Search for a person'), findsOne);
+  });
+
+  testWidgets('someone with no photo is drawn as their initial', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+
+    // Most people in a real tree have no photograph, so this placeholder is
+    // what the reader sees most: a wall of identical silhouettes tells them
+    // nothing about who is who.
+    expect(find.text('ع'), findsOne);
+  });
+
+  testWidgets('names the tree the way the family does', (tester) async {
+    await openTree(tester);
+
+    // `main` is the identifier webtrees routes on, and this screen is the
+    // app's home. The title is what the family calls the tree.
+    expect(find.text('Family tree'), findsOne);
+    expect(find.text('main'), findsNothing);
+  });
+
+  testWidgets('asks the site to write in the app’s language', (tester) async {
+    await openTree(tester);
+
+    // The site writes the dates, the month names and the fact labels, and it
+    // writes them in the language held in its own session — seeded from the
+    // account's preference, not from anything the app sent. So the app has to
+    // say which language it is reading in, or an Arabic screen fills with
+    // English dates.
+    expect(server.routes, contains('/language/en-GB'));
+  });
+
+  testWidgets('a change of language reaches the site too', (tester) async {
+    await openTree(tester);
+
+    await settings.setLocale(const Locale('ar'));
+    await tester.pumpAndSettle();
+
+    expect(server.routes, contains('/language/ar'));
+  });
+
+  testWidgets('shows one calendar when the reader picks one', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('٢١ ذو القعدة ١٣١٨'), findsOne);
+
+    await settings.setCalendarView(CalendarView.gregorian);
+    await tester.pumpAndSettle();
+
+    // The record is not fetched again: the site already sent both calendars,
+    // and which of them to show is the reader's business, not the server's.
+    expect(find.textContaining('١٢ مارس ١٩٠١'), findsOne);
+    expect(find.textContaining('٢١ ذو القعدة ١٣١٨'), findsNothing);
   });
 
   testWidgets('fetches photos over the signed-in session', (tester) async {

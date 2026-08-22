@@ -38,13 +38,15 @@ class AccessProbe {
 
     final trees = <TreeAccess>[];
     for (final name in names) {
+      final page = await _readTreePage(name);
       trees.add(
         TreeAccess(
           name: name,
           role: isAdministrator
               ? TreeRole.administrator
               : await _probeRole(name),
-          myXref: await _myXref(name),
+          title: page.title,
+          myXref: page.myXref,
         ),
       );
     }
@@ -167,23 +169,52 @@ class AccessProbe {
     }
   }
 
-  /// Finds the individual record this user is linked to within [tree].
+  /// Reads what the tree's own page says about itself.
   ///
-  /// The account page renders it in a disabled control with no value, so the
-  /// only place the XREF appears is the "My individual record" menu link.
-  Future<String?> _myXref(String tree) async {
+  /// Two things live there and nowhere else the app can reach. The XREF of
+  /// the user's own record appears only in the "My individual record" menu
+  /// link — the account page renders it in a disabled control with no value.
+  /// And the tree's title appears only as the site heading: the menu that
+  /// carries titles is rendered only when a site allows switching trees, and
+  /// a site with one tree does not.
+  ///
+  /// Both are best-effort. A theme is free to lay its header out differently,
+  /// and losing either costs a label, not a capability.
+  Future<({String? title, String? myXref})> _readTreePage(String tree) async {
     try {
       final reply = await _client.get('/tree/$tree');
-      final match = RegExp(
+      if (!reply.isOk) return (title: null, myXref: null);
+
+      final link = RegExp(
         r'<a[^>]*href="([^"]*)"[^>]*class="[^"]*menu-myrecord',
       ).firstMatch(reply.body);
-      if (match == null) return null;
+      final route = link == null
+          ? null
+          : _client.url.routeOf(_unescape(link.group(1)!));
 
-      final route = _client.url.routeOf(_unescape(match.group(1)!));
-      return RegExp(r'/individual/([^/?&#]+)').firstMatch(route)?.group(1);
+      return (
+        title: _siteTitle(reply.body),
+        myXref: route == null
+            ? null
+            : RegExp(r'/individual/([^/?&#]+)').firstMatch(route)?.group(1),
+      );
     } on WebtreesError {
-      return null;
+      return (title: null, myXref: null);
     }
+  }
+
+  /// The tree's title, as the default layout prints it.
+  static String? _siteTitle(String html) {
+    final match = RegExp(
+      r'<h1[^>]*class="[^"]*wt-site-title[^"]*"[^>]*>(.*?)</h1>',
+      dotAll: true,
+    ).firstMatch(html);
+    if (match == null) return null;
+
+    final title = _unescape(
+      match.group(1)!.replaceAll(RegExp('<[^>]+>'), ' '),
+    ).replaceAll(RegExp(r'\s+'), ' ').trim();
+    return title.isEmpty ? null : title;
   }
 
   static String? _field(String html, String name) {

@@ -242,10 +242,12 @@ class SessionManager extends ChangeNotifier {
 
   /// Tells the server which language to render in, if anything is listening.
   ///
-  /// Safe to call whenever the reader changes language; it does nothing when
-  /// nobody is signed in, and the next sign-in will carry the new choice.
+  /// Safe to call whenever any setting changes: it does nothing when nobody is
+  /// signed in, and nothing when the server already has this language — so
+  /// switching the theme does not cost a request.
   Future<void> syncContentLanguage() async {
     if (!isSignedIn) return;
+    if (contentLanguage?.call() == _appliedLanguage) return;
     await _applyContentLanguage();
   }
 
@@ -316,6 +318,10 @@ class SessionManager extends ChangeNotifier {
 
   static const String _log = 'webtrees.session';
 
+  /// The language the server was last told, so a settings change that is not
+  /// a language change costs nothing.
+  String? _appliedLanguage;
+
   /// Aligns the server's rendering language with the app's.
   ///
   /// webtrees renders dates, month names and fact labels in the language held
@@ -330,12 +336,16 @@ class SessionManager extends ChangeNotifier {
 
     try {
       await session.useLanguage(tag);
+      _appliedLanguage = tag;
     } on WebtreesError catch (problem) {
       developer.log(
         'Could not set the server language: ${problem.message}',
         name: _log,
         level: 900,
       );
+      // A failed attempt must not be remembered as done, or the next change
+      // of language would be skipped as redundant.
+      _appliedLanguage = null;
     }
   }
 

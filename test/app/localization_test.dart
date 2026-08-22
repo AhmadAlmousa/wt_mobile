@@ -7,6 +7,7 @@ import 'package:webtrees_mobile/app/theme.dart';
 import 'package:webtrees_mobile/core/errors.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
 import 'package:webtrees_mobile/domain/notice.dart';
+import 'package:webtrees_mobile/features/shared/bidi.dart';
 import 'package:webtrees_mobile/features/shared/messages.dart';
 import 'package:webtrees_mobile/l10n/app_localizations.dart';
 
@@ -90,6 +91,30 @@ void main() {
         Directionality.of(tester.element(find.byType(Scaffold).first)),
         TextDirection.ltr,
       );
+    });
+  });
+
+  group('isolating a Latin run', () {
+    test('a lifespan keeps its order inside Arabic text', () {
+      // Every character of "1875–1940" is a digit or a dash, so the
+      // bidirectional algorithm takes its direction from the paragraph around
+      // it. In Arabic that renders as 1940–1875, and the person appears to
+      // have died before they were born.
+      final isolated = ltrRun('1875–1940');
+      expect(isolated, startsWith('\u2066'));
+      expect(isolated, endsWith('\u2069'));
+      expect(isolated, contains('1875–1940'));
+    });
+
+    test('a name is left to find its own direction', () {
+      // A second recorded name may be Arabic or romanized, and only the text
+      // itself can say which.
+      expect(isolatedRun('Abdullah'), startsWith('\u2068'));
+    });
+
+    test('nothing is wrapped around nothing', () {
+      expect(ltrRun(null), isEmpty);
+      expect(isolatedRun(''), isEmpty);
     });
   });
 

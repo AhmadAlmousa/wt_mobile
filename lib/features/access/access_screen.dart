@@ -31,14 +31,18 @@ class AccessScreen extends StatefulWidget {
 
   /// Opens a tree for browsing. Reading is available to every role, so this is
   /// offered whatever the badges on the card say.
-  final void Function(String tree) onBrowseTree;
+  ///
+  /// Carries the tree's own title as well as its name, because the name is
+  /// the identifier webtrees routes on — often something like `main` — and
+  /// the title is what the family calls it.
+  final void Function(String name, String? title) onBrowseTree;
 
   /// Called when the account can reach exactly one tree.
   ///
   /// A list of one is not a choice, so the app goes straight in. The screen
   /// itself stays reachable — it doubles as the diagnostics view — which is
   /// why this is a separate callback the shell can decline to act on.
-  final void Function(String tree) onOnlyTree;
+  final void Function(String name, String? title) onOnlyTree;
 
   @override
   State<AccessScreen> createState() => _AccessScreenState();
@@ -62,7 +66,8 @@ class _AccessScreenState extends State<AccessScreen> {
             // chance to label the connection for next time.
             await widget.session.noteAccountName(summary.account.realName);
             if (summary.trees.length == 1 && mounted) {
-              widget.onOnlyTree(summary.trees.single.name);
+              final only = summary.trees.single;
+              widget.onOnlyTree(only.name, only.title);
             }
             return summary;
           });
@@ -98,14 +103,13 @@ class _AccessScreenState extends State<AccessScreen> {
             tooltip: text.settings,
             onPressed: () => SettingsSheet.show(context, widget.settings),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: text.signOut,
-            onPressed: _signOut,
-          ),
+          // Signing out lives in the menu rather than on the bar: this screen
+          // is now reached with a back button in the leading slot, and five
+          // controls left no room for the title.
           PopupMenuButton<void>(
             tooltip: text.more,
             itemBuilder: (context) => [
+              PopupMenuItem<void>(onTap: _signOut, child: Text(text.signOut)),
               PopupMenuItem<void>(
                 onTap: _forgetSite,
                 child: Text(text.forgetThisSite),
@@ -161,7 +165,7 @@ class _AccessScreenState extends State<AccessScreen> {
                   for (final tree in summary.trees)
                     _TreeCard(
                       tree: tree,
-                      onOpen: () => widget.onBrowseTree(tree.name),
+                      onOpen: () => widget.onBrowseTree(tree.name, tree.title),
                     ),
                   for (final warning in summary.warnings) ...[
                     const SizedBox(height: 12),

@@ -30,9 +30,17 @@ SessionManager sessionManagerFor(
   FakeWebtrees server, {
   SecretStore? secrets,
   UnlockGate gate = const OpenGate(),
+  SettingsStore? settings,
 }) => SessionManager(
   CredentialStore(secrets ?? MemorySecretStore(), gate),
   clientFactory: clientFactoryFor(server),
+  // Wired the same way the composition root wires it, so a test can prove the
+  // app tells the server which language to render in.
+  contentLanguage: settings == null
+      ? null
+      : () => SettingsStore.webtreesLanguageTag(
+          settings.resolve(const Locale('en')),
+        ),
   // Keep-alive is exercised separately; a live timer would outlast the
   // widget tree and trip the test binding's pending-timer check.
   keepAliveInterval: Duration.zero,
@@ -89,6 +97,7 @@ Map<String, Canned Function(Sent)> workingSite({
 
   const treeHome = '''
 <html><body>
+<h1 class="col wt-site-title">Family tree</h1>
 <a href="/tree/main" class="dropdown-item menu-tree-1">Family tree</a>
 <a href="/tree/main/individual/X42/slug" class="menu-myrecord">My record</a>
 </body></html>''';
@@ -113,6 +122,10 @@ Map<String, Canned Function(Sent)> workingSite({
       signedIn = false;
       return const Canned(204);
     },
+    // Exempt from the CSRF check in both supported versions, and answers 204.
+    // What the app sent is read back from the recorded requests.
+    for (final tag in const ['ar', 'en-GB', 'en-US'])
+      '/language/$tag': (_) => const Canned(204),
     '/my-account': (_) => signedIn
         ? const Canned(200, body: accountPage)
         : const Canned(302, location: 'https://host/login'),

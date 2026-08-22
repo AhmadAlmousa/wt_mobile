@@ -49,6 +49,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the account screen from wherever signing in landed.
+  ///
+  /// An account that can reach one tree goes straight into it, so what the
+  /// app knows about the site and the role is one tap away rather than the
+  /// first thing anybody sees.
+  Future<void> openAccount(WidgetTester tester) async {
+    final account = find.byTooltip('Your account');
+    if (account.evaluate().isNotEmpty) {
+      await tester.tap(account);
+      await tester.pumpAndSettle();
+    }
+  }
+
   group('connect', () {
     testWidgets('starts by asking for a site address', (tester) async {
       await launch(tester);
@@ -102,12 +115,11 @@ void main() {
   });
 
   group('sign in', () {
-    testWidgets('reaches the access screen with correct credentials', (
-      tester,
-    ) async {
+    testWidgets('signs in and shows who is signed in', (tester) async {
       await launch(tester);
       await connect(tester);
       await signIn(tester);
+      await openAccount(tester);
 
       expect(find.text('Your access'), findsOne);
       expect(find.text('Mobile Client'), findsOne);
@@ -155,6 +167,7 @@ void main() {
       await launch(tester);
       await connect(tester);
       await signIn(tester);
+      await openAccount(tester);
 
       expect(find.text('Member'), findsOne);
       expect(find.textContaining('including living relatives'), findsOne);
@@ -168,6 +181,7 @@ void main() {
       await launch(tester, site: workingSite(administrator: true));
       await connect(tester);
       await signIn(tester);
+      await openAccount(tester);
 
       expect(find.text('Site administrator'), findsOne);
       expect(find.text('Administrator'), findsOne);
@@ -178,8 +192,11 @@ void main() {
       await launch(tester);
       await connect(tester);
       await signIn(tester);
+      await openAccount(tester);
 
-      await tester.tap(find.byTooltip('Sign out'));
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
 
       expect(find.text('Connect to your family tree'), findsOne);
@@ -208,16 +225,54 @@ void main() {
       await launch(tester, secrets: secrets);
       await connect(tester);
       await signIn(tester);
-      expect(find.text('Your access'), findsOne);
+      expect(find.text('Search for a person'), findsOne);
 
       await launch(tester, secrets: secrets);
-      await tester.tap(find.text('host'));
-      await tester.pumpAndSettle();
 
-      // This is the whole promise of "stay signed in": no address to retype,
-      // no password to re-enter, straight to the content.
-      expect(find.text('Your access'), findsOne);
+      // This is the whole promise of "stay signed in", and it has to cost
+      // nothing: no address to retype, no site to pick out of a list of one,
+      // no password to re-enter. Straight into the family tree.
+      expect(find.text('Search for a person'), findsOne);
+      expect(find.text('Connect to your family tree'), findsNothing);
       expect(find.text('Sign in'), findsNothing);
+    });
+
+    testWidgets('offers the address it used last when it cannot resume', (
+      tester,
+    ) async {
+      final secrets = MemorySecretStore();
+      await launch(tester, secrets: secrets);
+      await connect(tester);
+      await signIn(tester);
+
+      await launch(tester, secrets: secrets);
+
+      // Nothing could be resumed, so the form is right — but it should not be
+      // empty. The address is almost always the same one as last time.
+      final field = tester.widget<TextFormField>(find.byType(TextFormField));
+      expect(field.controller?.text, contains('host'));
+    });
+
+    testWidgets('asks only for the password when the site is known', (
+      tester,
+    ) async {
+      // A stored password that has stopped working leaves the app connected
+      // but signed out. It knows the address perfectly well by then, so
+      // asking for it again would be asking a question it can answer itself.
+      final secrets = FakeKeystore();
+      await launch(tester, secrets: secrets);
+      await connect(tester);
+      await signIn(tester);
+
+      await launch(
+        tester,
+        site: workingSite(password: 'changed'),
+        secrets: secrets,
+      );
+
+      expect(find.widgetWithText(FilledButton, 'Sign in'), findsOne);
+      expect(find.text('Connect to your family tree'), findsNothing);
+      expect(find.textContaining('was not accepted'), findsOne);
     });
 
     testWidgets('asks for the password when none could be kept', (
@@ -236,7 +291,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(FilledButton, 'Sign in'), findsOne);
-      expect(find.text('Your access'), findsNothing);
+      expect(find.text('Search for a person'), findsNothing);
     });
   });
 }

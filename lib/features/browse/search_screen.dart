@@ -7,6 +7,7 @@ import '../../data/session_manager.dart';
 import '../../data/stock/records_repository.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/bidi.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import 'authenticated_image.dart';
@@ -24,12 +25,19 @@ class SearchScreen extends StatefulWidget {
     required this.tree,
     required this.onOpenPerson,
     required this.onShowAccount,
+    this.title,
     super.key,
   });
 
   final SessionManager session;
   final RecordsRepository records;
   final String tree;
+
+  /// What the family calls this tree, when the app was told.
+  ///
+  /// `tree` is the identifier webtrees routes on — often `main` — which is a
+  /// poor name for what is usually the app's home screen.
+  final String? title;
   final void Function(String xref) onOpenPerson;
 
   /// Opens the account screen.
@@ -110,7 +118,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.tree),
+        title: Text(widget.title ?? widget.tree),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
@@ -196,7 +204,11 @@ class _SearchScreenState extends State<SearchScreen> {
               size: 48,
             ),
             title: Text(person.name),
-            subtitle: person.lifespan == null ? null : Text(person.lifespan!),
+            // Isolated, or the Arabic layout around it reads 1875–1940 back
+            // to front and the person dies before they are born.
+            subtitle: person.lifespan == null
+                ? null
+                : Text(ltrRun(person.lifespan)),
             onTap: () => widget.onOpenPerson(person.xref),
           ),
         );

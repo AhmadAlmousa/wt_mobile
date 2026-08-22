@@ -1,9 +1,11 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/core/errors.dart';
 import 'package:webtrees_mobile/core/unlock_gate.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/credential_store.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
+import 'package:webtrees_mobile/data/settings_store.dart';
 
 import '../support/fake_site.dart';
 import '../support/fake_webtrees.dart';
@@ -304,6 +306,114 @@ void main() {
       expect(manager.isSignedIn, isFalse);
       expect(manager.stage, ConnectionStage.disconnected);
       expect(() => manager.client, throwsStateError);
+    });
+  });
+
+  group('rendering language', () {
+    SessionManager managerSpeaking(String tag) => SessionManager(
+      CredentialStore(secrets, const OpenGate()),
+      clientFactory: clientFactoryFor(server),
+      contentLanguage: () => tag,
+      keepAliveInterval: Duration.zero,
+    );
+
+    test('tells the server which language to render in', () async {
+      final manager = managerSpeaking('ar');
+      addTearDown(manager.dispose);
+      await manager.connect('host');
+      await manager.signIn('mobile', 'correct');
+
+      // webtrees seeds its session language from the account preference, so
+      // without this an Arabic app reads English dates off an Arabic tree.
+      expect(site.language, 'ar');
+      expect(server.routes, contains('/language/ar'));
+    });
+
+    test('says so again after the session had to be renewed', () async {
+      final manager = managerSpeaking('ar');
+      addTearDown(manager.dispose);
+      await manager.connect('host');
+      await manager.signIn('mobile', 'correct');
+
+      // A renewed session is a new session, and it starts in the account's
+      // own language again.
+      site.expire();
+      await manager.withSession(
+        () async => AccessProbe(manager.client).describe(),
+      );
+
+      expect(site.language, 'ar');
+    });
+
+    test('does not fail a sign-in when the language cannot be set', () async {
+      // An unknown tag 404s on this fake, as any route webtrees does not have
+      // would. Reading a little of the record in the wrong language is not
+      // worth refusing to sign somebody in over.
+      final manager = managerSpeaking('kl');
+      addTearDown(manager.dispose);
+      await manager.connect('host');
+
+      expect(await manager.signIn('mobile', 'correct'), isTrue);
+      expect(manager.error, isNull);
+    });
+
+    test('a change of language reaches the server', () async {
+      var tag = 'ar';
+      final manager = SessionManager(
+        CredentialStore(secrets, const OpenGate()),
+        clientFactory: clientFactoryFor(server),
+        contentLanguage: () => tag,
+        keepAliveInterval: Duration.zero,
+      );
+      addTearDown(manager.dispose);
+      await manager.connect('host');
+      await manager.signIn('mobile', 'correct');
+      expect(site.language, 'ar');
+
+      // Changing it mid-session has to travel too, or the reader switches the
+      // app to English and half the record stays in Arabic.
+      tag = 'en-GB';
+      await manager.syncContentLanguage();
+
+      expect(site.language, 'en-GB');
+    });
+
+    test('does not repeat itself when nothing changed', () async {
+      final manager = managerSpeaking('ar');
+      addTearDown(manager.dispose);
+      await manager.connect('host');
+      await manager.signIn('mobile', 'correct');
+
+      // Every settings change asks, including a change of theme. Asking twice
+      // for the same language would spend a request on someone else's server
+      // for nothing.
+      await manager.syncContentLanguage();
+      await manager.syncContentLanguage();
+
+      expect(server.routes.where((r) => r == '/language/ar').length, 1);
+    });
+
+    test('says nothing when nobody is signed in', () async {
+      var tag = 'ar';
+      final manager = SessionManager(
+        CredentialStore(secrets, const OpenGate()),
+        clientFactory: clientFactoryFor(server),
+        contentLanguage: () => tag,
+        keepAliveInterval: Duration.zero,
+      );
+      addTearDown(manager.dispose);
+
+      tag = 'en-GB';
+      await manager.syncContentLanguage();
+
+      expect(server.routes, isNot(contains('/language/en-GB')));
+    });
+
+    test('maps the app’s languages onto webtrees’ own tags', () {
+      // British English, not American: it orders a date day-first, as Arabic
+      // does, and this app’s first real tree is Arabic.
+      expect(SettingsStore.webtreesLanguageTag(const Locale('ar')), 'ar');
+      expect(SettingsStore.webtreesLanguageTag(const Locale('en')), 'en-GB');
     });
   });
 }

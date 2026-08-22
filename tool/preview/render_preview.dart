@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,40 @@ import '../../test/support/test_app.dart';
 /// ```
 /// flutter test tool/preview/render_preview.dart --update-goldens
 /// ```
+/// A site with enough content to photograph the browsing screens.
+///
+/// The fixtures are the same ones the parser tests run against, so what these
+/// pictures show is what the parsers actually produce.
+Map<String, Canned Function(Sent)> _browsableSite() {
+  String fixture(String name) =>
+      File('test/fixtures/v2_2_6/$name').readAsStringSync();
+
+  return {
+    ...workingSite(),
+    '/tree/main/tom-select-individual': (request) => Canned(
+      200,
+      contentType: 'application/json',
+      body: jsonEncode({
+        'data': [
+          {
+            'value': 'X42',
+            'text':
+                '<span class="NAME" dir="auto">عبد الله '
+                '<span class="SURN">الموسى</span></span>, 1901–1974',
+          },
+        ],
+        'nextUrl': null,
+      }),
+    ),
+    '/tree/main/individual/X42': (_) =>
+        Canned(200, body: fixture('individual_page.html')),
+    '/module/personal_facts/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_personal_facts.html')),
+    '/module/relatives/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_relatives.html')),
+  };
+}
+
 Future<void> main() async {
   const output = 'build/preview';
 
@@ -31,16 +66,17 @@ Future<void> main() async {
     // — which would make the whole exercise misleading rather than merely
     // incomplete.
     for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
-      await (FontLoader('Cairo')..addFont(
-        _bytesOf('assets/fonts/Cairo-$weight.ttf'),
-      )).load();
+      await (FontLoader(
+        'Cairo',
+      )..addFont(_bytesOf('assets/fonts/Cairo-$weight.ttf'))).load();
     }
     await (FontLoader('MaterialIcons')..addFont(
-      _bytesOf(
-        '${Platform.environment['FLUTTER_ROOT'] ?? '/home/ahmad/flutter'}'
-        '/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
-      ),
-    )).load();
+          _bytesOf(
+            '${Platform.environment['FLUTTER_ROOT'] ?? '/home/ahmad/flutter'}'
+            '/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+          ),
+        ))
+        .load();
 
     Directory(output).createSync(recursive: true);
   });
@@ -58,15 +94,13 @@ Future<void> main() async {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
-    final server = FakeWebtrees(workingSite());
-    final session = sessionManagerFor(server);
+    final server = FakeWebtrees(_browsableSite());
+    final settings = testSettings(locale: locale, theme: theme);
+    final session = sessionManagerFor(server, settings: settings);
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(
-        session: session,
-        settings: testSettings(locale: locale, theme: theme),
-      ),
+      WebtreesMobileApp(session: session, settings: settings),
     );
     await tester.pumpAndSettle();
 
@@ -84,7 +118,25 @@ Future<void> main() async {
       await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
     }
+    // Signing in lands in the tree, because this account can reach exactly
+    // one — so the account screen is a step further in, not a step back.
     if (steps >= 3) {
+      await tester.enterText(find.byType(TextField), 'الموسى');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('عبد الله الموسى'));
+      await tester.pumpAndSettle();
+    }
+    if (steps >= 4) {
+      // The Android back gesture, which is how anyone actually leaves this
+      // screen. `pageBack()` hunts for a back button and finds none here.
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      await WidgetsBinding.instance.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.account_circle_outlined));
+      await tester.pumpAndSettle();
+    }
+    if (steps >= 5) {
       await tester.tap(find.byIcon(Icons.tune));
       await tester.pumpAndSettle();
     }
@@ -102,23 +154,62 @@ Future<void> main() async {
       (ThemeMode.dark, 'dark'),
     ]) {
       testWidgets('connect $tag $mode', (tester) async {
-        await capture(tester, 'connect-$tag-$mode',
-            locale: locale, theme: theme);
+        await capture(
+          tester,
+          'connect-$tag-$mode',
+          locale: locale,
+          theme: theme,
+        );
       });
 
       testWidgets('sign-in $tag $mode', (tester) async {
-        await capture(tester, 'signin-$tag-$mode',
-            locale: locale, theme: theme, steps: 1);
+        await capture(
+          tester,
+          'signin-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 1,
+        );
+      });
+
+      testWidgets('tree $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'tree-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 2,
+        );
+      });
+
+      testWidgets('person $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'person-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 3,
+        );
       });
 
       testWidgets('access $tag $mode', (tester) async {
-        await capture(tester, 'access-$tag-$mode',
-            locale: locale, theme: theme, steps: 2);
+        await capture(
+          tester,
+          'access-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 4,
+        );
       });
 
       testWidgets('settings $tag $mode', (tester) async {
-        await capture(tester, 'settings-$tag-$mode',
-            locale: locale, theme: theme, steps: 3);
+        await capture(
+          tester,
+          'settings-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 5,
+        );
       });
     }
   }

@@ -23,6 +23,7 @@ import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/data/session.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
+import 'package:webtrees_mobile/domain/dates.dart';
 import 'package:webtrees_mobile/domain/records.dart';
 
 Future<void> main(List<String> args) async {
@@ -35,7 +36,7 @@ Future<void> main(List<String> args) async {
   if (address == null) {
     stderr.writeln(
       'Usage: dart run tool/live_check.dart --url HOST '
-      '[--user NAME] [--search TERM]',
+      '[--user NAME] [--search TERM] [--language TAG]',
     );
     exitCode = 64;
     return;
@@ -106,6 +107,14 @@ Future<void> main(List<String> args) async {
     );
     report('session survives a fresh request', await session.isSignedIn());
 
+    // The site writes the dates and the fact labels, in the language held in
+    // its own session — which it seeds from the account's preference, not from
+    // anything the app sent. Nothing else the app does can change that.
+    stdout.writeln('\n=== Language ===');
+    final language = options['language'] ?? 'ar';
+    await session.useLanguage(language);
+    report('server asked to render in', language);
+
     stdout.writeln('\n=== Access ===');
     final access = await AccessProbe(client).describe();
     report('account', access.account.displayName);
@@ -114,7 +123,7 @@ Future<void> main(List<String> args) async {
     for (final tree in access.trees) {
       report(
         'tree "${tree.name}"',
-        '${tree.role.name}'
+        '${tree.title ?? '(no title read)'} · ${tree.role.name}'
             '${tree.myXref == null ? '' : ' · own record ${tree.myXref}'}'
             ' · edit=${tree.role.canEdit}'
             ' moderate=${tree.role.canModerate}'
@@ -177,6 +186,10 @@ Future<void> main(List<String> args) async {
           stdout.writeln('  WARN  $warning');
         }
 
+        // Facts, and therefore dates, are what the calendar choice acts on —
+        // so if this record has none, find someone who does rather than
+        // reporting a skip that proves nothing.
+        var dateSource = person;
         if (person.facts.isEmpty) {
           IndividualRecord? withFacts;
           for (final candidate in found.people.take(10)) {
@@ -193,6 +206,42 @@ Future<void> main(List<String> args) async {
                 : '${withFacts.xref} — ${withFacts.facts.length} fact(s)',
             ok: withFacts != null,
           );
+          if (withFacts != null) dateSource = withFacts;
+        }
+
+        // Choosing a calendar means reading which calendar each rendered date
+        // is in, and on a stock site the only place that is stated is the
+        // `cal` parameter of the calendar links webtrees wraps dates in.
+        final dated = dateSource.facts
+            .where((fact) => fact.date != null)
+            .map((fact) => fact.date!)
+            .toList();
+        if (dated.isEmpty) {
+          stdout.writeln('  SKIP  no dated fact on this record');
+        } else {
+          final named = dated
+              .expand((date) => date.pieces)
+              .whereType<DateValue>()
+              .where((value) => value.calendar != DateCalendar.unknown);
+          report(
+            'dates naming their calendar',
+            '${named.length} of ${dated.length} dated fact(s) — '
+                '${named.map((v) => v.calendar.name).toSet().join(', ')}',
+            ok: named.isNotEmpty,
+          );
+
+          final sample = dated.firstWhere(
+            (date) => date.pieces.whereType<DateValue>().any(
+              (value) => value.conversions.isNotEmpty,
+            ),
+            orElse: () => dated.first,
+          );
+          report('date, both calendars', sample.display(CalendarView.both));
+          report(
+            'date, gregorian only',
+            sample.display(CalendarView.gregorian),
+          );
+          report('date, hijri only', sample.display(CalendarView.hijri));
         }
 
         final photo = person.thumbnailUrl;
