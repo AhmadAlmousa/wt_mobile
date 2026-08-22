@@ -23,6 +23,7 @@ import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/data/session.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
+import 'package:webtrees_mobile/domain/records.dart';
 
 Future<void> main(List<String> args) async {
   final options = <String, String>{};
@@ -156,11 +157,13 @@ Future<void> main(List<String> args) async {
         report('opened', '$xref — ${person.name}');
         report('alternate name', person.alternateName ?? '(none)');
 
+        // A person with no facts is valid data, not a parser failure — this
+        // tree has plenty. So an empty record is reported, and the parser is
+        // then exercised against someone who does have facts.
         final secondary = person.facts.length - person.primaryFacts.length;
         report(
           'facts',
           '${person.primaryFacts.length} primary, $secondary secondary',
-          ok: person.facts.isNotEmpty,
         );
         report(
           'families',
@@ -172,6 +175,24 @@ Future<void> main(List<String> args) async {
         );
         for (final warning in person.warnings) {
           stdout.writeln('  WARN  $warning');
+        }
+
+        if (person.facts.isEmpty) {
+          IndividualRecord? withFacts;
+          for (final candidate in found.people.take(10)) {
+            final other = await records.individual(tree.name, candidate.xref);
+            if (other.facts.isNotEmpty) {
+              withFacts = other;
+              break;
+            }
+          }
+          report(
+            'facts parsed for someone who has them',
+            withFacts == null
+                ? 'no one in the first 10 results had any'
+                : '${withFacts.xref} — ${withFacts.facts.length} fact(s)',
+            ok: withFacts != null,
+          );
         }
 
         final photo = person.thumbnailUrl;

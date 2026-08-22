@@ -32,11 +32,16 @@ void main() {
 
   Map<String, Canned Function(Sent)> browsableSite() => {
     ...workingSite(),
-    '/tree/main/tom-select-individual': (request) => Canned(
-      200,
-      body: searchJson(request.query['query'] ?? ''),
-      contentType: 'application/json',
-    ),
+    // `at` is required by the real handler; a fake that ignores it hid a
+    // 400 on every live search (bug 14).
+    '/tree/main/tom-select-individual': (request) =>
+        request.query['at'] != '' && request.query['at'] != '@'
+        ? const Canned(400, body: 'The parameter is missing.')
+        : Canned(
+            200,
+            body: searchJson(request.query['query'] ?? ''),
+            contentType: 'application/json',
+          ),
     '/tree/main/individual/X42': (_) =>
         Canned(200, body: fixture('individual_page.html')),
     '/tree/main/individual/X7': (_) => Canned(
@@ -45,9 +50,9 @@ void main() {
         'individual_page.html',
       ).replaceAll('عبد الله', 'محمد').replaceAll('xref=X42', 'xref=X7'),
     ),
-    '/module/personal_facts/Tab': (_) =>
+    '/module/personal_facts/Tab/main': (_) =>
         Canned(200, body: fixture('tab_personal_facts.html')),
-    '/module/relatives/Tab': (_) =>
+    '/module/relatives/Tab/main': (_) =>
         Canned(200, body: fixture('tab_relatives.html')),
     '/tree/main/media-thumbnail/M11/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
@@ -194,7 +199,7 @@ void main() {
   testWidgets('a lost section is named, not silently blank', (tester) async {
     server = FakeWebtrees({
       ...browsableSite(),
-      '/module/relatives/Tab': (_) => const Canned(403),
+      '/module/relatives/Tab/main': (_) => const Canned(403),
     });
     session = sessionManagerFor(server);
     addTearDown(session.dispose);

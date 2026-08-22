@@ -163,7 +163,11 @@ anonymous `/my-account`.
 ### Data availability on a stock instance
 
 - **No API exists.** `app/Http/Routes/ApiRoutes.php` is an empty placeholder.
-- The only useful JSON is `GET /tree/{t}/tom-select-individual?query=X&page=N`
+- The only useful JSON is
+  `GET /tree/{t}/tom-select-individual?at=&query=X&page=N`. **`at` is
+  required** — the handler validates it as `isInArray(['', '@'])->string('at')`
+  with no default, so omitting it is a `400`, not an empty result. Empty asks
+  for bare xrefs, `@` wraps them in GEDCOM pointer form
   — **search-as-you-type, not a list**. `AbstractTomSelectHandler` returns an
   empty collection unless `query` is non-empty, in both 2.2.6 and 2.3.0-dev, so
   it cannot enumerate a tree. It answers 50 per page plus a `nextUrl`.
@@ -180,13 +184,23 @@ anonymous `/my-account`.
   validating the signature, and picks watermarking per user. Images must
   therefore be fetched through the authenticated session, and any cache
   partitioned by site and account and cleared on sign-out.
+- **A record URL redirects when the slug is absent.** The route is
+  `/individual/{xref}{/slug}`, and the handler compares the given slug against
+  one derived from the record's current name, answering `301` to the canonical
+  URL otherwise. A search result carries only the xref, so this is the normal
+  path, not an edge case. Follow `301`/`308` once; a `302` is still the
+  middleware bouncing an expired session to the sign-in page. A bad xref is a
+  clean `404`.
 - Record detail comes from AJAX tab fragments (~10× less markup than a full
   page). **Do not build these URLs.** The individual page renders every tab it
   offers as `<a data-wt-href="…" href="#{module}">`, so the server states the
   exact URL, and which tabs this tree actually has. That matters twice over:
-  the route shape differs by version — `/module/{m}/Tab/{tree}` in 2.3 against
-  `/module/{m}/Tab?tree={t}` in 2.2.6 — and core tabs can be disabled or
-  access-restricted per tree.
+  core tabs can be disabled or access-restricted per tree, and a site can carry
+  custom tab modules (`tree.almou.sa` serves `_vytux_cousins_`). Both versions
+  route a tab as `/module/{m}/Tab/{tree}?xref={x}`; 2.2.6 additionally declares
+  `module-no-tree` (`/module/{m}/{action}`), so the tree may appear in the
+  query instead. **The `xref` query parameter is part of the URL** — dropping
+  it yields a 200 carrying `The parameter “xref” is missing.`
 - **The tab anchor has no `id` in 2.2.6**; 2.3 added `id="{module}-tab"`. Key
   on the `href="#{module}"` fragment, which both emit. A parser keyed on the id
   finds *no tabs at all* on 2.2.6 — the version the target server runs.
@@ -382,9 +396,17 @@ turned out to be decidable for private trees (§3).
 | 11 | Every non-`200` read as a definitive answer about the account | **External review** |
 | 12 | `tom-select-individual` documented as an enumeration API; it requires a query | **External review** |
 | 13 | Tab discovery keyed on an `id` that only 2.3 emits, so 2.2.6 found no tabs | **Two-version fixtures** |
+| 14 | Search omitted the required `at` parameter — every live search was a `400` | **Live run only** |
+| 15 | A record URL without its slug answers `301`; the app read that as a dead session | **Live run only** |
+| 16 | The 2.2.6 fixture's tab URLs were invented, not what a 2.2.6 server emits | **Live run only** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
-`tool/live_check.dart` current and run it after transport changes. Bug 7 is the
+`tool/live_check.dart` current and run it after transport changes. Bugs 14–16
+make the same point a second time and more sharply: 185 tests were green while
+**search was broken against every real webtrees instance**, because the fake
+server answered a request the real one rejects. A fake that is more permissive
+than the thing it stands for cannot fail. The fake now enforces `at` exactly as
+`AbstractTomSelectHandler` does. Bug 7 is the
 argument for widget tests carrying assertions about *copy*, not just structure.
 
 Bugs 9–12 share one cause, and it is the important lesson here: **the suite was
@@ -519,6 +541,41 @@ not set in this environment. Bug #5 was invisible to unit tests, so **run
 anonymous status codes the new privacy logic depends on *were* re-confirmed
 live, and the tool now exercises search, opening a person, the parsers and an
 authenticated photo fetch as well.
+
+### 2026-08-22 (later still) — Phase 3a verified against the live server
+
+`WEBTREES_PASSWORD` became available, so `tool/live_check.dart` ran
+authenticated for the first time since the Phase 2d and 3a transport changes.
+**It failed three times before it passed**, and every failure was a real defect
+that 185 green tests had not seen (bugs 14–16).
+
+| Found | Consequence |
+|---|---|
+| `tom-select-individual` needs `at` | Every search against a real site was a `400`. The endpoint the whole v1 browsing story rests on had never once succeeded |
+| `/individual/{xref}` answers `301` to the canonical slug URL | No person could be opened. The redirect was read as `SessionExpired`, so the app would have signed the user out instead |
+| The 2.2.6 fixture's tab URLs were invented | The documented "version difference" in tab routing did not exist; both versions use `/module/{m}/Tab/{tree}?xref={x}` |
+
+**Now passing end to end against `tree.almou.sa`:** connect, sign in, session
+rotation, roles, search (50 hits for `محمد`, more available), opening a person,
+Arabic names including an alternate name, facts, and relatives.
+
+**Checked more widely than the live check does.** Forty records were opened
+against real Arabic data: 27 had facts, all parsed, and no record produced a
+single parser warning. Records showing facts but no *primary* facts are honest
+— they hold only relatives' events (`Birth of a son`), which is exactly the
+primary/secondary split working.
+
+**What is still unproven, and why.** `tree.almou.sa` has **no media at all**
+(`/tree/main/media-list` returns a page with zero thumbnails), so the
+authenticated image path — `AuthenticatedImage`, `MediaCache`, and the
+`canShow()`-before-signature rule that motivated them — has never run against a
+real thumbnail. This is a limitation of the data, not of the code. It needs an
+instance that has media before it can be called verified.
+
+**A live site carries non-stock modules.** The target serves a custom
+`_vytux_cousins_` tab alongside the core ones. Discovery handled it without
+changes, which is the design working: the page states its tabs, the app does
+not guess.
 
 ---
 

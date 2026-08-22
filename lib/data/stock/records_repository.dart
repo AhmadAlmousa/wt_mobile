@@ -54,7 +54,17 @@ final class RecordsRepository {
 
     final reply = await _client.get(
       '/tree/$tree/tom-select-individual',
-      query: {'query': query.trim(), 'page': '$page'},
+      query: {
+        // `at` is required and has no default: the handler validates it with
+        // `isInArray(['', '@'])->string('at')`, so a missing value fails the
+        // rule and webtrees answers 400 rather than searching. Empty asks for
+        // bare xrefs; `@` would wrap them in GEDCOM pointer form. Dart renders
+        // an empty value as a bare `at`, which PHP reads as the empty string —
+        // confirmed 200 against live 2.2.6.
+        'at': '',
+        'query': query.trim(),
+        'page': '$page',
+      },
     );
     if (!reply.isOk) {
       throw failureFrom(reply, probe: 'searching $tree');
@@ -130,10 +140,10 @@ final class RecordsRepository {
   /// yields a record without relatives and a warning saying so, rather than a
   /// failure.
   Future<IndividualRecord> individual(String tree, String xref) async {
-    final reply = await _client.get('/tree/$tree/individual/$xref');
-    if (!reply.isOk) {
-      throw failureFrom(reply, probe: 'opening $xref');
-    }
+    final reply = await _fetchRecord(
+      '/tree/$tree/individual/$xref',
+      probe: 'opening $xref',
+    );
 
     final page = _parser.parseIndividualPage(reply.body, xref: xref);
     final warnings = <String>[];
@@ -152,6 +162,36 @@ final class RecordsRepository {
           : _parser.parseRelatives(relativesHtml, xref: xref),
       warnings: warnings,
     );
+  }
+
+  /// Fetches a record page, following webtrees' canonical-URL redirect.
+  ///
+  /// A record route is `/individual/{xref}{/slug}`, and the handler compares
+  /// the slug it was given against the one it derives from the record's
+  /// current name. A caller that knows only the xref — which is all a search
+  /// result carries — therefore gets `301` to the canonical URL rather than
+  /// the page. The slug cannot be computed here: it comes from the name as
+  /// the server has it, in the server's transliteration.
+  ///
+  /// Only a **permanent** redirect is followed, and only once. A `302` still
+  /// means the session is gone: that is the status middleware uses to bounce
+  /// an unauthenticated caller to the sign-in page, and following it would
+  /// turn an expiry into a confusing parse failure.
+  Future<Reply> _fetchRecord(String route, {required String probe}) async {
+    var reply = await _client.get(route);
+
+    if (reply.status == 301 || reply.status == 308) {
+      final target = _client.url.routeOf(reply.location ?? '');
+      if (target.isEmpty) {
+        throw failureFrom(reply, probe: probe);
+      }
+      reply = await _client.get(target);
+    }
+
+    if (!reply.isOk) {
+      throw failureFrom(reply, probe: probe);
+    }
+    return reply;
   }
 
   /// The markup of one tab, however the site chooses to deliver it.

@@ -34,6 +34,24 @@ String searchJson({required bool more}) => jsonEncode({
   'nextUrl': more ? '/tree/main/tom-select-individual?page=2' : null,
 });
 
+/// Answers like the real `AbstractTomSelectHandler`.
+///
+/// `at` is validated with `isInArray(['', '@'])->string('at')` and has no
+/// default, so a request that omits it is a 400 — not an empty result. The
+/// fake enforces that because the earlier one did not, and a live search
+/// against 2.2.6 failed while every test passed.
+Canned Function(Sent) tomSelect({required bool more}) => (request) {
+  final at = request.query['at'];
+  if (at != '' && at != '@') {
+    return const Canned(400, body: 'The parameter \u201cat\u201d is missing.');
+  }
+  return Canned(
+    200,
+    body: searchJson(more: more),
+    contentType: 'application/json',
+  );
+};
+
 void main() {
   late FakeWebtrees server;
   late RecordsRepository records;
@@ -53,25 +71,22 @@ void main() {
     );
   }
 
-  /// 2.3 routes a tab as `/module/{m}/Tab/{tree}`; 2.2.6 keeps the tree in the
-  /// query string. The app follows whichever URL the page handed it, so the
-  /// fake has to answer at both shapes.
-  String tabRoute(String module, String version) =>
-      version == 'v2_3' ? '/module/$module/Tab/main' : '/module/$module/Tab';
+  /// Both supported versions route a tab as `/module/{m}/Tab/{tree}` — 2.2.6
+  /// declares that shape first as `module-tree`, and a live 2.2.6 emits it.
+  /// The app never builds this URL, so the shape is the fixture's business
+  /// rather than the parser's; `follows a tab URL shaped as a query string`
+  /// covers the alternative `module-no-tree` route.
+  String tabRoute(String module) => '/module/$module/Tab/main';
 
   Map<String, Canned Function(Sent)> site({String version = 'v2_2_6'}) => {
-    '/tree/main/tom-select-individual': (request) => Canned(
-      200,
-      body: searchJson(more: false),
-      contentType: 'application/json',
-    ),
+    '/tree/main/tom-select-individual': tomSelect(more: false),
     '/tree/main/individual/X42': (_) =>
         Canned(200, body: fixture(version, 'individual_page.html')),
-    tabRoute('personal_facts', version): (_) =>
+    tabRoute('personal_facts'): (_) =>
         Canned(200, body: fixture(version, 'tab_personal_facts.html')),
-    tabRoute('relatives', version): (_) =>
+    tabRoute('relatives'): (_) =>
         Canned(200, body: fixture(version, 'tab_relatives.html')),
-    tabRoute('media', version): (_) => const Canned(200, body: '<div></div>'),
+    tabRoute('media'): (_) => const Canned(200, body: '<div></div>'),
   };
 
   group('search', () {
@@ -98,14 +113,19 @@ void main() {
     test('reports a further page when the server offers one', () async {
       serve({
         ...site(),
-        '/tree/main/tom-select-individual': (_) => Canned(
-          200,
-          body: searchJson(more: true),
-          contentType: 'application/json',
-        ),
+        '/tree/main/tom-select-individual': tomSelect(more: true),
       });
 
       expect((await records.search('main', 'a')).hasMore, isTrue);
+    });
+
+    test('sends the `at` parameter webtrees requires', () async {
+      serve(site());
+      await records.search('main', 'الموسى');
+
+      // Without this the live server answers 400, not an empty result: `at`
+      // has no default and the validator rejects a missing value.
+      expect(server.requests.single.query['at'], '');
     });
 
     test('answers an empty query without asking the server', () async {
@@ -171,10 +191,10 @@ void main() {
         serve(site(version: version));
         await records.individual('main', 'X42');
 
-        expect(server.routes, contains(tabRoute('personal_facts', version)));
-        expect(server.routes, contains(tabRoute('relatives', version)));
+        expect(server.routes, contains(tabRoute('personal_facts')));
+        expect(server.routes, contains(tabRoute('relatives')));
         // The media tab was offered but not needed for this slice.
-        expect(server.routes, isNot(contains(tabRoute('media', version))));
+        expect(server.routes, isNot(contains(tabRoute('media'))));
       });
 
       test('marks fragment requests as such', () async {
@@ -182,7 +202,7 @@ void main() {
         await records.individual('main', 'X42');
 
         final tab = server.requests.firstWhere(
-          (r) => r.route == tabRoute('relatives', version),
+          (r) => r.route == tabRoute('relatives'),
         );
         // Only fragment routes may carry this. Elsewhere webtrees uses it to
         // turn a 4xx into a 200 holding an error page.
@@ -191,11 +211,70 @@ void main() {
     });
   }
 
+  group('a record URL', () {
+    test('follows the canonical redirect a bare xref provokes', () async {
+      // `/individual/{xref}{/slug}` compares the slug against the one it
+      // derives from the record's name, so an xref-only URL — all a search
+      // result gives us — answers 301, not the page. Live 2.2.6 confirmed.
+      const slugged = '/tree/main/individual/X42/abd-allh-almwsy';
+      serve({
+        ...site(),
+        '/tree/main/individual/X42': (_) =>
+            const Canned(301, location: 'https://host$slugged'),
+        slugged: (_) =>
+            Canned(200, body: fixture('v2_2_6', 'individual_page.html')),
+      });
+
+      final person = await records.individual('main', 'X42');
+
+      expect(person.name, 'عبد الله الموسى');
+      expect(server.routes, contains(slugged));
+    });
+
+    test('treats a 302 as an expired session, not a canonical move', () async {
+      // Middleware bounces an unauthenticated caller with 302. Following it
+      // would parse the sign-in page as a person.
+      serve({
+        ...site(),
+        '/tree/main/individual/X42': (_) =>
+            const Canned(302, location: 'https://host/login'),
+      });
+
+      await expectLater(
+        records.individual('main', 'X42'),
+        throwsA(isA<SessionExpired>()),
+      );
+    });
+  });
+
+  group('a tab URL', () {
+    test('follows a tab URL shaped as a query string', () async {
+      // 2.2.6 also declares `module-no-tree` (`/module/{m}/{action}`), so a
+      // tab URL can carry the tree in the query instead of the path. The app
+      // must follow whatever the page printed rather than reshaping it.
+      final page = fixture('v2_2_6', 'individual_page.html').replaceAll(
+        '/module/personal_facts/Tab/main?xref=X42',
+        '/module/personal_facts/Tab?tree=main&amp;xref=X42',
+      );
+      serve({
+        ...site(),
+        '/tree/main/individual/X42': (_) => Canned(200, body: page),
+        '/module/personal_facts/Tab': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'tab_personal_facts.html')),
+      });
+
+      final person = await records.individual('main', 'X42');
+
+      expect(person.primaryFacts, isNotEmpty);
+      expect(person.warnings, isEmpty);
+    });
+  });
+
   group('a missing tab', () {
     test('costs that section and says so, not the whole record', () async {
       serve({
         ...site(),
-        tabRoute('relatives', 'v2_2_6'): (_) => const Canned(403),
+        tabRoute('relatives'): (_) => const Canned(403),
       });
 
       final person = await records.individual('main', 'X42');
@@ -219,7 +298,7 @@ void main() {
 
       final person = await records.individual('main', 'X42');
 
-      expect(server.routes, isNot(contains(tabRoute('relatives', 'v2_3'))));
+      expect(server.routes, isNot(contains(tabRoute('relatives'))));
       expect(person.warnings.single, contains('Family members'));
     });
   });
