@@ -226,6 +226,18 @@ class AppTextEn extends AppText {
   String get children => 'Children';
 
   @override
+  String get photos => 'Photos';
+
+  @override
+  String get notes => 'Notes';
+
+  @override
+  String get sources => 'Sources';
+
+  @override
+  String get showMoreResults => 'Show more';
+
+  @override
   String get eventsOfCloseRelatives => 'Events of close relatives';
 
   @override
@@ -365,6 +377,18 @@ class AppTextEn extends AppText {
   @override
   String get noticeRelativesUnavailable =>
       'Family members could not be loaded for this person.';
+
+  @override
+  String get noticeNotesUnavailable =>
+      'Notes could not be loaded for this person.';
+
+  @override
+  String get noticeSourcesUnavailable =>
+      'Sources could not be loaded for this person.';
+
+  @override
+  String get noticeMediaUnavailable =>
+      'Photos could not be loaded for this person.';
 
   @override
   String noticeSectionUnavailable(String module) {

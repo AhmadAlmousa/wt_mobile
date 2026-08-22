@@ -156,9 +156,7 @@ void main() {
           ? value / 12.92
           : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
       double luminance(Color c) =>
-          0.2126 * channel(c.r) +
-          0.7152 * channel(c.g) +
-          0.0722 * channel(c.b);
+          0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
 
       final first = luminance(a);
       final second = luminance(b);
@@ -183,7 +181,10 @@ void main() {
       final theme = AppTheme.light(const Locale('en'));
       final semantic = theme.extension<SemanticColors>()!;
 
-      expect(semantic.warningContainer, isNot(theme.colorScheme.tertiaryContainer));
+      expect(
+        semantic.warningContainer,
+        isNot(theme.colorScheme.tertiaryContainer),
+      );
     });
 
     test('both themes register the extension', () {
@@ -257,7 +258,11 @@ void main() {
       OnlyOneTreeFound(),
       SectionUnavailable('personal_facts'),
       SectionUnavailable('relatives'),
+      SectionUnavailable('notes'),
+      SectionUnavailable('sources_tab'),
       SectionUnavailable('media'),
+      // A module this app has never heard of, which a site may still offer.
+      SectionUnavailable('_vytux_cousins_'),
     ];
 
     for (final locale in SettingsStore.supportedLocales) {
@@ -303,6 +308,26 @@ void main() {
         ).localized(text),
         'الحساب بانتظار الموافقة',
       );
+    });
+  });
+  group('text a tree wrote, on a screen in another language', () {
+    test('takes its direction from what it says', () {
+      // A tree records its notes and places in the family's language, not the
+      // reader's. An Arabic note on an English screen belongs on the right of
+      // its card, with its full stop at the left end — which is what webtrees
+      // itself does with `dir="auto"` on the same content.
+      expect(directionOf('هاجر إلى الكويت'), TextDirection.rtl);
+      expect(directionOf('Merchant'), TextDirection.ltr);
+      // Latin punctuation ahead of Arabic does not make it English.
+      expect(directionOf('"سجل قيد العائلة"'), TextDirection.rtl);
+    });
+
+    test('leaves a run with no letters to the screen around it', () {
+      // A bare year or a record id says nothing about direction, and forcing
+      // one would mirror a line that is fine as it is.
+      expect(directionOf('1901–1974'), isNull);
+      expect(directionOf(''), isNull);
+      expect(directionOf(null), isNull);
     });
   });
 }

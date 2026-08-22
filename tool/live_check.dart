@@ -154,6 +154,25 @@ Future<void> main(List<String> args) async {
         ok: found.people.isNotEmpty,
       );
 
+      // A common surname matches more people than one page holds. webtrees
+      // pages by number, and its own `nextUrl` cannot be followed: it is built
+      // without the query, so a client that trusted it would page into
+      // nothing.
+      if (found.hasMore) {
+        final second = await records.search(tree.name, term, page: 2);
+        final first = found.people.map((person) => person.xref).toSet();
+        report(
+          'second page',
+          '${second.people.length} more'
+              '${second.hasMore ? ' (and more still)' : ''}'
+              ' · ${second.people.where((p) => first.contains(p.xref)).length}'
+              ' already seen',
+          ok: second.people.isNotEmpty,
+        );
+      } else {
+        stdout.writeln('  SKIP  one page of results, nothing to page through');
+      }
+
       // Prefer the account's own record: it is certain to be visible to this
       // user, which a search hit is not.
       final xref =
@@ -165,6 +184,17 @@ Future<void> main(List<String> args) async {
         final person = await records.individual(tree.name, xref);
         report('opened', '$xref — ${person.name}');
         report('alternate name', person.alternateName ?? '(none)');
+
+        // Which modules this site runs decides how much of a record the app
+        // can show at all, and no two instances agree — so the check reports
+        // what was on offer rather than assuming the stock set.
+        report('sections offered', person.sections.join(', '));
+        report(
+          'notes, sources, photos',
+          '${person.notes.length} note(s), '
+              '${person.sources.length} citation(s), '
+              '${person.media.length} media item(s)',
+        );
 
         // A person with no facts is valid data, not a parser failure — this
         // tree has plenty. So an empty record is reported, and the parser is
@@ -181,6 +211,19 @@ Future<void> main(List<String> args) async {
               'spouses=${person.spouses.length} '
               'children=${person.children.length}',
           ok: person.families.isNotEmpty,
+        );
+        // A marriage belongs to the family rather than to either person, and
+        // the relatives tab is the only place a stock site states it.
+        final familyFacts = person.families
+            .expand((family) => family.facts)
+            .toList();
+        report(
+          'family facts',
+          familyFacts.isEmpty
+              ? 'none recorded'
+              : familyFacts
+                    .map((fact) => '${fact.label}: ${fact.value ?? '—'}')
+                    .join(' · '),
         );
         for (final warning in person.warnings) {
           stdout.writeln('  WARN  $warning');

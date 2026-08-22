@@ -135,6 +135,17 @@ void main() {
         );
       });
 
+      test('names the relative a secondary fact really belongs to', () {
+        // "Death of a father" is not a fact about this person, and without
+        // the name in `.wt-fact-record` it does not say whose death it was —
+        // nor give the reader anywhere to go from it.
+        final relative = facts.firstWhere((f) => f.label == 'وفاة الأب');
+        expect(relative.about?.xref, 'X7');
+        expect(relative.about?.name, 'محمد الموسى');
+        // The person's own facts have nobody else attached.
+        expect(facts.first.about, isNull);
+      });
+
       test('drops a fact awaiting deletion', () {
         // v1 cannot edit, so showing a record queued for removal would only
         // mislead — the web interface strikes it through instead.
@@ -219,6 +230,133 @@ void main() {
 
       test('reads the family label for display', () {
         expect(families.first.label, 'الوالدان');
+      });
+
+      test('keeps the marriage the couple’s own row carries', () {
+        // The marriage belongs to the family, not to either person, and this
+        // row is the only place the relatives tab states it. Dropping it left
+        // a couple on screen with nothing said about them.
+        final marriage = families.last.facts.single;
+        expect(marriage.label, 'الزواج');
+        expect(marriage.value, '1925 — مكة');
+      });
+    });
+
+    group('$version notes tab', () {
+      late List<NoteEntry> notes;
+
+      setUp(() {
+        notes = const RecordParser().parseNotes(
+          fixture(version, 'tab_notes.html'),
+        );
+      });
+
+      test('reads a note recorded against the person', () {
+        expect(notes.first.text, startsWith('هاجر إلى الكويت'));
+        expect(notes.first.isSecondary, isFalse);
+        // A shared note is a record of its own, and webtrees links its label
+        // to it.
+        expect(notes.first.xref, 'N3');
+      });
+
+      test('reads a note attached to a fact, and says which', () {
+        final onBirth = notes.firstWhere((note) => note.label == 'الميلاد');
+        expect(onBirth.text, 'نُقل تاريخ الميلاد من دفتر العائلة.');
+        // webtrees keeps these collapsed itself: they are notes about a fact,
+        // not about the person.
+        expect(onBirth.isSecondary, isTrue);
+        expect(onBirth.xref, 'N7');
+      });
+
+      test('drops the link announcing a shared note, not the note', () {
+        final onBirth = notes.firstWhere((note) => note.label == 'الميلاد');
+        expect(onBirth.text, isNot(contains('ملاحظة مشتركة')));
+      });
+
+      test('ignores the tab’s own controls and its empty line', () {
+        expect(
+          notes.map((note) => note.text),
+          isNot(contains(contains('إظهار'))),
+        );
+      });
+
+      test('drops a note awaiting deletion', () {
+        // These tabs mark a pending deletion on the cells rather than on the
+        // row, so a parser that only reads the row would show it.
+        expect(
+          notes.map((note) => note.text),
+          isNot(contains('ملاحظة في انتظار الحذف.')),
+        );
+      });
+    });
+
+    group('$version sources tab', () {
+      late List<SourceCitation> citations;
+
+      setUp(() {
+        citations = const RecordParser().parseSources(
+          fixture(version, 'tab_sources.html'),
+        );
+      });
+
+      test('reads the source a citation points at', () {
+        expect(citations.first.title, 'سجل قيد العائلة');
+        expect(citations.first.xref, 'S4');
+        expect(citations.first.isSecondary, isFalse);
+      });
+
+      test('keeps the citation’s own fields as the site worded them', () {
+        // webtrees translates the separator as well as the label, so each
+        // line is taken whole rather than rebuilt from a pair here.
+        expect(citations.first.details, ['الصفحة: ٤٢', 'الجودة: مصدر أساسي']);
+      });
+
+      test('reads a citation attached to a fact, and says which', () {
+        final onBirth = citations.firstWhere((c) => c.label == 'الميلاد');
+        expect(onBirth.title, 'دفتر النفوس');
+        expect(onBirth.xref, 'S9');
+        expect(onBirth.isSecondary, isTrue);
+        expect(onBirth.details, ['الصفحة: ١٧']);
+      });
+
+      test('does not repeat the source line as one of its own details', () {
+        // The line naming the source is a label/value pair like the rest, and
+        // reading it as a detail would print the title twice.
+        expect(
+          citations.last.details,
+          isNot(contains(contains('دفتر النفوس'))),
+        );
+      });
+    });
+
+    group('$version media tab', () {
+      late List<MediaItem> media;
+
+      setUp(() {
+        media = const RecordParser().parseMedia(
+          fixture(version, 'tab_media.html'),
+        );
+      });
+
+      test('reads the title and the signed thumbnail', () {
+        expect(media.first.title, 'صورة العائلة');
+        expect(media.first.xref, 'M11');
+        expect(media.first.thumbnailUrl, contains('media-thumbnail/M11/1'));
+        // The signature is the server's; it cannot be built here.
+        expect(media.first.thumbnailUrl, contains('s=6f1c9a0b2e'));
+      });
+
+      test('reads a photo attached to a fact, and says which', () {
+        final onBirth = media.firstWhere((item) => item.isSecondary);
+        expect(onBirth.title, 'شهادة الميلاد');
+        expect(onBirth.thumbnailUrl, contains('media-thumbnail/M12/1'));
+      });
+
+      test('takes the download link for a photo, never the thumbnail', () {
+        // A media *record* is `/media/M11`; the bytes are at
+        // `/media-download/…`. Reading the wrong one would open a file
+        // instead of the record it belongs to.
+        expect(media.map((item) => item.xref), ['M11', 'M12']);
       });
     });
   }

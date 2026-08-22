@@ -15,18 +15,43 @@ import '../support/test_app.dart';
 String fixture(String name) =>
     File('test/fixtures/v2_2_6/$name').readAsStringSync();
 
-String searchJson(String query) => jsonEncode({
+/// A page of results, in the shape webtrees sends them.
+///
+/// `nextUrl` is what says a further page exists — and webtrees builds it
+/// without the query, which is why the app pages by number instead of
+/// following it.
+String searchJson(String query, {int page = 1}) => jsonEncode({
   'data': query.contains('nobody')
       ? <Object>[]
       : [
-          {
-            'value': 'X42',
-            'text':
-                '<span class="NAME" dir="auto">عبد الله '
-                '<span class="SURN">الموسى</span></span>, 1901–1974',
-          },
+          if (page == 1)
+            {
+              'value': 'X42',
+              'text':
+                  '<span class="NAME" dir="auto">عبد الله '
+                  '<span class="SURN">الموسى</span></span>, 1901–1974',
+            }
+          else ...[
+            {
+              'value': 'X60',
+              'text':
+                  '<span class="NAME" dir="auto">خالد '
+                  '<span class="SURN">الموسى</span></span>, 1926–2001',
+            },
+            // The same person twice: webtrees searches the name table, so
+            // somebody recorded under two names is two rows, and it removes
+            // those duplicates only within a page.
+            {
+              'value': 'X42',
+              'text':
+                  '<span class="NAME" dir="auto">عبد الله '
+                  '<span class="SURN">الموسى</span></span>, 1901–1974',
+            },
+          ],
         ],
-  'nextUrl': null,
+  'nextUrl': page == 1 && query.contains('كثير')
+      ? '/tree/main/tom-select-individual?page=2'
+      : null,
 });
 
 void main() {
@@ -43,7 +68,10 @@ void main() {
         ? const Canned(400, body: 'The parameter is missing.')
         : Canned(
             200,
-            body: searchJson(request.query['query'] ?? ''),
+            body: searchJson(
+              request.query['query'] ?? '',
+              page: int.tryParse(request.query['page'] ?? '1') ?? 1,
+            ),
             contentType: 'application/json',
           ),
     '/tree/main/individual/X42': (_) =>
@@ -58,6 +86,14 @@ void main() {
         Canned(200, body: fixture('tab_personal_facts.html')),
     '/module/relatives/Tab/main': (_) =>
         Canned(200, body: fixture('tab_relatives.html')),
+    '/module/notes/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_notes.html')),
+    '/module/sources_tab/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_sources.html')),
+    '/module/media/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_media.html')),
+    '/tree/main/media-thumbnail/M12/1': (_) =>
+        const Canned(200, body: 'x', contentType: 'image/png'),
     '/tree/main/media-thumbnail/M11/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
     '/tree/main/media-thumbnail/M3/1': (_) =>
@@ -156,7 +192,159 @@ void main() {
     // The date keeps the calendar conversion webtrees rendered.
     expect(find.textContaining('١٢ مارس ١٩٠١'), findsOne);
     expect(find.textContaining('٢١ ذو القعدة ١٣١٨'), findsOne);
-    expect(find.textContaining('الرياض'), findsOne);
+    expect(find.textContaining('الرياض, السعودية'), findsOne);
+  });
+
+  testWidgets('shows the marriage a family recorded', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    // A marriage belongs to the family rather than to either person, and the
+    // relatives tab is the only place a stock site states it.
+    expect(find.textContaining('1898 — الرياض'), findsOne);
+
+    await tester.scrollUntilVisible(
+      find.text('عائلته مع سارة'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    // The heading is the site's own words, which already name the spouse.
+    expect(find.text('عائلته مع سارة'), findsOne);
+    expect(find.textContaining('1925 — مكة'), findsOne);
+    // Children are listed under the marriage they belong to, not merged into
+    // one list for everyone the person ever had.
+    expect(find.text('Children'), findsOne);
+  });
+
+  testWidgets('names a family even when its caption is empty', (tester) async {
+    // Some themes render the caption without text, which leaves the parser
+    // holding the family's identifier — "F2" is no heading for a marriage.
+    server = FakeWebtrees({
+      ...browsableSite(),
+      '/module/relatives/Tab/main': (_) => Canned(
+        200,
+        body: fixture(
+          'tab_relatives.html',
+        ).replaceAll('>عائلته مع سارة<', '><'),
+      ),
+    });
+    session = sessionManagerFor(server, settings: settings = testSettings());
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      WebtreesMobileApp(session: session, settings: settings),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'host');
+    await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), 'mobile');
+    await tester.enterText(find.byType(TextFormField).at(1), 'correct');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Spouses'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('F2'), findsNothing);
+  });
+
+  testWidgets('shows the notes and sources a tree publishes', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Notes'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('هاجر إلى الكويت'), findsOne);
+
+    await tester.scrollUntilVisible(
+      find.text('Sources'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('سجل قيد العائلة'), findsOne);
+    // The citation's own fields, worded by the site rather than by the app.
+    expect(find.text('الصفحة: ٤٢'), findsOne);
+  });
+
+  testWidgets('shows the photos a tree publishes', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Photos'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('صورة العائلة'), findsOne);
+
+    // Every thumbnail travels over the session: webtrees checks this
+    // account's permission before it honours the signature.
+    final image = server.requests.firstWhere(
+      (r) => r.route == '/tree/main/media-thumbnail/M12/1',
+    );
+    expect(image.anonymous, isFalse);
+  });
+
+  testWidgets('opens the relative a secondary fact belongs to', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Events of close relatives'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Events of close relatives'));
+    await tester.pumpAndSettle();
+
+    // "Death of a father" names the event and not the man; the name is what
+    // the reader is looking for, and where they may want to go next.
+    expect(find.text('محمد الموسى'), findsOne);
+    await tester.tap(find.text('محمد الموسى'));
+    await tester.pumpAndSettle();
+
+    expect(server.routes, contains('/tree/main/individual/X7'));
+  });
+
+  testWidgets('fetches the next page of results when asked', (tester) async {
+    await openTree(tester);
+    await search(tester, 'كثير');
+
+    // 50 per page, and webtrees says exactly whether more exist rather than
+    // leaving it to be guessed from a full page.
+    await tester.tap(find.text('Show more'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('خالد الموسى'), findsOne);
+    // Somebody recorded under two names is two rows in the search webtrees
+    // runs, and it drops those duplicates only within one page.
+    expect(find.text('عبد الله الموسى'), findsOne);
+    expect(find.text('Show more'), findsNothing);
+
+    final second = server.requests.lastWhere(
+      (r) => r.route == '/tree/main/tom-select-individual',
+    );
+    expect(second.query['page'], '2');
+    // The query has to be repeated: webtrees builds its own `nextUrl` without
+    // it, so a client that followed that link would search for nothing.
+    expect(second.query['query'], 'كثير');
   });
 
   testWidgets('keeps a relative’s event out of the main list', (tester) async {

@@ -177,6 +177,15 @@ anonymous `/my-account`.
   Its `text` is **rendered HTML** from `resources/views/selects/individual.phtml`
   — name and lifespan — carrying a thumbnail **only** when the individual has
   a highlighted media file.
+- **Paging is by number, and `nextUrl` cannot be followed.** 50 per page,
+  `page` counting from 1, and webtrees fetches one row beyond the page so
+  `nextUrl` is an exact statement that more exist — but it builds that URL
+  from the tree, `at` and the page **only**, dropping the query. A client that
+  followed it would page through an empty search. Verified live: `محمد` gives
+  50, then 50 more, with no overlap.
+- The search joins the name table, so **someone recorded under two names is
+  two rows**; webtrees removes those duplicates only within the page it is
+  building, so the same person can arrive again on the next one.
 - Enumeration, if ever needed, means `/tree/{t}/individual-list` partitioned by
   surname or initial. Its "show all" mode renders the entire tree server-side,
   so it is not a pagination API.
@@ -194,16 +203,45 @@ anonymous `/my-account`.
   path, not an edge case. Follow `301`/`308` once; a `302` is still the
   middleware bouncing an expired session to the sign-in page. A bad xref is a
   clean `404`.
-- Record detail comes from AJAX tab fragments (~10× less markup than a full
-  page). **Do not build these URLs.** The individual page renders every tab it
-  offers as `<a data-wt-href="…" href="#{module}">`, so the server states the
-  exact URL, and which tabs this tree actually has. That matters twice over:
+- **Every core tab is rendered into the page.** `canLoadAjax()` returns false
+  for personal facts, relatives, notes, sources and media, so a stock record
+  costs **one** request however many sections it has — confirmed live, where
+  `tree.almou.sa` delivers personal facts, relatives and a custom tab inline
+  and the app fetches nothing further.
+- Record detail otherwise comes from AJAX tab fragments (~10× less markup than
+  a full page). **Do not build these URLs.** The individual page renders every
+  tab it offers as `<a data-wt-href="…" href="#{module}">`, so the server states
+  the exact URL, and which tabs this tree actually has. That matters twice over:
   core tabs can be disabled or access-restricted per tree, and a site can carry
   custom tab modules (`tree.almou.sa` serves `_vytux_cousins_`). Both versions
   route a tab as `/module/{m}/Tab/{tree}?xref={x}`; 2.2.6 additionally declares
   `module-no-tree` (`/module/{m}/{action}`), so the tree may appear in the
   query instead. **The `xref` query parameter is part of the URL** — dropping
   it yields a 200 carrying `The parameter “xref” is missing.`
+- **Tab module names are not view directory names.** The app only ever sees
+  the module name — `personal_facts`, `relatives`, `notes`, `sources_tab`,
+  `media` — which is what the anchor and the fragment URL carry. 2.3 renamed
+  the sources tab's *view directory* to `sources-tab`; the module kept the
+  underscore, so a client keyed on the directory would ask for a tab that does
+  not exist.
+- **Notes, sources and media are optional modules**, and their absence is a
+  configuration rather than a fault: `tree.almou.sa` runs none of the three
+  (sections offered there are `personal_facts`, `relatives`, `tree`, `places`
+  and `_vytux_cousins_`). Warning about a section a site never offered would
+  put a caution on every record it ever shows.
+- Those three tabs share one shape: an ordinary fact row for something
+  recorded against the person, and `tr.wt-level-two-{note,source,media}` for
+  something hanging off a fact — whose `th.rela` carries **that fact's** label
+  and no `.wt-fact-label` at all. They also mark a pending deletion with
+  `wt-old` on the **cells**, where `fact.phtml` marks it on the row; a parser
+  reading only the row shows a record queued for removal.
+- A citation's fields are `label: value` lines webtrees has already worded and
+  translated (`%1$s: %2$s`), including the separator — so they are shown whole
+  rather than split into a pair the app would have to rejoin.
+- **`.wt-fact-record` names the record a fact really belongs to** — the
+  sibling whose birth it was, the spouse a marriage was to (with a link to the
+  family beside them). Without it "Birth of a brother" names an event and no
+  brother.
 - **The tab anchor has no `id` in 2.2.6**; 2.3 added `id="{module}-tab"`. Key
   on the `href="#{module}"` fragment, which both emit. A parser keyed on the id
   finds *no tabs at all* on 2.2.6 — the version the target server runs.
@@ -234,6 +272,13 @@ anonymous `/my-account`.
   the conversion is dropped per date, in place, never by a regex over the
   whole string (`interpreted %s (%s)` puts real parentheses in the text).
   2.3 names no calendar, so the app shows both there rather than guessing.
+- **A family's marriage is stated in the relatives tab and nowhere else** on
+  a person's page: a row of `span.label` beside `span.field`, rendered by
+  `Date::display()` *without* calendar links, so unlike a fact date it carries
+  no calendar. A marriage with neither date nor place still prints its
+  separators, arriving as a lone dash; and a family with no marriage recorded
+  prints **no row at all** for a member — only an editor is offered "Add
+  marriage details".
 - Relatives carry **no machine-readable role**. The family view emits its
   `FAMC`/`FAMS` type only inside editor-only link text, and the `<th>`
   relationship names are translated. Role is therefore derived structurally:
@@ -389,7 +434,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **2c** | "Your access" screen | ✅ |
 | **2d** | Stabilization — status interpretation, resume, credential semantics | ✅ |
 | **3a** | Vertical slice — search → person → facts → relatives → photo | ✅ |
-| **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ⬜ |
+| **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ✅ |
 | **4** | Interface (Material 3 Expressive theme, Arabic/RTL, navigation) | ✅ |
 | **4a** | Getting out of the way — resume, one-tree, back stack, calendar choice | ✅ |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
@@ -455,6 +500,62 @@ cookie correctly, including the session-id rotation inside the sign-in redirect.
 **Improved on the plan:** the Member-vs-Visitor gap, documented as unsolvable,
 turned out to be decidable for private trees (§3).
 
+### 2026-08-22 (later still) — Phase 3b: the rest of what a record says
+
+Phase 3a read a person. This reads the rest of what a stock site publishes
+about them — the families they belong to, the notes and citations a tree keeps,
+the photographs, and the results past the first fifty.
+
+**Almost all of it was already on the wire.** Every core tab returns
+`canLoadAjax() === false`, so webtrees renders notes, sources and media *into*
+the individual page it has already sent. The app was parsing two panes out of
+that page and discarding the rest. Reading them costs nothing extra.
+
+**A marriage belongs to the family, not to either person.** The relatives tab
+is the only place a stock page states it, in a row the parser had been using
+purely as a divider between spouses and children. Now the couple's own facts
+are kept — and with them, the reason to show a family as a *block*: someone who
+married twice has two sets of children, and one merged list of children puts
+them under the wrong marriage. Birth families stay flat under *Parents* and
+*Brothers and sisters*, which is what anyone calls them; the families a person
+made are shown one at a time under the site's own heading, which already names
+the spouse.
+
+**"Birth of a brother" names an event and no brother.** `.wt-fact-record` was
+being dropped, so every one of these secondary rows was anonymous and led
+nowhere. It now names the relative and opens them.
+
+**Paging turned on a trap.** webtrees answers `nextUrl` when more results
+exist — and builds that URL without the query, so following it searches for
+nothing. The app pages by number instead, and dedupes: the search joins the
+name table, so a person recorded under two names is two rows, and webtrees
+drops those duplicates only within the page it is building.
+
+**A module a site does not run is not a missing section.** The target runs
+neither notes, sources nor media, so warning about their absence would have put
+a caution on every record it will ever show. A tab that is *offered* and fails
+still says so.
+
+**Text a tree wrote gets the direction it deserves.** A note is in the
+family's language whatever language the reader chose, so an Arabic note on an
+English screen now sets its own paragraph direction — the same thing webtrees
+does with `dir="auto"` — rather than ending with its full stop on the wrong
+side.
+
+Released as **0.3.0**. **275 tests** green (234 → 275), analyzer clean, and
+`tool/live_check.dart` passes against `tree.almou.sa`: 50 results then 50 more
+with no overlap, and the sections that instance actually offers reported by
+name. The rendered previews now walk further down a person's page, which is
+where all of this lives.
+
+**Verified against live markup, not only fixtures.** Real pages from
+`tree.almou.sa` were captured and run through the parsers directly. The
+relatives parser reads that instance's markup — its chart boxes carry a whole
+facts dropdown the fixtures do not — and its one recorded marriage arrives with
+an empty field, which is what a marriage with no date and no place looks like.
+The notes, sources and media parsers have **no live evidence at all**: that
+instance runs none of those modules (§9).
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -482,6 +583,7 @@ turned out to be decidable for private trees (§3).
 | 18 | The person route was declared beside the search route, so the first back gesture left the app | **Widget test** |
 | 19 | A lifespan rendered `1940–1875` in Arabic — bidi reordering a run of digits | **Rendered preview** |
 | 20 | The calendar escape was read from a decoded URL, whose `#` swallowed the query | **Parser test** |
+| 21 | Submitting a search left its debounce pending, so every search ran twice | **Widget test** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -500,6 +602,12 @@ the wrong version's template and agreed with a parser that never looked.
 Bugs 18 and 19 are the two the tests could not have been expected to catch
 from copy alone: one needed the system back button simulated, the other needed
 somebody to look at a picture.
+
+Bug 21 had been there since search was written and cost only a duplicate
+request, which is why nothing noticed. Paging gave it teeth: the second,
+debounced run reset the results, so the page the reader had just asked for
+vanished a moment after arriving. A harmless waste and a visible fault were
+the same defect, and only the second one was ever going to be reported.
 
 Bugs 9–12 share one cause, and it is the important lesson here: **the suite was
 green for all of them.** Tests were written against the fixtures the code
@@ -777,12 +885,13 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 234 tests
+flutter test          # 275 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
-# Walks connect → sign-in → tree → person → account → settings.
+# Walks connect → sign-in → tree → person (twice: the top, and scrolled down
+# to family, photos, notes and sources) → account → settings.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -806,33 +915,46 @@ Both tools read the password from the terminal with echo disabled, or from
 
 ## 9. Open questions and risks
 
-1. **The authenticated image path has never run against a real thumbnail.**
-   `tree.almou.sa` has no media at all — `/tree/main/media-list` renders with
-   zero thumbnails — so `AuthenticatedImage`, `MediaCache` and the
-   `canShow()`-before-signature rule that motivated them are proven only by
-   unit tests. Needs an instance that has media. This is a gap in the *data*
-   available, not in the code.
-2. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
-   AJAX fragments rather than whole pages, a two-version fixture matrix, and
+1. **Notes, sources and photographs have never been seen from a real site.**
+   `tree.almou.sa` runs none of those three tab modules — it offers
+   `personal_facts`, `relatives`, `tree`, `places` and `_vytux_cousins_` — and
+   has no media at all (`/tree/main/media-list` renders zero thumbnails). So
+   `parseNotes`, `parseSources`, `parseMedia`, `AuthenticatedImage`,
+   `MediaCache` and the `canShow()`-before-signature rule that motivated them
+   stand on fixtures transcribed from the upstream templates and nothing else.
+   Needs an instance that runs those modules and holds media. This is a gap in
+   the *data* available, not in the code — but it is the largest untested
+   surface the app now has.
+2. **A photograph can only be shown at thumbnail size.** The media tab signs
+   its URLs at 100 pixels, and the signature covers those dimensions, so the
+   app cannot ask for a bigger copy — the full image lives behind the media
+   *record* page, which v1 has no screen for. The gallery therefore shows
+   thumbnails that do not open. Worth revisiting with a media record screen.
+3. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+   tab fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
    site, so no non-default theme, language or module configuration has ever
-   been parsed. Sanitized real captures are the next step.
-3. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
+   been parsed. Narrowed a little in Phase 3b — real pages from
+   `tree.almou.sa` were captured and run through the facts and relatives
+   parsers, which read them correctly, including a chart box carrying a whole
+   facts dropdown no fixture has. Sanitized real captures in `test/fixtures/`
+   are still the right next step.
+4. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
-4. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
+5. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
    default tree; consider letting the user enter a tree name manually.
-5. **`local_auth` has no Linux support** — the biometric gate must degrade
+6. **`local_auth` has no Linux support** — the biometric gate must degrade
    gracefully on the development machine.
-6. **Upstream module API churn.** webtrees does not guarantee stability for
+7. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
    is built (v2), isolate volatile core APIs behind one adapter and run CI
    against both 2.2.x and 2.3.
-7. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
+8. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-8. **Nothing has run on a real device.** This is now the largest gap by some
+9. **Nothing has run on a real device.** This is now the largest gap by some
    way: three of the six things Phase 4a changed — resuming through the
    biometric gate at launch, the Android back gesture, and the keystore that
    makes resuming possible at all — are *device* behaviours that a widget test
@@ -842,17 +964,19 @@ Both tools read the password from the terminal with echo disabled, or from
    networking still cannot be validated without hardware. Sideloadable builds
    exist (`flutter build apk --release --split-per-abi`, ~20MB for arm64), so
    this is now waiting on a device rather than on the toolchain.
-9. **"Works against any webtrees instance" is a goal, not a tested claim.**
+10. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 **live end to end** — connect, sign in,
-   roles, search, opening a person, facts and relatives across 40 real records,
-   the language switch and the calendar structure of real dates — and
-   2.3.0-dev by source; both URL styles; both tab-route shapes; one
-   private tree; the default theme; one non-stock tab module
-   (`_vytux_cousins_`), which discovery handled without changes. Untested:
-   non-default themes, subdirectory installs, multiple trees, media, and 2.3
-   against a running server. This belongs in an explicit compatibility matrix
+   roles, search and its second page, opening a person, facts, relatives and
+   family facts across 40 real records, the language switch and the calendar
+   structure of real dates — and 2.3.0-dev by source; both URL styles; both
+   tab-route shapes; one private tree; the default theme; one non-stock tab
+   module (`_vytux_cousins_`), which discovery handled without changes.
+   Untested: non-default themes, subdirectory installs, multiple trees, notes,
+   sources, media, and 2.3 against a running server. The app now reports the
+   sections an instance offers (`sections offered` in `tool/live_check.dart`),
+   which is the raw material for the compatibility matrix this still needs
    before release.
-10. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
+11. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
    on the `cal` parameter of the calendar links webtrees wraps each date in;
    2.3's rewritten `Date::display` emits no links, so nothing states which
    calendar a rendered date is in and the app shows both. Two further 2.3
@@ -861,13 +985,13 @@ Both tools read the password from the terminal with echo disabled, or from
    which would drop it from ordinary single dates; and it is bracketed rather
    than parenthesised. Worth reproducing on a 2.3 install and reporting
    upstream before building around it.
-11. **The app writes the account's language preference.** Aligning the server's
+12. **The app writes the account's language preference.** Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
    account with. Disclosed in the settings sheet; an optional module could
    avoid it, nothing stock can.
-12. **The Android compile-SDK override** rewrites every plugin subproject
+13. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.

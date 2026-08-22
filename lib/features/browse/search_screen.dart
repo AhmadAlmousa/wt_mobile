@@ -59,6 +59,22 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _searching = false;
   bool _hasSearched = false;
 
+  /// What the results on screen are answers to.
+  ///
+  /// Held because a further page has to repeat the query: webtrees' own
+  /// `nextUrl` is built without it, so following that link would page through
+  /// an empty search.
+  String _searchedFor = '';
+
+  /// The last page fetched, counting from one as webtrees does.
+  int _page = 1;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
+  /// A failure while fetching a *further* page, which must not throw away the
+  /// results already on screen.
+  WebtreesError? _moreError;
+
   /// Rises with each search so a slow earlier reply cannot overwrite a newer
   /// one — typing quickly otherwise leaves the wrong names on screen.
   int _generation = 0;
@@ -77,11 +93,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _search(String query) async {
+    // Submitting from the keyboard leaves the debounce still pending, and
+    // letting it fire would repeat the same search a moment later — a second
+    // request against someone else's server, and one that throws away any
+    // further pages the reader had asked for.
+    _debounce?.cancel();
+
     if (query.trim().isEmpty) {
       setState(() {
         _results = const [];
         _error = null;
         _hasSearched = false;
+        _hasMore = false;
       });
       return;
     }
@@ -90,6 +113,9 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _searching = true;
       _error = null;
+      _moreError = null;
+      _searchedFor = query;
+      _page = 1;
     });
 
     try {
@@ -99,6 +125,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted || generation != _generation) return;
       setState(() {
         _results = page.people;
+        _hasMore = page.hasMore;
         _searching = false;
         _hasSearched = true;
       });
@@ -106,8 +133,51 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted || generation != _generation) return;
       setState(() {
         _error = problem;
+        _hasMore = false;
         _searching = false;
         _hasSearched = true;
+      });
+    }
+  }
+
+  /// Fetches the next 50 results and adds them to the ones on screen.
+  ///
+  /// A common surname matches far more people than one page holds, and
+  /// webtrees says exactly whether more exist rather than leaving it to be
+  /// guessed from a full page.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+
+    final generation = _generation;
+    setState(() {
+      _loadingMore = true;
+      _moreError = null;
+    });
+
+    try {
+      final next = await widget.session.withSession(
+        () => widget.records.search(widget.tree, _searchedFor, page: _page + 1),
+      );
+      if (!mounted || generation != _generation) return;
+
+      // Someone recorded under two names is two rows in the search webtrees
+      // runs, and it only removes those duplicates within one page — so the
+      // same person can arrive again on the next.
+      final seen = _results.map((person) => person.xref).toSet();
+      setState(() {
+        _results = [
+          ..._results,
+          ...next.people.where((person) => seen.add(person.xref)),
+        ];
+        _page += 1;
+        _hasMore = next.hasMore;
+        _loadingMore = false;
+      });
+    } on WebtreesError catch (problem) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _moreError = problem;
+        _loadingMore = false;
       });
     }
   }
@@ -190,8 +260,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-      itemCount: _results.length,
+      // One row beyond the results when the site says it has more, which is
+      // where the reader asks for them.
+      itemCount: _results.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _results.length) return _moreFooter(context);
+
         final person = _results[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -213,6 +287,37 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// The row that asks for the next page, or explains why it could not.
+  Widget _moreFooter(BuildContext context) {
+    final text = AppText.of(context);
+    final problem = _moreError;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Column(
+        children: [
+          if (problem != null) ...[
+            MessagePanel.error(problem.localized(text)),
+            const SizedBox(height: 12),
+          ],
+          if (_loadingMore)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            OutlinedButton(
+              onPressed: _loadMore,
+              child: Text(text.showMoreResults),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -226,6 +226,18 @@ class AppTextAr extends AppText {
   String get children => 'أولاد';
 
   @override
+  String get photos => 'صور';
+
+  @override
+  String get notes => 'ملاحظات';
+
+  @override
+  String get sources => 'مصادر';
+
+  @override
+  String get showMoreResults => 'عرض المزيد';
+
+  @override
   String get eventsOfCloseRelatives => 'أحداث الأقارب';
 
   @override
@@ -364,6 +376,15 @@ class AppTextAr extends AppText {
   @override
   String get noticeRelativesUnavailable =>
       'تعذّر تحميل أفراد العائلة لهذا الشخص.';
+
+  @override
+  String get noticeNotesUnavailable => 'تعذّر تحميل الملاحظات لهذا الشخص.';
+
+  @override
+  String get noticeSourcesUnavailable => 'تعذّر تحميل المصادر لهذا الشخص.';
+
+  @override
+  String get noticeMediaUnavailable => 'تعذّر تحميل الصور لهذا الشخص.';
 
   @override
   String noticeSectionUnavailable(String module) {

@@ -79,6 +79,10 @@
   "siblings": "Brothers and sisters",
   "spouses": "Spouses",
   "children": "Children",
+  "photos": "Photos",
+  "notes": "Notes",
+  "sources": "Sources",
+  "showMoreResults": "Show more",
   "eventsOfCloseRelatives": "Events of close relatives",
 
   "settings": "Settings",
@@ -128,6 +132,9 @@
   "noticeOnlyOneTreeFound": "Only one family tree was found. If this site has more, its administrator may have turned off switching between trees.",
   "noticeFactsUnavailable": "Facts and events could not be loaded for this person.",
   "noticeRelativesUnavailable": "Family members could not be loaded for this person.",
+  "noticeNotesUnavailable": "Notes could not be loaded for this person.",
+  "noticeSourcesUnavailable": "Sources could not be loaded for this person.",
+  "noticeMediaUnavailable": "Photos could not be loaded for this person.",
   "noticeSectionUnavailable": "The {module} section could not be loaded.",
   "@noticeSectionUnavailable": {"placeholders": {"module": {"type": "String"}}}
 }

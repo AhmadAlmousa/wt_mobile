@@ -44,6 +44,11 @@ final class RecordsRepository {
   /// instance that answers JSON. It is **search**, not enumeration: webtrees
   /// returns an empty collection for an empty query, so a blank [query] is
   /// answered here rather than wasting a request.
+  ///
+  /// Answers 50 people at a time, from [page] counting at one. The reply
+  /// carries a `nextUrl` when more exist — but that URL is built from the
+  /// tree, `at` and the page number **only**, dropping the query, so following
+  /// it would search for nothing. Paging is therefore done by number.
   Future<SearchPage> search(String tree, String query, {int page = 1}) async {
     if (query.trim().isEmpty) {
       return const SearchPage(people: [], hasMore: false);
@@ -129,13 +134,17 @@ final class RecordsRepository {
     return people;
   }
 
-  /// Reads one person: their names, photo, facts and relatives.
+  /// Reads one person: their names, photo, facts, family, notes, sources and
+  /// media.
   ///
-  /// Two or three requests. The page itself names every tab the site offers
-  /// and gives the exact URL for each, so nothing is assumed about which
-  /// modules a tree has enabled — a site with the relatives tab switched off
-  /// yields a record without relatives and a warning saying so, rather than a
-  /// failure.
+  /// Usually one request. The page names every tab the site offers and gives
+  /// the exact URL for each, so nothing is assumed about which modules a tree
+  /// has enabled — and every core tab renders its content into the page rather
+  /// than over AJAX, so the sections below normally cost nothing more to read
+  /// than they did to fetch.
+  ///
+  /// A site with the relatives tab switched off yields a record without
+  /// relatives and a warning saying so, rather than a failure.
   Future<IndividualRecord> individual(String tree, String xref) async {
     final reply = await _fetchRecord(
       '/tree/$tree/individual/$xref',
@@ -148,6 +157,28 @@ final class RecordsRepository {
     final factsHtml = await _tabContent(page, 'personal_facts', warnings);
     final relativesHtml = await _tabContent(page, 'relatives', warnings);
 
+    // Notes, sources and media are separate modules a site may simply not
+    // run — this project's own target runs none of the three — so their
+    // absence is the site's shape rather than a section that went missing.
+    final notesHtml = await _tabContent(
+      page,
+      'notes',
+      warnings,
+      offered: false,
+    );
+    final sourcesHtml = await _tabContent(
+      page,
+      'sources_tab',
+      warnings,
+      offered: false,
+    );
+    final mediaHtml = await _tabContent(
+      page,
+      'media',
+      warnings,
+      offered: false,
+    );
+
     return IndividualRecord(
       xref: xref,
       name: page.name,
@@ -157,6 +188,15 @@ final class RecordsRepository {
       families: relativesHtml == null
           ? const []
           : _parser.parseRelatives(relativesHtml, xref: xref),
+      notes: notesHtml == null ? const [] : _parser.parseNotes(notesHtml),
+      sources: sourcesHtml == null
+          ? const []
+          : _parser.parseSources(sourcesHtml),
+      media: mediaHtml == null ? const [] : _parser.parseMedia(mediaHtml),
+      // What this site actually offers, for the diagnostics: two instances
+      // rarely run the same modules, and that is what decides how much of a
+      // record the app can show.
+      sections: page.tabs.keys.toList(),
       warnings: warnings,
     );
   }
@@ -194,18 +234,28 @@ final class RecordsRepository {
   /// The markup of one tab, however the site chooses to deliver it.
   ///
   /// A tab that does not load over AJAX is already rendered into the page, so
-  /// re-requesting it would return the same bytes twice.
+  /// re-requesting it would return the same bytes twice. Every core tab is
+  /// this kind, which is why a stock record usually costs one request however
+  /// many sections it has.
+  ///
+  /// [offered] says whether the app expects this tab to exist: a section it
+  /// relies on going missing is worth a warning, a module the site does not
+  /// run is not.
   Future<String?> _tabContent(
     IndividualPage page,
     String module,
-    List<Notice> warnings,
-  ) async {
+    List<Notice> warnings, {
+    bool offered = true,
+  }) async {
     final inline = page.inlineTabs[module];
     if (inline != null) return inline;
 
     final url = page.tabs[module];
     if (url == null) {
-      warnings.add(SectionUnavailable(module));
+      // A tab the site never offered is only worth mentioning when the app
+      // counts on it. Warning that a site has no notes module would report
+      // an ordinary configuration as a fault.
+      if (offered) warnings.add(SectionUnavailable(module));
       return null;
     }
 

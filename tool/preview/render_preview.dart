@@ -54,6 +54,12 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('tab_personal_facts.html')),
     '/module/relatives/Tab/main': (_) =>
         Canned(200, body: fixture('tab_relatives.html')),
+    '/module/notes/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_notes.html')),
+    '/module/sources_tab/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_sources.html')),
+    '/module/media/Tab/main': (_) =>
+        Canned(200, body: fixture('tab_media.html')),
   };
 }
 
@@ -89,6 +95,7 @@ Future<void> main() async {
     required Locale locale,
     required ThemeMode theme,
     int steps = 0,
+    double scroll = 0,
   }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
@@ -141,6 +148,14 @@ Future<void> main() async {
       await tester.pumpAndSettle();
     }
 
+    // A person's page is longer than a phone screen, and the family, photos,
+    // notes and sources all live below the fold — the parts most worth
+    // looking at before they reach a device.
+    if (scroll > 0) {
+      await tester.drag(find.byType(Scrollable).first, Offset(0, -scroll));
+      await tester.pumpAndSettle();
+    }
+
     await expectLater(
       find.byType(WebtreesMobileApp),
       matchesGoldenFile('../../$output/$name.png'),
@@ -189,6 +204,17 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 3,
+        );
+      });
+
+      testWidgets('person, further down $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'person-family-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 3,
+          scroll: 1100,
         );
       });
 

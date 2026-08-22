@@ -49,11 +49,14 @@ extension LocalizedNotice on Notice {
     SiteUnidentified() => text.noticeSiteUnidentified,
     NoTreesVisible() => text.noticeNoTreesVisible,
     OnlyOneTreeFound() => text.noticeOnlyOneTreeFound,
-    // The two sections the app actually asks for get a sentence naming them;
+    // The sections the app actually asks for get a sentence naming them;
     // anything else a site offers falls back to the module's own name.
     SectionUnavailable(:final module) => switch (module) {
       'personal_facts' => text.noticeFactsUnavailable,
       'relatives' => text.noticeRelativesUnavailable,
+      'notes' => text.noticeNotesUnavailable,
+      'sources_tab' => text.noticeSourcesUnavailable,
+      'media' => text.noticeMediaUnavailable,
       _ => text.noticeSectionUnavailable(module),
     },
   };

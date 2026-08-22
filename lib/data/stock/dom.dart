@@ -50,3 +50,30 @@ String? xrefIn(String? url, String type) {
   final decoded = Uri.decodeFull(url);
   return RegExp('/$type/([^/?&#]+)').firstMatch(decoded)?.group(1);
 }
+
+/// The first link inside [element] that points at a record of [type].
+///
+/// webtrees links to a record by a URL the app cannot reliably match with a
+/// CSS attribute selector — the two URL styles put the xref in a path segment
+/// or inside an encoded query — so the match is made on the parsed href.
+Element? recordLink(Element? element, String type) {
+  if (element == null) return null;
+  for (final link in element.querySelectorAll('a[href]')) {
+    if (xrefIn(link.attributes['href'], type) != null) return link;
+  }
+  return null;
+}
+
+/// The text of [element] with [unwanted] descendants removed first.
+///
+/// Like [textWithout], but for elements already found rather than selectors:
+/// the record links this file matches are recognised by their href, which no
+/// selector can express.
+String? textExcluding(Element element, Iterable<Element> unwanted) {
+  final drop = unwanted.map((e) => e.outerHtml).toSet();
+  final copy = element.clone(true);
+  for (final candidate in copy.querySelectorAll('*')) {
+    if (drop.contains(candidate.outerHtml)) candidate.remove();
+  }
+  return cleanText(copy.text);
+}

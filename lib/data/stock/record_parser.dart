@@ -138,6 +138,9 @@ final class RecordParser {
           date: _dateOf(row),
           place: place,
           type: textOf(row.querySelector('.wt-fact-type')),
+          // Whose event this is, when webtrees folded someone else's into
+          // this list: a sibling's birth, a family's marriage.
+          about: _aboutOf(row),
           // webtrees collapses relatives' events, historical events and
           // associates by default; they are context, not this person's facts.
           isSecondary: classes.contains('collapse'),
@@ -145,6 +148,26 @@ final class RecordParser {
       );
     }
     return facts;
+  }
+
+  /// The other person a fact really belongs to, when there is one.
+  ///
+  /// webtrees names them in `.wt-fact-record` — the block it uses to say "this
+  /// happened to someone else". A marriage names the spouse there and links to
+  /// the family beside them, so only the individual link is read.
+  PersonRef? _aboutOf(Element row) {
+    final block = row.querySelector('.wt-fact-record');
+    final link = recordLink(block, 'individual');
+    final xref = xrefIn(link?.attributes['href'], 'individual');
+    if (link == null || xref == null) return null;
+
+    return PersonRef(
+      xref: xref,
+      // The name is wrapped in the usual NAME span; older markup and some
+      // themes put a relationship word there instead, which is still better
+      // than showing nobody.
+      name: textOf(link.querySelector('span.NAME')) ?? textOf(link) ?? xref,
+    );
   }
 
   /// Reads the date box of a fact row.
@@ -270,6 +293,207 @@ final class RecordParser {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  /// Reads the rows of a notes tab.
+  ///
+  /// Two shapes share one table, and both are wanted: a note recorded against
+  /// the person, rendered as an ordinary fact row, and a note hanging off one
+  /// of their facts, rendered as a relationship row webtrees keeps collapsed.
+  List<NoteEntry> parseNotes(String fragment) {
+    final document = html.parseFragment(fragment);
+    final notes = <NoteEntry>[];
+
+    for (final row in _recordRows(document)) {
+      final label = _rowLabel(row);
+      if (label == null) continue;
+      final secondary = _isSecondaryRow(row);
+
+      // A note of the person's own: the text is in the value box, and a
+      // *shared* note also turns the label into a link to its record.
+      final value = row.querySelector('.wt-fact-value');
+      if (value != null) {
+        final text = textOf(value);
+        if (text == null) continue;
+        notes.add(
+          NoteEntry(
+            label: label,
+            text: text,
+            xref: _xrefOf(row.querySelector('th'), 'note'),
+            isSecondary: secondary,
+          ),
+        );
+        continue;
+      }
+
+      // A note on a fact: one block per note, each holding the text and, for
+      // a shared note, a link announcing it as one.
+      for (final block in row.querySelectorAll('td > div')) {
+        final link = recordLink(block, 'note');
+        // Only that announcement is dropped. A note may carry links of its
+        // own, and cutting them would edit the family's words.
+        final text = link == null
+            ? textOf(block)
+            : textExcluding(block, [link]);
+        if (text == null) continue;
+
+        notes.add(
+          NoteEntry(
+            label: label,
+            text: text,
+            xref: xrefIn(link?.attributes['href'], 'note'),
+            isSecondary: secondary,
+          ),
+        );
+      }
+    }
+    return notes;
+  }
+
+  /// Reads the rows of a sources tab.
+  ///
+  /// A citation is a source record plus where in it to look. Both shapes —
+  /// the person's own citations and those hanging off a fact — put the source
+  /// behind a link and its fields in `label: value` lines the server has
+  /// already worded.
+  List<SourceCitation> parseSources(String fragment) {
+    final document = html.parseFragment(fragment);
+    final citations = <SourceCitation>[];
+
+    for (final row in _recordRows(document)) {
+      final label = _rowLabel(row);
+      final cell = row.querySelector('td');
+      if (label == null || cell == null) continue;
+
+      final link = recordLink(cell, 'source');
+      final title =
+          textOf(link) ?? textOf(cell.querySelector('.wt-fact-value'));
+      // A citation of a source this account may not see renders with neither
+      // link nor title; there is nothing to show and nothing to say.
+      if (title == null) continue;
+
+      citations.add(
+        SourceCitation(
+          label: label,
+          title: title,
+          xref: xrefIn(link?.attributes['href'], 'source'),
+          details: _citationDetails(cell, link),
+          isSecondary: _isSecondaryRow(row),
+        ),
+      );
+    }
+    return citations;
+  }
+
+  /// The fields of one citation — page, quality, date.
+  ///
+  /// webtrees renders each as `<div><span class="label">…</span>: …</div>`,
+  /// with the wording and the separator already translated, so each line is
+  /// taken whole rather than split into a pair this app would have to rejoin.
+  List<String> _citationDetails(Element cell, Element? source) {
+    final details = <String>[];
+
+    for (final block in cell.querySelectorAll('div')) {
+      // The label must be a *direct* child: webtrees wraps a citation's
+      // fields in a collapsible div, which holds the same spans one level
+      // deeper — reading that too would repeat every field as one run-on line.
+      if (!block.children.any((child) => child.classes.contains('label'))) {
+        continue;
+      }
+      // The line naming the source is the title, not a detail about it.
+      if (source != null &&
+          block.querySelectorAll('a[href]').contains(source)) {
+        continue;
+      }
+
+      final text = textOf(block);
+      if (text != null) details.add(text);
+    }
+    return details;
+  }
+
+  /// Reads the rows of a media tab.
+  ///
+  /// The thumbnails here are signed URLs like any other, so they carry no
+  /// authority of their own: webtrees checks this account's permission when
+  /// they are fetched, which is why they must travel over the session.
+  List<MediaItem> parseMedia(String fragment) {
+    final document = html.parseFragment(fragment);
+    final media = <MediaItem>[];
+
+    for (final row in _recordRows(document)) {
+      final label = _rowLabel(row);
+      final cell = row.querySelector('td');
+      if (label == null || cell == null) continue;
+
+      final link = recordLink(cell, 'media');
+      final images = cell.querySelectorAll('img[src]');
+      if (link == null && images.isEmpty) continue;
+
+      final item = MediaItem(
+        title: textOf(link) ?? label,
+        xref: xrefIn(link?.attributes['href'], 'media'),
+        isSecondary: _isSecondaryRow(row),
+      );
+
+      // A media record may hold several files, and one that is not an image
+      // at all — a sound file, a document — renders as an icon rather than a
+      // thumbnail. Naming it is better than dropping it.
+      if (images.isEmpty) {
+        media.add(item);
+        continue;
+      }
+      for (final image in images) {
+        media.add(
+          MediaItem(
+            title: item.title,
+            xref: item.xref,
+            thumbnailUrl: image.attributes['src'],
+            isSecondary: item.isSecondary,
+          ),
+        );
+      }
+    }
+    return media;
+  }
+
+  /// The rows of a record tab that describe something.
+  ///
+  /// Skips the tab's own controls and its "there is nothing here" line, which
+  /// have no header cell, and anything queued for deletion — the notes,
+  /// sources and media tabs mark those on the cells rather than on the row.
+  Iterable<Element> _recordRows(DocumentFragment document) => document
+      .querySelectorAll('tr')
+      .where((row) => row.querySelector('th') != null)
+      .where(
+        (row) =>
+            !row.classes.contains('wt-old') &&
+            !row
+                .querySelectorAll('th, td')
+                .any((cell) => cell.classes.contains('wt-old')),
+      );
+
+  /// What a row is about, in the site's own words.
+  String? _rowLabel(Element row) {
+    final head = row.querySelector('th');
+    if (head == null) return null;
+
+    final own = textOf(head.querySelector('.wt-fact-label'));
+    if (own != null) return own;
+
+    // A row for something attached to a fact carries no fact label: webtrees
+    // prints that fact's label straight into the header cell, followed by the
+    // editing controls only an editor is served.
+    return textWithout(head, const ['.wt-fact-edit-links', '.wt-fact-icon']);
+  }
+
+  /// Whether webtrees renders this row collapsed — attached to a fact rather
+  /// than recorded against the person.
+  bool _isSecondaryRow(Element row) => row.classes.contains('collapse');
+
+  /// The identifier of the [type] record [element] links to, if it links to
+  /// one at all.
+  String? _xrefOf(Element? element, String type) =>
+      xrefIn(recordLink(element, type)?.attributes['href'], type);
+
   /// Reads the family blocks of a relatives tab.
   ///
   /// Each family is its own table: a caption linking to the family record,
@@ -286,7 +510,7 @@ final class RecordParser {
       // the "date differences" toggle.
       if (familyXref == null) continue;
 
-      final (spouses, children) = _splitFamily(table);
+      final (spouses, children, facts) = _splitFamily(table);
       families.add(
         FamilyGroup(
           xref: familyXref,
@@ -294,6 +518,7 @@ final class RecordParser {
           kind: _kindOf(xref, spouses, children),
           spouses: spouses,
           children: children,
+          facts: facts,
         ),
       );
     }
@@ -306,9 +531,12 @@ final class RecordParser {
   /// rows carry no chart box, which makes them a reliable divider; when a
   /// family records no marriage at all there is no divider, and the leading
   /// pair of people are the couple.
-  (List<PersonRef>, List<PersonRef>) _splitFamily(Element table) {
+  (List<PersonRef>, List<PersonRef>, List<FactEntry>) _splitFamily(
+    Element table,
+  ) {
     final spouses = <PersonRef>[];
     final children = <PersonRef>[];
+    final facts = <FactEntry>[];
     var seenDivider = false;
 
     for (final row in table.querySelectorAll('tr')) {
@@ -318,6 +546,8 @@ final class RecordParser {
         // child" links an editor sees — carry no chart box either, but they
         // only ever appear after the children, so treating them as a divider
         // costs nothing.
+        final fact = _familyFact(row);
+        if (fact != null) facts.add(fact);
         if (row.querySelector('.field') != null) seenDivider = true;
         continue;
       }
@@ -332,8 +562,30 @@ final class RecordParser {
         children.add(person);
       }
     }
-    return (spouses, children);
+    return (spouses, children, facts);
   }
+
+  /// A marriage or divorce row of a family table.
+  ///
+  /// Rendered as a label beside a field rather than as a fact row, and the
+  /// date carries no calendar links here — `Date::display()` is called without
+  /// them — so this text is all there is. An empty field is normal: webtrees
+  /// still prints the row for a marriage it has no date or place for.
+  FactEntry? _familyFact(Element row) {
+    final label = textOf(row.querySelector('td span.label'));
+    if (label == null) return null;
+
+    final value = cleanText(textOf(row.querySelector('td span.field')));
+    return FactEntry(label: label, value: _hasContent(value) ? value : null);
+  }
+
+  /// Whether a rendered value says anything at all.
+  ///
+  /// A marriage with neither date nor place still renders its separators, so
+  /// the field arrives as a lone dash — punctuation the reader would have to
+  /// decode as "nothing recorded".
+  static bool _hasContent(String? text) =>
+      text != null && RegExp(r'[\p{L}\p{N}]', unicode: true).hasMatch(text);
 
   /// Decides what a family is to the person being viewed.
   ///

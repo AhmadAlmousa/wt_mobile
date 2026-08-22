@@ -7,7 +7,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Keep in step with `kAppVersion` in lib/core/webtrees_client.dart, which puts
 # this number in the User-Agent every request carries. Site administrators read
 # that string in their logs, so it has to name the build they actually have.
-version: 0.2.0+2
+version: 0.3.0+3
 
 environment:
   sdk: ^3.12.2

@@ -77,6 +77,7 @@ final class FactEntry {
     this.date,
     this.place,
     this.type,
+    this.about,
     this.isSecondary = false,
   });
 
@@ -100,6 +101,14 @@ final class FactEntry {
 
   /// A refinement of the label, from the fact's `TYPE` field.
   final String? type;
+
+  /// Whose event this really is, when it is not this person's.
+  ///
+  /// webtrees folds a relative's birth and a family's marriage into the
+  /// person's own list, and names the other record in `.wt-fact-record`.
+  /// Without it "Birth of a sibling" says nothing about *which* sibling, and
+  /// the reader has no way to walk to them.
+  final PersonRef? about;
 
   /// Whether webtrees itself renders this collapsed by default.
   ///
@@ -133,8 +142,10 @@ final class FamilyGroup {
     required this.kind,
     required List<PersonRef> spouses,
     required List<PersonRef> children,
+    List<FactEntry> facts = const [],
   }) : spouses = List.unmodifiable(spouses),
-       children = List.unmodifiable(children);
+       children = List.unmodifiable(children),
+       facts = List.unmodifiable(facts);
 
   /// The family record identifier, e.g. `F7`.
   final String xref;
@@ -148,6 +159,108 @@ final class FamilyGroup {
   final List<PersonRef> spouses;
 
   final List<PersonRef> children;
+
+  /// What happened to the couple — a marriage, a divorce.
+  ///
+  /// These belong to the family record rather than to either person, which is
+  /// why they have to be read here: a marriage date shown against one spouse
+  /// and not the other would be an odd thing to claim.
+  final List<FactEntry> facts;
+}
+
+/// A note recorded against a person, or against one of their facts.
+///
+/// webtrees keeps both in one tab: a note about the person, and a note
+/// hanging off their birth. The second kind is collapsed by the site itself,
+/// so [isSecondary] carries that distinction rather than losing it.
+@immutable
+final class NoteEntry {
+  const NoteEntry({
+    required this.label,
+    required this.text,
+    this.xref,
+    this.isSecondary = false,
+  });
+
+  /// What the note is attached to, in the site's own words — `Note` for one
+  /// recorded against the person, the fact's own label for the rest.
+  final String label;
+
+  /// The note itself, exactly as webtrees rendered it.
+  final String text;
+
+  /// The record identifier when this is a *shared* note, e.g. `N3`.
+  ///
+  /// A shared note is a record of its own that several people may cite; a
+  /// plain one is text inside this record and has no identifier.
+  final String? xref;
+
+  final bool isSecondary;
+
+  @override
+  String toString() => 'NoteEntry($label)';
+}
+
+/// One citation: the source a fact came from, and where in it to look.
+@immutable
+final class SourceCitation {
+  SourceCitation({
+    required this.label,
+    required this.title,
+    this.xref,
+    List<String> details = const [],
+    this.isSecondary = false,
+  }) : details = List.unmodifiable(details);
+
+  /// What this citation supports — the fact's label, or `Source` when it is
+  /// cited against the person as a whole.
+  final String label;
+
+  /// The source record's title, as webtrees rendered it.
+  final String title;
+
+  /// The source record identifier, e.g. `S4`.
+  final String? xref;
+
+  /// The citation's own fields — page, quality, date — each already worded
+  /// and translated by the server as `Page: 42`.
+  ///
+  /// Kept as the site's own sentences rather than as pairs to re-join here:
+  /// webtrees translates the separator too, and rebuilding it in Dart would
+  /// mean guessing at punctuation the site has already chosen.
+  final List<String> details;
+
+  final bool isSecondary;
+
+  @override
+  String toString() => 'SourceCitation($title)';
+}
+
+/// One media object linked to a person.
+@immutable
+final class MediaItem {
+  const MediaItem({
+    required this.title,
+    this.xref,
+    this.thumbnailUrl,
+    this.isSecondary = false,
+  });
+
+  /// The media record's title, already rendered by the server.
+  final String title;
+
+  /// The media record identifier, e.g. `M11`.
+  final String? xref;
+
+  /// A signed thumbnail URL, which must be fetched through the session — see
+  /// [PersonRef.thumbnailUrl].
+  final String? thumbnailUrl;
+
+  /// Whether this hangs off a fact rather than off the person.
+  final bool isSecondary;
+
+  @override
+  String toString() => 'MediaItem($title)';
 }
 
 /// Everything the app read about one person.
@@ -161,9 +274,17 @@ final class IndividualRecord {
     this.alternateName,
     this.thumbnailUrl,
     this.sex = Sex.unknown,
+    List<NoteEntry> notes = const [],
+    List<SourceCitation> sources = const [],
+    List<MediaItem> media = const [],
+    List<String> sections = const [],
     List<Notice> warnings = const [],
   }) : facts = List.unmodifiable(facts),
        families = List.unmodifiable(families),
+       notes = List.unmodifiable(notes),
+       sources = List.unmodifiable(sources),
+       media = List.unmodifiable(media),
+       sections = List.unmodifiable(sections),
        warnings = List.unmodifiable(warnings);
 
   final String xref;
@@ -174,6 +295,22 @@ final class IndividualRecord {
 
   final List<FactEntry> facts;
   final List<FamilyGroup> families;
+
+  /// Notes, source citations and photographs, when the tree offers those tabs.
+  ///
+  /// All three are optional modules a site may switch off — this project's own
+  /// target has all three off — so an empty list means "this site does not
+  /// publish them", not "this person has none".
+  final List<NoteEntry> notes;
+  final List<SourceCitation> sources;
+  final List<MediaItem> media;
+
+  /// Every tab this site offered on the page, by webtrees module name.
+  ///
+  /// Not used by the interface: it is what the diagnostics report, because
+  /// which modules a site runs decides what the app can show at all, and no
+  /// two instances agree. A custom tab appears here beside the core ones.
+  final List<String> sections;
 
   /// Parts that could not be read, named so the interface can say which.
   ///

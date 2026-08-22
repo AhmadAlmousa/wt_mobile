@@ -87,7 +87,12 @@ void main() {
         Canned(200, body: fixture(version, 'tab_personal_facts.html')),
     tabRoute('relatives'): (_) =>
         Canned(200, body: fixture(version, 'tab_relatives.html')),
-    tabRoute('media'): (_) => const Canned(200, body: '<div></div>'),
+    tabRoute('media'): (_) =>
+        Canned(200, body: fixture(version, 'tab_media.html')),
+    tabRoute('notes'): (_) =>
+        Canned(200, body: fixture(version, 'tab_notes.html')),
+    tabRoute('sources_tab'): (_) =>
+        Canned(200, body: fixture(version, 'tab_sources.html')),
   };
 
   group('search', () {
@@ -192,10 +197,26 @@ void main() {
         serve(site(version: version));
         await records.individual('main', 'X42');
 
-        expect(server.routes, contains(tabRoute('personal_facts')));
-        expect(server.routes, contains(tabRoute('relatives')));
-        // The media tab was offered but not needed for this slice.
-        expect(server.routes, isNot(contains(tabRoute('media'))));
+        for (final module in const [
+          'personal_facts',
+          'relatives',
+          'notes',
+          'sources_tab',
+          'media',
+        ]) {
+          expect(server.routes, contains(tabRoute(module)));
+        }
+      });
+
+      test('reads the notes, sources and photos a site publishes', () async {
+        serve(site(version: version));
+
+        final person = await records.individual('main', 'X42');
+
+        expect(person.notes.first.text, startsWith('هاجر إلى الكويت'));
+        expect(person.sources.first.title, 'سجل قيد العائلة');
+        expect(person.media.first.thumbnailUrl, contains('M11'));
+        expect(person.warnings, isEmpty);
       });
 
       test('marks fragment requests as such', () async {
@@ -312,6 +333,65 @@ void main() {
           'relatives',
         ),
       );
+    });
+  });
+
+  group('a module the site does not run', () {
+    test('is not a missing section', () async {
+      // Notes, sources and media are optional modules. This project's own
+      // target runs none of the three, so treating their absence as a fault
+      // would put a warning on every record it ever shows.
+      final page = fixture('v2_2_6', 'individual_page.html')
+          .replaceAll('href="#notes"', 'href="#none"')
+          .replaceAll('href="#sources_tab"', 'href="#nothing"')
+          .replaceAll('href="#media"', 'href="#neither"');
+      serve({
+        ...site(),
+        '/tree/main/individual/X42': (_) => Canned(200, body: page),
+      });
+
+      final person = await records.individual('main', 'X42');
+
+      expect(person.notes, isEmpty);
+      expect(person.sources, isEmpty);
+      expect(person.media, isEmpty);
+      expect(person.warnings, isEmpty);
+      expect(server.routes, isNot(contains(tabRoute('notes'))));
+    });
+
+    test('but one that fails to load still says so', () async {
+      serve({...site(), tabRoute('notes'): (_) => const Canned(500)});
+
+      final person = await records.individual('main', 'X42');
+
+      // Offered and broken is a different thing from never offered, and the
+      // reader is owed the difference: something is missing from this page.
+      expect(person.notes, isEmpty);
+      expect(
+        person.warnings.single,
+        isA<SectionUnavailable>().having(
+          (notice) => notice.module,
+          'module',
+          'notes',
+        ),
+      );
+    });
+  });
+
+  group('paging', () {
+    test('asks for the page it was given', () async {
+      serve({
+        ...site(),
+        '/tree/main/tom-select-individual': tomSelect(more: true),
+      });
+
+      await records.search('main', 'الموسى', page: 3);
+
+      // webtrees pages by number from one. Its own `nextUrl` cannot be
+      // followed: it is built from the tree, `at` and the page only, dropping
+      // the query, so a client that trusted it would search for nothing.
+      expect(server.requests.single.query['page'], '3');
+      expect(server.requests.single.query['query'], 'الموسى');
     });
   });
 

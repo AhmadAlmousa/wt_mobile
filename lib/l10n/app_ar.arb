@@ -78,6 +78,10 @@
   "siblings": "إخوة وأخوات",
   "spouses": "أزواج",
   "children": "أولاد",
+  "photos": "صور",
+  "notes": "ملاحظات",
+  "sources": "مصادر",
+  "showMoreResults": "عرض المزيد",
   "eventsOfCloseRelatives": "أحداث الأقارب",
 
   "settings": "الإعدادات",
@@ -127,6 +131,9 @@
   "noticeOnlyOneTreeFound": "لم يُعثر إلا على شجرة عائلة واحدة. إن كان في هذا الموقع أكثر من شجرة، فقد يكون مديره قد أوقف التنقّل بينها.",
   "noticeFactsUnavailable": "تعذّر تحميل المعلومات والأحداث لهذا الشخص.",
   "noticeRelativesUnavailable": "تعذّر تحميل أفراد العائلة لهذا الشخص.",
+  "noticeNotesUnavailable": "تعذّر تحميل الملاحظات لهذا الشخص.",
+  "noticeSourcesUnavailable": "تعذّر تحميل المصادر لهذا الشخص.",
+  "noticeMediaUnavailable": "تعذّر تحميل الصور لهذا الشخص.",
   "noticeSectionUnavailable": "تعذّر تحميل قسم {module}.",
   "@noticeSectionUnavailable": {"placeholders": {"module": {"type": "String"}}}
 }

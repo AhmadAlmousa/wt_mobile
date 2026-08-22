@@ -493,6 +493,30 @@ abstract class AppText {
   /// **'Children'**
   String get children;
 
+  /// No description provided for @photos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get photos;
+
+  /// No description provided for @notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notes;
+
+  /// No description provided for @sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources'**
+  String get sources;
+
+  /// No description provided for @showMoreResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get showMoreResults;
+
   /// No description provided for @eventsOfCloseRelatives.
   ///
   /// In en, this message translates to:
@@ -720,6 +744,24 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'Family members could not be loaded for this person.'**
   String get noticeRelativesUnavailable;
+
+  /// No description provided for @noticeNotesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes could not be loaded for this person.'**
+  String get noticeNotesUnavailable;
+
+  /// No description provided for @noticeSourcesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources could not be loaded for this person.'**
+  String get noticeSourcesUnavailable;
+
+  /// No description provided for @noticeMediaUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos could not be loaded for this person.'**
+  String get noticeMediaUnavailable;
 
   /// No description provided for @noticeSectionUnavailable.
   ///
