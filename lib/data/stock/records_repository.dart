@@ -7,6 +7,7 @@ import 'package:html/parser.dart' as html;
 import '../../core/errors.dart';
 import '../../core/response_status.dart';
 import '../../core/webtrees_client.dart';
+import '../../domain/charts.dart';
 import '../../domain/notice.dart';
 import '../../domain/records.dart';
 import 'dom.dart';
@@ -132,6 +133,19 @@ final class RecordsRepository {
       );
     }
     return people;
+  }
+
+  /// The charts a site offers for a whole tree rather than for one person.
+  ///
+  /// Read from the tree's own page, because that is where webtrees puts the
+  /// links to them — the statistics of a whole database belong to nobody in
+  /// particular, so no person's page carries a link with their xref in it.
+  Future<Map<ChartKind, String>> treeCharts(String tree) async {
+    final reply = await _client.get('/tree/$tree');
+    if (!reply.isOk) {
+      throw failureFrom(reply, probe: 'reading the charts $tree offers');
+    }
+    return _parser.parseChartMenu(html.parse(reply.body));
   }
 
   /// Reads one person: their names, photo, facts, family, notes, sources and

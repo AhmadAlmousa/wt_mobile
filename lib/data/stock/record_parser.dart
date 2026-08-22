@@ -59,7 +59,7 @@ final class RecordParser {
           ?.attributes['src'],
       tabs: _tabs(document),
       inlineTabs: _inlineTabs(document),
-      charts: _charts(document, xref),
+      charts: parseChartMenu(document, xref: xref),
     );
   }
 
@@ -98,7 +98,7 @@ final class RecordParser {
     return tabs;
   }
 
-  /// The charts this site offers for this person, by kind.
+  /// The charts a page links to, by kind.
   ///
   /// webtrees puts its own class on every link to a chart —
   /// `menu-chart-ancestry` — so the app discovers what an instance runs the
@@ -110,7 +110,7 @@ final class RecordParser {
   /// The page's own menu is preferred because its links are for *this*
   /// person; the same classes appear inside every chart box on the page, each
   /// pointing at whoever that box holds.
-  Map<ChartKind, String> _charts(Document document, String xref) {
+  Map<ChartKind, String> parseChartMenu(Document document, {String? xref}) {
     final charts = <ChartKind, String>{};
 
     void collect(Iterable<Element> links) {
@@ -131,11 +131,13 @@ final class RecordParser {
     // No recognisable menu — a theme that lays its navigation out
     // differently. Any link to a chart will do, so long as it is a link to
     // *this* person's chart: the boxes on the page each carry their own.
-    collect(
-      document
-          .querySelectorAll('a[href]')
-          .where((link) => (link.attributes['href'] ?? '').contains(xref)),
-    );
+    if (xref != null) {
+      collect(
+        document
+            .querySelectorAll('a[href]')
+            .where((link) => (link.attributes['href'] ?? '').contains(xref)),
+      );
+    }
     return charts;
   }
 

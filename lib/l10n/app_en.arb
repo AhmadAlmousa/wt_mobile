@@ -83,6 +83,8 @@
   "notes": "Notes",
   "sources": "Sources",
   "charts": "Charts",
+  "statistics": "Statistics",
+  "statisticsEmpty": "This site published no statistics the app could read.",
   "chartAncestors": "Ancestors",
   "chartDescendants": "Descendants",
   "chartHourglass": "Hourglass",

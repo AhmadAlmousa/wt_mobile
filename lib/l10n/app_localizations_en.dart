@@ -238,6 +238,13 @@ class AppTextEn extends AppText {
   String get charts => 'Charts';
 
   @override
+  String get statistics => 'Statistics';
+
+  @override
+  String get statisticsEmpty =>
+      'This site published no statistics the app could read.';
+
+  @override
   String get chartAncestors => 'Ancestors';
 
   @override

@@ -517,6 +517,18 @@ abstract class AppText {
   /// **'Charts'**
   String get charts;
 
+  /// No description provided for @statistics.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get statistics;
+
+  /// No description provided for @statisticsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This site published no statistics the app could read.'**
+  String get statisticsEmpty;
+
   /// No description provided for @chartAncestors.
   ///
   /// In en, this message translates to:

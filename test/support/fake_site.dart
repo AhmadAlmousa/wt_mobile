@@ -118,5 +118,13 @@ final class FakeSite {
 <h1 class="col wt-site-title">Family tree</h1>
 <a href="/tree/main" class="dropdown-item menu-tree-1">Family tree</a>
 <a href="/tree/main/individual/X42/slug" class="menu-myrecord">My record</a>
+<nav class="col wt-primary-navigation"><ul class="nav wt-genealogy-menu">
+<li class="nav-item dropdown menu-chart">
+<a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Charts</a>
+<div class="dropdown-menu">
+<a class="dropdown-item menu-chart-statistics" href="/module/statistics_chart/Chart/main">Statistics</a>
+</div>
+</li>
+</ul></nav>
 </body></html>''';
 }

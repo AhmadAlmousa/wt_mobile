@@ -1,11 +1,16 @@
 import 'dart:developer' as developer;
 
+import 'package:html/parser.dart' as html;
+
 import '../../core/errors.dart';
 import '../../core/response_status.dart';
 import '../../core/webtrees_client.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
+import '../../domain/statistics.dart';
 import 'chart_parser.dart';
+import 'dom.dart';
+import 'statistics_parser.dart';
 
 /// Fetches the charts a stock webtrees site draws, and reads their structure.
 ///
@@ -107,6 +112,31 @@ final class ChartsRepository {
       probe: 'reading how $from and $to are related',
     );
     return _parser.parseRelationships(body, from: from);
+  }
+
+  /// Reads a site's statistics page: its counts, and the data behind its own
+  /// charts.
+  ///
+  /// The page itself holds nothing but tabs; each one names a fragment where
+  /// the numbers actually are, exactly as a record's tabs do. A tab that
+  /// yields no sections — webtrees offers one for *building* a chart rather
+  /// than showing one — simply contributes nothing.
+  Future<TreeStatistics> statistics(String url) async {
+    final page = await _fragment(url, probe: 'reading the statistics');
+    final document = html.parse(page);
+
+    final parts = <StatisticPart>[];
+    for (final tab in document.querySelectorAll('a[data-wt-href]')) {
+      final href = tab.attributes['data-wt-href'];
+      if (href == null) continue;
+
+      final body = await _fragment(href, probe: 'reading the statistics');
+      final sections = const StatisticsParser().parseSections(body);
+      if (sections.isEmpty) continue;
+
+      parts.add(StatisticPart(title: textOf(tab) ?? '', sections: sections));
+    }
+    return TreeStatistics(parts: parts);
   }
 
   /// Whether a site's own settings keep this chart to blood relations.

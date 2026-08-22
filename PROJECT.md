@@ -365,6 +365,24 @@ is the **shape** — who descends from whom — and draws it again.
   `…/{xref}` and takes an optional second xref after it, and a page only ever
   links to one person at a time — so the app appends the other. Every other
   part of the URL, both settings included, is left as the site wrote it.
+- **A statistics page says everything twice.** Its counts are in the markup —
+  `<h4>Total individuals <span class="badge">١٬٤٦٣</span></h4>`, rendered in
+  the reader's own numerals — and the data behind each of its charts is in a
+  `<script>` beside it, handed to the site's charting library as **plain
+  numbers**. So the counts are shown exactly as they arrived and the charts
+  are redrawn from the numbers, which is also why a chart's numerals have to
+  be written by the app: `NumberFormat` for `ar` produces Latin digits, and a
+  screen that changed numerals halfway down would look broken.
+- The page itself holds only tabs, each naming its fragment in `data-wt-href`
+  exactly as a record's tabs do — including one that holds a *form* for
+  building a chart rather than a chart. It is read and found to contain no
+  figures, rather than skipped by its name.
+- **The data is JSON; the options beside it are not.** webtrees writes some
+  option objects by hand, with comments and unquoted keys, so a parser that
+  decoded both would drop every chart whose options were hand-written — which
+  is most of the pie charts (§7, bug 23).
+- A map chart names each place twice, `{"v": "KW", "f": "الكويت"}`: the code it
+  plots by and the name a reader wants.
 - **Not every chart is a fetch.** A fan chart is an ancestors chart bent round
   a circle, a compact chart is the same one with smaller boxes, and an
   hourglass is the two charts either side of a person stitched at the middle.
@@ -529,7 +547,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **6a** | Charts: discovery, ancestors and descendants, drawn natively | ✅ |
 | **6b** | Charts: fan/circle, compact, hourglass — the same data, redrawn | ✅ |
 | **6c** | Relationships — how any two people in a tree are connected | ✅ |
-| **6d** | Statistics — the counts, and the datasets behind its charts | ⬜ |
+| **6d** | Statistics — the counts, and the datasets behind its charts | ✅ |
 | **6e** | Timeline and lifespans — events and lives against a scale | ⬜ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
@@ -550,7 +568,7 @@ from a box to the person.
 | Relationships | the server's own path between two people, walked out of its grid | ✅ 6c |
 | Timeline | positioned event boxes, with the years in a `<script>` beside them | 6c |
 | Lifespan | years per person, which means reading numerals the server localized | 6c |
-| Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | 6c |
+| Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | ✅ 6d |
 | Pedigree map | a map. Out of scope for v1 — no map dependency is worth the weight yet | — |
 
 **Exit criteria**
@@ -791,6 +809,49 @@ arrived, and both of the site's own settings inside it are left alone.
 Released as **0.6.0**. **363 tests** green (350 → 363), analyzer clean, and the
 live check reads a real path — *son*, one step — against `tree.almou.sa`.
 
+### 2026-08-22 (later still) — Phase 6d: what a site says about the whole tree
+
+A statistics page is not a family shape, so none of the chart work applied to
+it. What it turned out to be is a page that says everything twice: its counts
+are in the markup, in the reader's own numerals, and the data behind each of
+its charts is in a `<script>` beside it — plain numbers, written for a
+JavaScript library that was never meant to have a reader.
+
+**So the counts are shown as they arrived and the charts are drawn again.**
+`tree.almou.sa` publishes seventeen sections and sixteen datasets: the split
+of sexes, births by century, the commonest surnames, average lifespan by
+century, where in the world its events happened.
+
+**The chart forms are not webtrees' own.** It draws pies; a phone reads a
+share far better as one bar cut into its parts, with every part named and
+counted beside its swatch — identity never carried by colour alone. Counts by
+category are bars of one hue, because the length already says the number and
+colouring by value would spend the identity channel saying it twice.
+
+**The palette was computed, not chosen.** The app's own scheme fails as chart
+colours: its secondary and tertiary sit 1.2 ΔE apart under deuteranopia and
+below the chroma floor where a hue stops carrying identity at all. The four
+used instead pass the lightness band, chroma floor, colour-vision separation
+and contrast checks against *both* of this app's surfaces — verified by
+running the checks rather than by looking.
+
+**Two bugs a picture caught, again.** The share bar rendered as eighteen
+pixels of empty surface, because a coloured box has no height of its own and a
+row centres it into nothing. And every chart number came out in Latin digits
+beside the site's own Arabic-Indic ones, because `NumberFormat` for `ar` uses
+the Latin numbering system. Neither would have failed a test that asked
+whether the widget was there.
+
+**A standing risk turned out to be wrong.** §9 said this tree has no media at
+all. Its own statistics say 86 media objects, 83 of them photographs — but not
+one is visible to this account as a highlighted thumbnail (0 of 50 people
+searched), so the authenticated image path *still* cannot be proven here. The
+risk is the same size; its description was simply false.
+
+Released as **0.7.0**. **384 tests** green (363 → 384), analyzer clean, and the
+live check reads the real statistics page — three parts, seventeen sections,
+sixteen charts.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -820,6 +881,8 @@ live check reads a real path — *son*, one step — against `tree.almou.sa`.
 | 20 | The calendar escape was read from a decoded URL, whose `#` swallowed the query | **Parser test** |
 | 21 | Submitting a search left its debounce pending, so every search ran twice | **Widget test** |
 | 22 | The live check asked the server for a chart the app never fetches | **Live run only** |
+| 23 | Every statistics chart was dropped: one *options* argument is JavaScript, not JSON | **Live markup** |
+| 24 | A stacked bar drew as empty surface — a coloured box has no height of its own | **Rendered preview** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -838,6 +901,13 @@ the wrong version's template and agreed with a parser that never looked.
 Bugs 18 and 19 are the two the tests could not have been expected to catch
 from copy alone: one needed the system back button simulated, the other needed
 somebody to look at a picture.
+
+Bug 23 is the fixture lesson in a new coat: the *data* argument of every
+`statistics.draw*Chart` call is strict JSON, and the options argument beside it
+is hand-written JavaScript — comments, unquoted keys and all. A parser that
+decoded both threw on the second and dropped the chart, and no fixture written
+from the data alone would ever have shown it. Bug 24 is bug 19 again: the
+tests said the widget was there, and the picture said it was invisible.
 
 Bug 22 is small and the lesson is not: "charts the app can draw" and "charts
 the app fetches" became different sets the moment an hourglass was stitched
@@ -1128,14 +1198,15 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 363 tests
+flutter test          # 384 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
-# ancestors, descendants, fan and hourglass charts, and a relationship.
+# ancestors, descendants, fan and hourglass charts, a relationship, and the
+# site's statistics.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -1162,7 +1233,10 @@ Both tools read the password from the terminal with echo disabled, or from
 1. **Notes, sources and photographs have never been seen from a real site.**
    `tree.almou.sa` runs none of those three tab modules — it offers
    `personal_facts`, `relatives`, `tree`, `places` and `_vytux_cousins_` — and
-   has no media at all (`/tree/main/media-list` renders zero thumbnails). So
+   although its own statistics report **86 media objects, 83 of them
+   photographs**, not one is visible to this account: no highlighted thumbnail
+   appears on any of 50 people searched, and `/tree/main/media-list` renders
+   none either. So
    `parseNotes`, `parseSources`, `parseMedia`, `AuthenticatedImage`,
    `MediaCache` and the `canShow()`-before-signature rule that motivated them
    stand on fixtures transcribed from the upstream templates and nothing else.

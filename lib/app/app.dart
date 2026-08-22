@@ -15,6 +15,7 @@ import '../features/browse/person_screen.dart';
 import '../features/browse/search_screen.dart';
 import '../features/charts/chart_screen.dart';
 import '../features/charts/relationship_screen.dart';
+import '../features/charts/statistics_screen.dart';
 import '../features/connect/connect_screen.dart';
 import '../features/launch/launch_screen.dart';
 import '../l10n/app_localizations.dart';
@@ -181,9 +182,19 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
             title: state.extra as String?,
             onOpenPerson: (xref) => _router.push(Routes.personIn(tree, xref)),
             onShowAccount: () => _router.push(Routes.access),
+            onShowStatistics: () => _router.push(Routes.statisticsIn(tree)),
           );
         },
         routes: [
+          GoRoute(
+            path: Routes.statisticsUnderTree,
+            builder: (context, state) => StatisticsScreen(
+              session: widget.session,
+              records: _records,
+              charts: _charts,
+              tree: state.pathParameters['tree']!,
+            ),
+          ),
           // Nested, so opening a person by URL still puts the search screen
           // underneath them. As siblings these two shared no stack, and the
           // first back gesture left the app instead of returning to the
@@ -320,6 +331,9 @@ abstract final class Routes {
   /// on top of the search results in the navigation stack.
   static const String personUnderSearch = 'person/:xref';
 
+  /// What a site says about the whole tree, rather than about anybody in it.
+  static const String statisticsUnderTree = 'statistics';
+
   /// Declared relative to the person, for the same reason.
   static const String chartUnderPerson = 'chart/:kind';
   static const String relationshipUnderPerson = 'relationship';
@@ -334,4 +348,6 @@ abstract final class Routes {
 
   static String relationshipIn(String tree, String xref) =>
       '${personIn(tree, xref)}/relationship';
+
+  static String statisticsIn(String tree) => '${searchIn(tree)}/statistics';
 }

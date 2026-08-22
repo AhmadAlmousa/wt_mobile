@@ -105,6 +105,60 @@ void main() {
     });
   });
 
+  group('reading the statistics', () {
+    Map<String, Canned Function(Sent)> withStatistics() => {
+      ...site(),
+      '/module/statistics_chart/Chart/main': (_) => const Canned(
+        200,
+        body:
+            '<div id="statistics-tabs"><ul class="nav nav-tabs">'
+            '<li><a class="nav-link" href="#tab-1" '
+            'data-wt-href="/module/statistics_chart/Individuals/main">أفراد</a>'
+            '</li>'
+            '<li><a class="nav-link" href="#tab-2" '
+            'data-wt-href="/module/statistics_chart/Custom/main">مخصص</a></li>'
+            '</ul></div>',
+      ),
+      '/module/statistics_chart/Individuals/main': (_) =>
+          Canned(200, body: fixture('v2_2_6', 'statistics_individuals.html')),
+      // webtrees offers a tab for *building* a chart, which holds a form and
+      // no figures at all.
+      '/module/statistics_chart/Custom/main': (_) =>
+          const Canned(200, body: '<form><select></select></form>'),
+    };
+
+    test('follows the page to the fragments that hold the numbers', () async {
+      serve(withStatistics());
+
+      final statistics = await charts.statistics(
+        '/module/statistics_chart/Chart/main',
+      );
+
+      expect(statistics.parts.single.title, 'أفراد');
+      expect(statistics.parts.single.sections.first.total, '١٬٤٦٣');
+      expect(
+        server.routes,
+        containsAll(<String>[
+          '/module/statistics_chart/Chart/main',
+          '/module/statistics_chart/Individuals/main',
+        ]),
+      );
+    });
+
+    test('drops a tab that turned out to hold no figures', () async {
+      serve(withStatistics());
+
+      final statistics = await charts.statistics(
+        '/module/statistics_chart/Chart/main',
+      );
+
+      // Read and found wanting, rather than skipped by its name: the app has
+      // no business knowing what a site calls its tabs.
+      expect(statistics.parts, hasLength(1));
+      expect(server.routes, contains('/module/statistics_chart/Custom/main'));
+    });
+  });
+
   group('reading a relationship', () {
     Map<String, Canned Function(Sent)> withRelationships() => {
       ...site(),

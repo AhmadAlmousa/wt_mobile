@@ -82,6 +82,8 @@
   "notes": "ملاحظات",
   "sources": "مصادر",
   "charts": "مخططات",
+  "statistics": "تعداد وإحصائيات",
+  "statisticsEmpty": "لم ينشر هذا الموقع إحصاءات يستطيع التطبيق قراءتها.",
   "chartAncestors": "أسلاف",
   "chartDescendants": "أنسال",
   "chartHourglass": "ساعة رملية",

@@ -73,6 +73,16 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    '/module/statistics_chart/Chart/main': (_) => const Canned(
+      200,
+      body:
+          '<div id="statistics-tabs"><ul class="nav nav-tabs"><li>'
+          '<a class="nav-link" href="#tab-1" '
+          'data-wt-href="/module/statistics_chart/Individuals/main">أفراد</a>'
+          '</li></ul></div>',
+    ),
+    '/module/statistics_chart/Individuals/main': (_) =>
+        Canned(200, body: fixture('statistics_individuals.html')),
   };
 }
 
@@ -162,7 +172,7 @@ Future<void> main() async {
     }
     // The charts are opened from the person rather than from the account
     // screen, so these steps rejoin the walk at step 3.
-    if (steps >= 6) {
+    if (steps >= 6 && steps <= 10) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
@@ -178,6 +188,12 @@ Future<void> main() async {
           _ => 0,
         }),
       );
+      await tester.pumpAndSettle();
+    }
+    // Statistics belong to the tree rather than to anybody in it, so they
+    // are reached from the tree screen.
+    if (steps == 11) {
+      await tester.tap(find.byIcon(Icons.insights_outlined));
       await tester.pumpAndSettle();
     }
     // A relationship needs a second person before there is anything to draw,
@@ -335,6 +351,16 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 10,
+        );
+      });
+
+      testWidgets('statistics $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'statistics-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 11,
         );
       });
     }

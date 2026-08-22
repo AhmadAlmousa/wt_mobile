@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
 import '../../data/stock/records_repository.dart';
+import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/bidi.dart';
@@ -25,6 +26,7 @@ class SearchScreen extends StatefulWidget {
     required this.tree,
     required this.onOpenPerson,
     required this.onShowAccount,
+    required this.onShowStatistics,
     this.title,
     super.key,
   });
@@ -45,6 +47,9 @@ class SearchScreen extends StatefulWidget {
   /// An account with one tree comes straight here, so this is the only route
   /// back to what the app knows about the site, the role and the session.
   final VoidCallback onShowAccount;
+
+  /// Opens what the site says about the tree as a whole.
+  final VoidCallback onShowStatistics;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -78,6 +83,34 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Rises with each search so a slow earlier reply cannot overwrite a newer
   /// one — typing quickly otherwise leaves the wrong names on screen.
   int _generation = 0;
+
+  /// Whether this site publishes statistics for the tree.
+  ///
+  /// Read from the tree's own page, once, because that is where webtrees puts
+  /// the link — and a button for a page the site does not publish is a promise
+  /// the next tap breaks.
+  bool _hasStatistics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_findTreeCharts());
+  }
+
+  Future<void> _findTreeCharts() async {
+    try {
+      final offered = await widget.session.withSession(
+        () => widget.records.treeCharts(widget.tree),
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasStatistics = offered.containsKey(ChartKind.statistics);
+      });
+    } on WebtreesError {
+      // Nothing is lost: the tree still browses, it simply offers no
+      // statistics button.
+    }
+  }
 
   @override
   void dispose() {
@@ -190,6 +223,12 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         title: Text(widget.title ?? widget.tree),
         actions: [
+          if (_hasStatistics)
+            IconButton(
+              icon: const Icon(Icons.insights_outlined),
+              tooltip: text.statistics,
+              onPressed: widget.onShowStatistics,
+            ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
             tooltip: text.yourAccount,

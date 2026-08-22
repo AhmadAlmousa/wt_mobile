@@ -109,6 +109,16 @@ void main() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    '/module/statistics_chart/Chart/main': (_) => const Canned(
+      200,
+      body:
+          '<div id="statistics-tabs"><ul class="nav nav-tabs"><li>'
+          '<a class="nav-link" href="#tab-1" '
+          'data-wt-href="/module/statistics_chart/Individuals/main">أفراد</a>'
+          '</li></ul></div>',
+    ),
+    '/module/statistics_chart/Individuals/main': (_) =>
+        Canned(200, body: fixture('statistics_individuals.html')),
     '/tree/main/media-thumbnail/M11/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
     '/tree/main/media-thumbnail/M3/1': (_) =>
@@ -600,6 +610,28 @@ void main() {
     // what the reader sees most: a wall of identical silhouettes tells them
     // nothing about who is who.
     expect(find.text('ع'), findsOne);
+  });
+
+  testWidgets('offers a site’s statistics from the tree screen', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await tester.pumpAndSettle();
+
+    // Statistics belong to a whole tree rather than to anybody in it, so the
+    // link lives on the tree's own page — and the button appears only where
+    // the site actually publishes them.
+    await tester.tap(find.byIcon(Icons.insights_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('مجموع الأفراد'), findsOne);
+    // A count as the site rendered it, in its own numerals — isolated so an
+    // Arabic layout cannot reorder the digits around it.
+    expect(find.textContaining('١٬٤٦٣'), findsOne);
+    // And a chart the app drew for itself, from the numbers behind the
+    // site's own.
+    expect(find.text('الجنس'), findsOne);
+    expect(find.text('ذكور'), findsOne);
   });
 
   testWidgets('names the tree the way the family does', (tester) async {

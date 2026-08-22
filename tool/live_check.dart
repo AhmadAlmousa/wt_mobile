@@ -414,9 +414,48 @@ Future<void> main(List<String> args) async {
           }
         }
 
-        final photo = person.thumbnailUrl;
+        // Statistics belong to the tree rather than to anybody in it, so the
+        // link to them is on the tree's own page.
+        final treeCharts = await records.treeCharts(tree.name);
+        final statisticsUrl = treeCharts[ChartKind.statistics];
+        if (statisticsUrl == null) {
+          stdout.writeln('  SKIP  this site publishes no statistics');
+        } else {
+          final statistics = await chartRepository.statistics(statisticsUrl);
+          final sections = statistics.parts
+              .expand((part) => part.sections)
+              .toList();
+          final datasets = sections
+              .expand((section) => section.datasets)
+              .toList();
+          report(
+            'statistics',
+            '${statistics.parts.length} part(s), '
+                '${sections.length} section(s), '
+                '${datasets.length} chart(s) · '
+                '${sections.first.title} ${sections.first.total ?? ''}',
+            ok: datasets.isNotEmpty,
+          );
+        }
+
+        // A signed thumbnail URL is not an access token — webtrees checks
+        // this account's permission before it honours the signature — so the
+        // one thing worth proving is that an image fetched through the
+        // session arrives. Search rows carry a thumbnail for anybody with a
+        // highlighted photo, which is the cheapest place to find one.
+        final withPhotos = found.people
+            .where((candidate) => candidate.thumbnailUrl != null)
+            .toList();
+        final photo =
+            person.thumbnailUrl ?? withPhotos.firstOrNull?.thumbnailUrl;
+
+        report(
+          'people with a photo',
+          '${withPhotos.length} of ${found.people.length} searched',
+        );
+
         if (photo == null) {
-          stdout.writeln('  SKIP  no photo on this record');
+          stdout.writeln('  SKIP  nobody found with a photo to fetch');
         } else {
           final bytes = await records.image(photo);
           report(

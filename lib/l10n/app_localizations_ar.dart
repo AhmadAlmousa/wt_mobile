@@ -238,6 +238,13 @@ class AppTextAr extends AppText {
   String get charts => 'مخططات';
 
   @override
+  String get statistics => 'تعداد وإحصائيات';
+
+  @override
+  String get statisticsEmpty =>
+      'لم ينشر هذا الموقع إحصاءات يستطيع التطبيق قراءتها.';
+
+  @override
   String get chartAncestors => 'أسلاف';
 
   @override
