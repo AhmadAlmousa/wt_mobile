@@ -1,0 +1,27 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Effective Dart style, per the project guidelines.
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    directives_ordering: true
+    unnecessary_parenthesis: true
+    prefer_final_locals: true
+    always_declare_return_types: true
+    avoid_positional_boolean_parameters: true
+    use_super_parameters: true
+    # Logging goes through dart:developer, never print().
+    avoid_print: true
+
+analyzer:
+  # Turned on before the domain model grows. Genealogy data arrives as loosely
+  # typed maps and HTML, which is exactly where an implicit dynamic slips in
+  # and stays.
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Documentation gaps on public API should be visible, not fatal.
+    public_member_api_docs: ignore

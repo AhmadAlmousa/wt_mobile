@@ -1,0 +1,112 @@
+import 'package:dio/dio.dart';
+import 'package:webtrees_mobile/core/secret_store.dart';
+import 'package:webtrees_mobile/core/unlock_gate.dart';
+import 'package:webtrees_mobile/core/webtrees_client.dart';
+import 'package:webtrees_mobile/data/credential_store.dart';
+import 'package:webtrees_mobile/data/session_manager.dart';
+
+import 'fake_webtrees.dart';
+
+/// Builds a [SessionManager] wired to [server] instead of the network.
+SessionManager sessionManagerFor(
+  FakeWebtrees server, {
+  SecretStore? secrets,
+  UnlockGate gate = const OpenGate(),
+}) => SessionManager(
+  CredentialStore(secrets ?? MemorySecretStore(), gate),
+  clientFactory: clientFactoryFor(server),
+  // Keep-alive is exercised separately; a live timer would outlast the
+  // widget tree and trip the test binding's pending-timer check.
+  keepAliveInterval: Duration.zero,
+);
+
+/// A keystore that behaves like a real one.
+///
+/// [MemorySecretStore] deliberately reports itself as non-persistent, since in
+/// production it only ever stands in for a keystore that is missing — so the
+/// app correctly declines to store a password in it. Tests about remembering
+/// passwords need something that says it will keep them.
+final class FakeKeystore implements SecretStore {
+  final Map<String, String> _values = {};
+
+  @override
+  bool get isPersistent => true;
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+
+  @override
+  Future<bool> contains(String key) async => _values.containsKey(key);
+}
+
+/// Builds clients that talk to [server] rather than the network.
+ClientFactory clientFactoryFor(FakeWebtrees server) =>
+    (url, cookies) => WebtreesClient(
+      url: url,
+      cookies: cookies,
+      dio: Dio()..httpClientAdapter = server,
+    );
+
+/// A complete, healthy webtrees site with one private tree and a member.
+///
+/// Mirrors `tree.almou.sa`: pretty URLs, webtrees 2.2.6, tree `main`.
+Map<String, Canned Function(Sent)> workingSite({
+  String username = 'mobile',
+  String password = 'correct',
+  String realName = 'Mobile Client',
+  bool administrator = false,
+}) {
+  const accountPage = '''
+<form method="post">
+<input name="user_name" value="mobile">
+<input name="real_name" value="Mobile Client">
+<input name="email" value="mobile@example.com">
+</form>''';
+
+  const treeHome = '''
+<html><body>
+<a href="/tree/main" class="dropdown-item menu-tree-1">Family tree</a>
+<a href="/tree/main/individual/X42/slug" class="menu-myrecord">My record</a>
+</body></html>''';
+
+  var signedIn = false;
+
+  return {
+    '/ping': (request) => request.ugly
+        ? const Canned(308, location: 'https://host/ping')
+        : const Canned(200, body: 'OK'),
+    '/robots.txt': (_) => Canned(200, body: robotsTxt(['SomeBadBot'])),
+    '/login': (request) {
+      if (request.method != 'POST') return Canned(200, body: pageWith());
+      if (request.fields['username'] == username &&
+          request.fields['password'] == password) {
+        signedIn = true;
+        return const Canned(302, location: 'https://host/');
+      }
+      return const Canned(302, location: 'https://host/login?username=x&url=');
+    },
+    '/logout': (_) {
+      signedIn = false;
+      return const Canned(204);
+    },
+    '/my-account': (_) => signedIn
+        ? const Canned(200, body: accountPage)
+        : const Canned(302, location: 'https://host/login'),
+    '/admin': (_) => administrator && signedIn
+        ? const Canned(200, body: 'control panel')
+        : const Canned(403),
+    '/': (_) => const Canned(302, location: 'https://host/tree/main/my-page'),
+    '/tree/main': (request) => request.anonymous
+        ? const Canned(404) // private tree
+        : const Canned(200, body: treeHome),
+    '/tree/main/autocomplete/place': (_) => const Canned(403),
+    '/tree/main/pending': (_) => const Canned(403),
+    '/tree/main/changes-log': (_) => const Canned(403),
+  };
+}
