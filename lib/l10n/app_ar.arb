@@ -88,6 +88,8 @@
   "chartDescendants": "أنسال",
   "chartHourglass": "ساعة رملية",
   "chartRelationship": "قرابة",
+  "chartTimeline": "خط زمني",
+  "timelineEmpty": "لا توجد أحداث مؤرخة لهذا الشخص لعرضها على خط زمني.",
   "relationshipPick": "قرابة من بـ{name}؟",
   "relationshipNoLink": "لم يُعثر على صلة بين الشخصين في هذه الشجرة.",
   "relationshipChoose": "اختر شخصاً آخر",

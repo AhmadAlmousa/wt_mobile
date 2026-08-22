@@ -54,6 +54,51 @@ final class ChartParser {
     return node;
   }
 
+  /// Reads a timeline: events against a scale of years.
+  ///
+  /// webtrees draws this one by absolute position — a column of year labels
+  /// down one side and a box per event beside them, each placed with a `top`
+  /// in pixels. That is not a layout worth keeping, but it *is* a statement
+  /// of where every event sits relative to every year, which is exactly what
+  /// a timeline is. So both are read as positions and compared with each
+  /// other; no date is parsed, and no numeral has to be understood.
+  TimelineChart parseTimeline(String fragment) {
+    final root = html.parseFragment(fragment);
+    final ticks = <TimelineTick>[];
+    final events = <TimelineEvent>[];
+
+    for (final element in root.querySelectorAll('div[id]')) {
+      final id = element.id;
+      final top = _topOf(element);
+      if (top == null) continue;
+
+      if (id.startsWith('scale')) {
+        final year = int.tryParse(id.substring(5));
+        // The year is in the id as plain digits, where the label beside it is
+        // written in the reader's own numerals.
+        if (year != null) ticks.add(TimelineTick(year: year, position: top));
+        continue;
+      }
+      if (id.startsWith('fact')) {
+        final label = textOf(element);
+        if (label != null) {
+          events.add(TimelineEvent(label: label, position: top));
+        }
+      }
+    }
+
+    return TimelineChart(ticks: ticks, events: events);
+  }
+
+  /// The `top` of an absolutely positioned element, in pixels.
+  static double? _topOf(Element element) {
+    final style = element.attributes['style'];
+    if (style == null) return null;
+
+    final match = RegExp(r'top:\s*(-?[\d.]+)px').firstMatch(style);
+    return match == null ? null : double.tryParse(match.group(1)!);
+  }
+
   /// Reads a relationship chart: how two people are connected, and by whom.
   ///
   /// webtrees lays this one out as a grid of positioned cells with lines drawn

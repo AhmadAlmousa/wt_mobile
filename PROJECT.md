@@ -383,6 +383,16 @@ is the **shape** — who descends from whom — and draws it again.
   is most of the pie charts (§7, bug 23).
 - A map chart names each place twice, `{"v": "KW", "f": "الكويت"}`: the code it
   plots by and the name a reader wants.
+- **A timeline states its own scale.** Every year label is a `div` whose id
+  carries the year in plain digits — `id="scale1938"` — and whose style
+  carries its position; every event is a `div#factN` positioned the same way.
+  So the app compares positions with positions and never reads a date: the
+  event's label already carries one, written by the server in whichever
+  calendars the tree converts to. Reading a year *out of* a box's position
+  would also be wrong by one — the box sits a few pixels above the line it
+  points at.
+- 2.3 rewrote the fact box with classes and `data-wt-timeline-*` attributes,
+  and kept the ids and the positions. A parser keyed on either survives both.
 - **Not every chart is a fetch.** A fan chart is an ancestors chart bent round
   a circle, a compact chart is the same one with smaller boxes, and an
   hourglass is the two charts either side of a person stitched at the middle.
@@ -548,7 +558,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **6b** | Charts: fan/circle, compact, hourglass — the same data, redrawn | ✅ |
 | **6c** | Relationships — how any two people in a tree are connected | ✅ |
 | **6d** | Statistics — the counts, and the datasets behind its charts | ✅ |
-| **6e** | Timeline and lifespans — events and lives against a scale | ⬜ |
+| **6e** | Timeline — a life against a scale of years | ✅ |
+| **6f** | Lifespans — several lives compared against one scale | ⬜ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -566,8 +577,8 @@ from a box to the person.
 | Hourglass | ancestors *and* descendants of one person, stitched at the subject | ✅ 6b |
 | Family book | the hourglass with every spouse's family drawn too | 6c |
 | Relationships | the server's own path between two people, walked out of its grid | ✅ 6c |
-| Timeline | positioned event boxes, with the years in a `<script>` beside them | 6c |
-| Lifespan | years per person, which means reading numerals the server localized | 6c |
+| Timeline | event boxes and year labels, each stating its own position | ✅ 6e |
+| Lifespan | bars positioned against a scale of decades, the same way | 6f |
 | Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | ✅ 6d |
 | Pedigree map | a map. Out of scope for v1 — no map dependency is worth the weight yet | — |
 
@@ -852,6 +863,36 @@ Released as **0.7.0**. **384 tests** green (363 → 384), analyzer clean, and th
 live check reads the real statistics page — three parts, seventeen sections,
 sixteen charts.
 
+### 2026-08-22 (later still) — Phase 6e: a life against a scale
+
+The last of the charts that is about a person: their events, in order, spaced
+as far apart as they actually happened.
+
+**Nothing here is converted.** webtrees positions each year label and each
+event box in its own pixels, so the app keeps both as positions and draws them
+in proportion. No date is parsed, no numeral has to be understood, and the
+label a reader sees is the one the server wrote — the date in both calendars
+included. Converting a box's position to a year would also have been wrong by
+one: the box sits a few pixels above the line it points at, which is the sort
+of detail that looks like a rounding error and is really a misread.
+
+**Two events a month apart must not be drawn a year apart.** Where cards would
+overlap, the later one is pushed down and a line still points back at the
+moment it belongs to. Even spacing would be a chart that lied about time; a
+collision would be a chart that hid an event.
+
+**A picture caught a third bug of the same family.** The chart buttons on a
+person's page were being filtered by hand rather than through
+`ChartKind.drawnFrom`, so they appeared in whatever order the site's menu
+happened to list them — and the rule that an hourglass needs both of its
+halves was never applied to them. The rule had a test; nothing checked that
+the screen used it. A `const Set` of enum values does not iterate in the order
+it was written, which is how the ordering looked deliberate and was not
+(§7, bug 25).
+
+Released as **0.8.0**. **400 tests** green (384 → 400), analyzer clean, and the
+live check reads a real timeline against `tree.almou.sa`.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -883,6 +924,7 @@ sixteen charts.
 | 22 | The live check asked the server for a chart the app never fetches | **Live run only** |
 | 23 | Every statistics chart was dropped: one *options* argument is JavaScript, not JSON | **Live markup** |
 | 24 | A stacked bar drew as empty surface — a coloured box has no height of its own | **Rendered preview** |
+| 25 | Chart buttons appeared in the site's menu order, and skipped their own rule | **Rendered preview** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -901,6 +943,15 @@ the wrong version's template and agreed with a parser that never looked.
 Bugs 18 and 19 are the two the tests could not have been expected to catch
 from copy alone: one needed the system back button simulated, the other needed
 somebody to look at a picture.
+
+Bug 25 is worth the entry for its cause: `ChartKind.drawnFrom` decides which
+charts a person's page may offer *and in what order*, and the screen was still
+filtering the map by hand — so the rule that an hourglass needs both halves
+went unapplied, and the buttons came out in the order the site's menu happened
+to list them. What made it look deliberate is that a `const Set` of enum
+values does not iterate in the order it is written. The rule had a unit test;
+nothing tested that the screen used the rule, and only walking the preview to
+that screen showed it.
 
 Bug 23 is the fixture lesson in a new coat: the *data* argument of every
 `statistics.draw*Chart` call is strict JSON, and the options argument beside it
@@ -1198,7 +1249,7 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 384 tests
+flutter test          # 400 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
@@ -1206,7 +1257,7 @@ flutter run -d linux  # web is not viable — no CORS
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
 # ancestors, descendants, fan and hourglass charts, a relationship, and the
-# site's statistics.
+# site's statistics, a relationship and a timeline.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 

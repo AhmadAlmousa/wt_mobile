@@ -296,5 +296,6 @@ String chartTitle(ChartKind kind, AppText text) => switch (kind) {
   ChartKind.descendants => text.chartDescendants,
   ChartKind.hourglass => text.chartHourglass,
   ChartKind.relationship => text.chartRelationship,
+  ChartKind.timeline => text.chartTimeline,
   _ => text.charts,
 };

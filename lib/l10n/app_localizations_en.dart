@@ -257,6 +257,13 @@ class AppTextEn extends AppText {
   String get chartRelationship => 'Relationship';
 
   @override
+  String get chartTimeline => 'Timeline';
+
+  @override
+  String get timelineEmpty =>
+      'This person has no dated events to put on a timeline.';
+
+  @override
   String relationshipPick(String name) {
     return 'Whose relationship to $name?';
   }

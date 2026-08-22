@@ -37,18 +37,23 @@ enum ChartKind {
   /// The class webtrees marks its own link to this chart with.
   final String menuClass;
 
-  /// The charts this app draws for itself.
+  /// The charts this app draws for itself, in the order it offers them.
   ///
-  /// webtrees renders each of these as a shape — who descends from whom — that
-  /// survives being drawn again for a phone. The rest of what a site offers is
-  /// a map, a statistics page or a report, which are not shapes of this kind
-  /// and are not claimed here.
-  static const Set<ChartKind> drawable = {
+  /// webtrees renders each of these as something that survives being drawn
+  /// again for a phone: a shape of a family, a path between two people, a
+  /// life against a scale. The rest of what a site offers is a map, a
+  /// statistics page or a report, which are not, and are not claimed here.
+  ///
+  /// A list rather than a set, because the order is the order the reader sees
+  /// — and a `const Set` of enum values does *not* iterate in the order it
+  /// was written.
+  static const List<ChartKind> drawable = [
     ChartKind.ancestors,
     ChartKind.descendants,
     ChartKind.hourglass,
     ChartKind.relationship,
-  };
+    ChartKind.timeline,
+  ];
 
   /// The charts the app can actually draw for a person, given what the site
   /// offered for them.
@@ -231,6 +236,63 @@ final class RelationshipPath {
 
   /// The person at the far end.
   PersonRef? get to => steps.isEmpty ? null : steps.last.person;
+}
+
+/// One event on a timeline: what happened, and where it sits on the scale.
+@immutable
+final class TimelineEvent {
+  const TimelineEvent({required this.label, required this.position});
+
+  /// The event as webtrees wrote it — its name, its date in whichever
+  /// calendars the tree converts to, and its place.
+  final String label;
+
+  /// Where the site placed it, in the pixels of its own drawing.
+  ///
+  /// Kept as the site's own measurement and never turned into a year. The
+  /// scale beside it is measured the same way, so the two are drawn against
+  /// each other — and the label already carries the date, written by the
+  /// server in whichever calendars this tree converts to. Reading a year out
+  /// of a box's position would be arithmetic on somebody else's layout, and
+  /// it comes out a year short: the box sits a few pixels above the line it
+  /// points at.
+  final double position;
+}
+
+/// One labelled year on a timeline's scale.
+@immutable
+final class TimelineTick {
+  const TimelineTick({required this.year, required this.position});
+
+  final int year;
+  final double position;
+}
+
+/// Events against a scale of years, as a site laid them out.
+@immutable
+final class TimelineChart {
+  TimelineChart({
+    required List<TimelineTick> ticks,
+    required List<TimelineEvent> events,
+  }) : ticks = List.unmodifiable(ticks),
+       events = List.unmodifiable(events);
+
+  final List<TimelineTick> ticks;
+  final List<TimelineEvent> events;
+
+  bool get isEmpty => events.isEmpty || ticks.length < 2;
+
+  /// The first and last positions the chart covers.
+  (double, double) get extent {
+    final positions = [
+      for (final tick in ticks) tick.position,
+      for (final event in events) event.position,
+    ];
+    return (
+      positions.reduce((a, b) => a < b ? a : b),
+      positions.reduce((a, b) => a > b ? a : b),
+    );
+  }
 }
 
 /// A chart as the app read it, whichever direction it runs in.

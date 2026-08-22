@@ -73,6 +73,8 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    '/tree/main/timeline-10': (_) =>
+        Canned(200, body: fixture('timeline.html')),
     '/module/statistics_chart/Chart/main': (_) => const Canned(
       200,
       body:
@@ -172,7 +174,7 @@ Future<void> main() async {
     }
     // The charts are opened from the person rather than from the account
     // screen, so these steps rejoin the walk at step 3.
-    if (steps >= 6 && steps <= 10) {
+    if ((steps >= 6 && steps <= 10) || steps == 12) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
@@ -185,6 +187,7 @@ Future<void> main() async {
           7 => 1,
           9 => 2,
           10 => 3,
+          12 => 4,
           _ => 0,
         }),
       );
@@ -351,6 +354,16 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 10,
+        );
+      });
+
+      testWidgets('timeline $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'timeline-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 12,
         );
       });
 

@@ -414,6 +414,34 @@ Future<void> main(List<String> args) async {
           }
         }
 
+        // A timeline says where each event sits against a scale of years,
+        // both as positions in its own drawing — the app compares the two and
+        // never reads a date out of them.
+        final timelineUrl = person.charts[ChartKind.timeline];
+        if (timelineUrl == null) {
+          stdout.writeln('  SKIP  this site does not run the timeline chart');
+        } else {
+          var drawn = person;
+          var timeline = await chartRepository.timeline(timelineUrl);
+          for (final candidate in found.people.take(8)) {
+            if (!timeline.isEmpty) break;
+            final other = await records.individual(tree.name, candidate.xref);
+            final url = other.charts[ChartKind.timeline];
+            if (url == null) continue;
+            drawn = other;
+            timeline = await chartRepository.timeline(url);
+          }
+
+          report(
+            'timeline',
+            '${drawn.xref}: ${timeline.events.length} event(s) between '
+                '${timeline.ticks.isEmpty ? '?' : timeline.ticks.first.year} '
+                'and '
+                '${timeline.ticks.isEmpty ? '?' : timeline.ticks.last.year}',
+            ok: !timeline.isEmpty,
+          );
+        }
+
         // Statistics belong to the tree rather than to anybody in it, so the
         // link to them is on the tree's own page.
         final treeCharts = await records.treeCharts(tree.name);

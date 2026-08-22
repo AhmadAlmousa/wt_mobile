@@ -89,6 +89,8 @@
   "chartDescendants": "Descendants",
   "chartHourglass": "Hourglass",
   "chartRelationship": "Relationship",
+  "chartTimeline": "Timeline",
+  "timelineEmpty": "This person has no dated events to put on a timeline.",
   "relationshipPick": "Whose relationship to {name}?",
   "@relationshipPick": {
     "placeholders": {

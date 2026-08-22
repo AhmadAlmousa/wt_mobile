@@ -553,6 +553,18 @@ abstract class AppText {
   /// **'Relationship'**
   String get chartRelationship;
 
+  /// No description provided for @chartTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get chartTimeline;
+
+  /// No description provided for @timelineEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This person has no dated events to put on a timeline.'**
+  String get timelineEmpty;
+
   /// No description provided for @relationshipPick.
   ///
   /// In en, this message translates to:

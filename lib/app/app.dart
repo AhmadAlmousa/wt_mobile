@@ -16,6 +16,7 @@ import '../features/browse/search_screen.dart';
 import '../features/charts/chart_screen.dart';
 import '../features/charts/relationship_screen.dart';
 import '../features/charts/statistics_screen.dart';
+import '../features/charts/timeline_screen.dart';
 import '../features/connect/connect_screen.dart';
 import '../features/launch/launch_screen.dart';
 import '../l10n/app_localizations.dart';
@@ -216,21 +217,36 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
                 // A relationship is not a shape of a family but a path
                 // between two of them, and it needs a second person before
                 // there is anything to draw — so it has a screen of its own.
-                onOpenChart: (kind) => _router.push(
-                  kind == ChartKind.relationship
-                      ? Routes.relationshipIn(
-                          tree,
-                          state.pathParameters['xref']!,
-                        )
-                      : Routes.chartIn(
-                          tree,
-                          state.pathParameters['xref']!,
-                          kind,
-                        ),
-                ),
+                onOpenChart: (kind) => _router.push(switch (kind) {
+                  // Neither of these is a shape of a family: one is a path
+                  // between two people, the other a life against a scale.
+                  ChartKind.relationship => Routes.relationshipIn(
+                    tree,
+                    state.pathParameters['xref']!,
+                  ),
+                  ChartKind.timeline => Routes.timelineIn(
+                    tree,
+                    state.pathParameters['xref']!,
+                  ),
+                  _ => Routes.chartIn(
+                    tree,
+                    state.pathParameters['xref']!,
+                    kind,
+                  ),
+                }),
               );
             },
             routes: [
+              GoRoute(
+                path: Routes.timelineUnderPerson,
+                builder: (context, state) => TimelineScreen(
+                  session: widget.session,
+                  records: _records,
+                  charts: _charts,
+                  tree: state.pathParameters['tree']!,
+                  xref: state.pathParameters['xref']!,
+                ),
+              ),
               GoRoute(
                 path: Routes.relationshipUnderPerson,
                 builder: (context, state) {
@@ -337,6 +353,7 @@ abstract final class Routes {
   /// Declared relative to the person, for the same reason.
   static const String chartUnderPerson = 'chart/:kind';
   static const String relationshipUnderPerson = 'relationship';
+  static const String timelineUnderPerson = 'timeline';
 
   static String searchIn(String tree) => '/tree/${Uri.encodeComponent(tree)}';
 
@@ -348,6 +365,9 @@ abstract final class Routes {
 
   static String relationshipIn(String tree, String xref) =>
       '${personIn(tree, xref)}/relationship';
+
+  static String timelineIn(String tree, String xref) =>
+      '${personIn(tree, xref)}/timeline';
 
   static String statisticsIn(String tree) => '${searchIn(tree)}/statistics';
 }

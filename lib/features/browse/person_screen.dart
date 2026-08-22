@@ -159,10 +159,7 @@ class _PersonBody extends StatelessWidget {
         // Only the charts this site actually runs, and only those the app can
         // draw for itself — offering one it cannot draw would be a promise
         // the next tap breaks.
-        _Charts(
-          kinds: person.charts.keys.where(ChartKind.drawable.contains).toList(),
-          onOpen: onOpenChart,
-        ),
+        _Charts(kinds: ChartKind.drawnFrom(person.charts), onOpen: onOpenChart),
 
         // Each warning names a section that could not be loaded. Saying so is
         // the difference between a known gap and an app that looks broken.
@@ -660,6 +657,7 @@ IconData _iconFor(ChartKind kind) => switch (kind) {
   ChartKind.ancestors => Icons.account_tree_outlined,
   ChartKind.hourglass => Icons.hourglass_empty,
   ChartKind.relationship => Icons.compare_arrows,
+  ChartKind.timeline => Icons.timeline,
   _ => Icons.family_restroom_outlined,
 };
 

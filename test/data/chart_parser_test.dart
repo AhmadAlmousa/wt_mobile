@@ -157,6 +157,58 @@ void main() {
         );
       });
     });
+    group('$version timeline', () {
+      late TimelineChart chart;
+
+      setUp(() {
+        chart = const ChartParser().parseTimeline(
+          fixture(version, 'timeline.html'),
+        );
+      });
+
+      test('reads the scale the site drew', () {
+        // The year is in the element's id as plain digits; the label beside
+        // it is written in the reader's own numerals.
+        expect(chart.ticks.map((tick) => tick.year), [
+          1900,
+          1910,
+          1920,
+          1930,
+          1940,
+          1950,
+        ]);
+        expect(chart.ticks.first.position, -5);
+      });
+
+      test('reads each event where the site put it', () {
+        expect(chart.events, hasLength(2));
+        expect(chart.events.first.label, startsWith('الميلاد'));
+        expect(chart.events.first.position, 35);
+        expect(chart.events.last.position, 135);
+      });
+
+      test('keeps the date as the site wrote it', () {
+        // Both calendars, in the site's own numerals — the app never reads a
+        // year out of a box's position.
+        expect(chart.events.first.label, contains('١٩٠١'));
+        expect(chart.events.last.label, contains('مكة'));
+      });
+
+      test('knows the ground it covers', () {
+        final (first, last) = chart.extent;
+        expect(first, -5);
+        expect(last, 195);
+        expect(chart.isEmpty, isFalse);
+      });
+
+      test('a scale with nothing on it is empty, not a chart', () {
+        final empty = const ChartParser().parseTimeline(
+          '<div id="scale1900" style="top:0px">1900</div>',
+        );
+        expect(empty.isEmpty, isTrue);
+      });
+    });
+
     group('$version relationship chart', () {
       test('reads the path from one person to the other', () {
         final paths = const ChartParser().parseRelationships(

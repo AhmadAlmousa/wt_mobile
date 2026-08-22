@@ -257,6 +257,13 @@ class AppTextAr extends AppText {
   String get chartRelationship => 'قرابة';
 
   @override
+  String get chartTimeline => 'خط زمني';
+
+  @override
+  String get timelineEmpty =>
+      'لا توجد أحداث مؤرخة لهذا الشخص لعرضها على خط زمني.';
+
+  @override
   String relationshipPick(String name) {
     return 'قرابة من بـ$name؟';
   }

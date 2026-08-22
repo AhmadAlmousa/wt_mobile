@@ -139,6 +139,16 @@ final class ChartsRepository {
     return TreeStatistics(parts: parts);
   }
 
+  /// Reads a timeline: a person's events against a scale of years.
+  ///
+  /// The address comes from the page as every other does, and already carries
+  /// the person it is for — webtrees' own menu link puts them in the query as
+  /// `xrefs[0]`, because a timeline can hold several people at once.
+  Future<TimelineChart> timeline(String url) async {
+    final body = await _fragment(url, probe: 'reading the timeline');
+    return _parser.parseTimeline(body);
+  }
+
   /// Whether a site's own settings keep this chart to blood relations.
   ///
   /// The first number in `relationships-{ancestors}-{recursion}` is that

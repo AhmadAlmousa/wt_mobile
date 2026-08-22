@@ -109,6 +109,8 @@ void main() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    '/tree/main/timeline-10': (_) =>
+        Canned(200, body: fixture('timeline.html')),
     '/module/statistics_chart/Chart/main': (_) => const Canned(
       200,
       body:
@@ -294,6 +296,14 @@ void main() {
     // An hourglass is not fetched at all: it is those two charts stacked, so
     // it is offered exactly when both of them are.
     expect(find.widgetWithText(ActionChip, 'Hourglass'), findsOne);
+    // In the app's own order, not the order the site's menu happened to list
+    // them in — and only the charts it can actually draw.
+    expect(
+      tester
+          .widgetList<ActionChip>(find.byType(ActionChip))
+          .map((chip) => (chip.label as Text).data),
+      ['Ancestors', 'Descendants', 'Hourglass', 'Relationship', 'Timeline'],
+    );
     // The site offers these two as well, and the app cannot draw either — a
     // button it could not honour would be a promise the next tap breaks.
     expect(find.textContaining('Fan'), findsNothing);
@@ -360,6 +370,29 @@ void main() {
       server.routes.where((route) => route.contains('ancestors-tree-4')),
       hasLength(1),
     );
+  });
+
+  testWidgets('lays a life out on a timeline', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Timeline'));
+    await tester.pumpAndSettle();
+
+    // The scale the site drew, and the events it placed against it — each
+    // still carrying the date in the site's own words.
+    // Isolated, because a year is Latin whichever way the page reads.
+    expect(find.textContaining('1900'), findsOne);
+    expect(find.textContaining('الميلاد'), findsOne);
+    expect(find.textContaining('١٩٠١'), findsOne);
+    // The person is in the address the site gave, so the app asked for the
+    // chart rather than building one.
+    final asked = server.requests.lastWhere(
+      (request) => request.route == '/tree/main/timeline-10',
+    );
+    expect(asked.query['xrefs[0]'], 'X42');
+    expect(asked.query['ajax'], '1');
   });
 
   testWidgets('says how two people are related', (tester) async {
