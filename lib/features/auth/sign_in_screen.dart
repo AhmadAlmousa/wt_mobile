@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../data/session_manager.dart';
 import '../../domain/instance.dart';
+import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
+import '../shared/messages.dart';
 
 /// Collects a username and password for the connected site.
 class SignInScreen extends StatefulWidget {
@@ -55,10 +57,11 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final text = AppText.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign in'),
+        title: Text(text.signIn),
         leading: BackButton(onPressed: widget.onChangeSite),
       ),
       body: SafeArea(
@@ -85,13 +88,13 @@ class _SignInScreenState extends State<SignInScreen> {
                           enabled: !session.isBusy,
                           autocorrect: false,
                           textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Username or email',
-                            prefixIcon: Icon(Icons.person_outline),
+                          decoration: InputDecoration(
+                            labelText: text.usernameOrEmail,
+                            prefixIcon: const Icon(Icons.person_outline),
                           ),
                           validator: (value) =>
                               (value == null || value.trim().isEmpty)
-                              ? 'Enter your username or email address.'
+                              ? text.usernameRequired
                               : null,
                         ),
                         const SizedBox(height: 16),
@@ -101,7 +104,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           obscureText: _obscured,
                           textInputAction: TextInputAction.go,
                           decoration: InputDecoration(
-                            labelText: 'Password',
+                            labelText: text.password,
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -110,14 +113,14 @@ class _SignInScreenState extends State<SignInScreen> {
                                     : Icons.visibility_off_outlined,
                               ),
                               tooltip: _obscured
-                                  ? 'Show password'
-                                  : 'Hide password',
+                                  ? text.showPassword
+                                  : text.hidePassword,
                               onPressed: () =>
                                   setState(() => _obscured = !_obscured),
                             ),
                           ),
                           validator: (value) => (value == null || value.isEmpty)
-                              ? 'Enter your password.'
+                              ? text.passwordRequired
                               : null,
                           onFieldSubmitted: (_) => _submit(),
                         ),
@@ -144,16 +147,15 @@ class _SignInScreenState extends State<SignInScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Sign in'),
+                              : Text(text.signIn),
                         ),
                         if (session.error != null) ...[
                           const SizedBox(height: 20),
-                          MessagePanel.error(session.error!.message),
+                          MessagePanel.error(session.error!.localized(text)),
                         ],
                         const SizedBox(height: 24),
                         Text(
-                          'Your password is sent only to this site, over the '
-                          'same sign-in form its website uses.',
+                          text.passwordScopeNote,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -181,6 +183,7 @@ class _SiteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final text = AppText.of(context);
     final insecure = instance.url.base.scheme != 'https';
 
     return Column(
@@ -192,31 +195,28 @@ class _SiteCard extends StatelessWidget {
               insecure ? Icons.lock_open_outlined : Icons.lock_outline,
               color: insecure ? theme.colorScheme.error : null,
             ),
-            title: Text(instance.url.base.host),
+            title: Text(
+              instance.url.base.host,
+              textDirection: TextDirection.ltr,
+            ),
             subtitle: Text(
               instance.version.isEmpty
-                  ? 'webtrees'
-                  : 'webtrees ${instance.version}',
+                  ? text.webtrees
+                  : text.webtreesVersion(instance.version),
             ),
           ),
         ),
         if (insecure) ...[
           const SizedBox(height: 12),
-          const MessagePanel.warning(
-            'This site does not use a secure connection. Your password '
-            'would be sent unencrypted.',
-          ),
+          MessagePanel.warning(text.insecureSiteWarning),
         ],
         if (instance.health == ServerHealth.degraded) ...[
           const SizedBox(height: 12),
-          const MessagePanel.warning(
-            'This site reports a minor server configuration problem. '
-            'Signing in should still work.',
-          ),
+          MessagePanel.warning(text.degradedServerWarning),
         ],
         for (final warning in instance.warnings) ...[
           const SizedBox(height: 12),
-          MessagePanel.warning(warning),
+          MessagePanel.warning(warning.localized(text)),
         ],
       ],
     );
@@ -246,26 +246,22 @@ class _RememberToggle extends StatelessWidget {
   /// States exactly what the device will and will not do, because the
   /// protection differs by platform and overstating it would be a lie the user
   /// cannot check.
-  String get _explanation {
-    if (!canRemember) {
-      return 'This device has no secure storage, so your password cannot '
-          'be kept.';
-    }
-    if (!isGated) {
-      return 'Your password is kept in this device’s secure storage. This '
-          'device cannot ask for a fingerprint or passcode, so anyone who '
-          'can unlock it can sign in as you.';
-    }
-    return 'Your password is kept in this device’s secure storage, and '
-        'unlocked with your fingerprint, face or passcode.';
+  String _explanation(AppText text) {
+    if (!canRemember) return text.rememberUnavailable;
+    if (!isGated) return text.rememberUngated;
+    return text.rememberGated;
   }
 
   @override
-  Widget build(BuildContext context) => SwitchListTile.adaptive(
-    value: canRemember && value,
-    onChanged: (canRemember && enabled) ? onChanged : null,
-    contentPadding: EdgeInsets.zero,
-    title: const Text('Stay signed in'),
-    subtitle: Text(_explanation),
-  );
+  Widget build(BuildContext context) {
+    final text = AppText.of(context);
+
+    return SwitchListTile.adaptive(
+      value: canRemember && value,
+      onChanged: (canRemember && enabled) ? onChanged : null,
+      contentPadding: EdgeInsets.zero,
+      title: Text(text.staySignedIn),
+      subtitle: Text(_explanation(text)),
+    );
+  }
 }

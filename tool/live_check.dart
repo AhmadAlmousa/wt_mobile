@@ -147,9 +147,9 @@ Future<void> main(List<String> args) async {
 
       // Prefer the account's own record: it is certain to be visible to this
       // user, which a search hit is not.
-      final xref = tree.myXref ?? (found.people.isEmpty
-          ? null
-          : found.people.first.xref);
+      final xref =
+          tree.myXref ??
+          (found.people.isEmpty ? null : found.people.first.xref);
       if (xref == null) {
         stdout.writeln('  SKIP  nobody to open');
       } else {

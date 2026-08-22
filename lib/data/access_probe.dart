@@ -4,6 +4,7 @@ import '../core/errors.dart';
 import '../core/response_status.dart';
 import '../core/webtrees_client.dart';
 import '../domain/access.dart';
+import '../domain/notice.dart';
 
 /// Works out which trees the signed-in user can reach, and their role in each.
 ///
@@ -29,7 +30,7 @@ class AccessProbe {
 
   /// Gathers the account details, the visible trees and the role in each.
   Future<AccessSummary> describe() async {
-    final warnings = <String>[];
+    final warnings = <Notice>[];
 
     final account = await _readAccount();
     final isAdministrator = await _isAdministrator();
@@ -49,10 +50,7 @@ class AccessProbe {
     }
 
     if (trees.isEmpty) {
-      warnings.add(
-        'This account cannot see any family tree. Its administrator may '
-        'still need to grant access.',
-      );
+      warnings.add(const NoTreesVisible());
     }
 
     return AccessSummary(
@@ -99,8 +97,8 @@ class AccessProbe {
     // decidable when the tree is provably private.
     return switch (await _visibilityOf(tree)) {
       TreeVisibility.private => TreeRole.member,
-      TreeVisibility.public || TreeVisibility.unknown =>
-        TreeRole.memberOrVisitor,
+      TreeVisibility.public ||
+      TreeVisibility.unknown => TreeRole.memberOrVisitor,
     };
   }
 
@@ -128,7 +126,7 @@ class AccessProbe {
   /// reliability: the post-sign-in redirect names the default tree; the header
   /// menu lists them all, but only when the site allows switching trees; the
   /// search page repeats the list as checkboxes.
-  Future<List<String>> _discoverTrees(List<String> warnings) async {
+  Future<List<String>> _discoverTrees(List<Notice> warnings) async {
     final found = <String>{};
 
     final home = await _client.get('/');
@@ -150,10 +148,7 @@ class AccessProbe {
     }
 
     if (found.length == 1) {
-      warnings.add(
-        'Only one family tree was found. If this site has more, its '
-        'administrator may have turned off switching between trees.',
-      );
+      warnings.add(const OnlyOneTreeFound());
     }
     return found.toList();
   }

@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../data/credential_store.dart';
 import '../../data/session_manager.dart';
+import '../../data/settings_store.dart';
+import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
+import '../shared/messages.dart';
+import '../shared/settings_sheet.dart';
 
 /// Asks which webtrees site to use, and identifies it.
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({
     required this.session,
+    required this.settings,
     required this.onConnected,
     required this.onSignedIn,
     super.key,
   });
 
   final SessionManager session;
+  final SettingsStore settings;
 
   /// Called once the site has been identified and is ready for sign-in.
   final VoidCallback onConnected;
@@ -79,8 +86,20 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final text = AppText.of(context);
 
     return Scaffold(
+      appBar: AppBar(
+        // Offered before sign-in on purpose: someone who reads Arabic should
+        // not have to work through an English form to find the switch.
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: text.settings,
+            onPressed: () => SettingsSheet.show(context, widget.settings),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: widget.session,
@@ -95,26 +114,22 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.account_tree_outlined,
-                        size: 56,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(height: 20),
+                      const _Emblem(),
+                      const SizedBox(height: 24),
                       Text(
-                        'Connect to your family tree',
-                        style: theme.textTheme.headlineSmall,
+                        text.connectTitle,
+                        style: theme.textTheme.headlineMedium,
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
-                        'Enter the address of your webtrees site.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        text.connectSubtitle,
+                        style: theme.textTheme.bodyLarge?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 32),
                       Form(
                         key: _form,
                         child: TextFormField(
@@ -123,15 +138,18 @@ class _ConnectScreenState extends State<ConnectScreen> {
                           autocorrect: false,
                           keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.go,
-                          decoration: const InputDecoration(
-                            labelText: 'Site address',
-                            hintText: 'tree.example.com',
-                            prefixIcon: Icon(Icons.language),
+                          decoration: InputDecoration(
+                            labelText: text.siteAddress,
+                            hintText: text.siteAddressHint,
+                            prefixIcon: const Icon(Icons.language),
+                            // The address is always Latin, whichever way the
+                            // rest of the interface reads.
+                            hintTextDirection: TextDirection.ltr,
                           ),
+                          textDirection: TextDirection.ltr,
                           validator: (value) =>
                               (value == null || value.trim().isEmpty)
-                              ? 'An address is needed, for example '
-                                    'tree.example.com'
+                              ? text.siteAddressRequired
                               : null,
                           onFieldSubmitted: (value) {
                             if (_form.currentState!.validate()) {
@@ -150,17 +168,18 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                 }
                               },
                         child: session.isBusy
-                            ? const _ButtonSpinner(label: 'Connecting…')
-                            : const Text('Connect'),
+                            ? _ButtonSpinner(label: text.connecting)
+                            : Text(text.connect),
                       ),
                       if (session.error != null) ...[
                         const SizedBox(height: 20),
-                        MessagePanel.error(session.error!.message),
+                        MessagePanel.error(session.error!.localized(text)),
                       ],
                       if (_saved.isNotEmpty) ...[
                         const SizedBox(height: 32),
                         _SavedConnections(
                           connections: _saved,
+                          label: text.recentSites,
                           enabled: !session.isBusy,
                           onSelected: _reopen,
                         ),
@@ -181,11 +200,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
 class _SavedConnections extends StatelessWidget {
   const _SavedConnections({
     required this.connections,
+    required this.label,
     required this.enabled,
     required this.onSelected,
   });
 
   final List<SavedConnection> connections;
+  final String label;
   final bool enabled;
   final ValueChanged<SavedConnection> onSelected;
 
@@ -197,30 +218,64 @@ class _SavedConnections extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'RECENT',
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 1.2,
-            color: theme.colorScheme.onSurfaceVariant,
+          label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.primary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         for (final saved in connections)
           Card(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 10),
+            clipBehavior: Clip.antiAlias,
             child: ListTile(
               enabled: enabled,
-              leading: const Icon(Icons.history),
-              title: Text(saved.base.host),
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.tertiaryContainer,
+                foregroundColor: theme.colorScheme.onTertiaryContainer,
+                child: const Icon(Icons.history, size: 20),
+              ),
+              // The host is Latin even in an Arabic interface, but the row
+              // itself still mirrors, so only the text is pinned.
+              title: Text(saved.base.host, textDirection: TextDirection.ltr),
               subtitle: Text(
                 saved.displayName == null
                     ? saved.username
                     : '${saved.displayName} · ${saved.username}',
               ),
-              trailing: const Icon(Icons.chevron_right),
+              // Mirrors with the layout, so it points "onward" in both
+              // directions rather than always to the right.
+              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
               onTap: enabled ? () => onSelected(saved) : null,
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The app's mark: a rounded, layered badge in the Expressive idiom.
+class _Emblem extends StatelessWidget {
+  const _Emblem();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Container(
+        width: 92,
+        height: 92,
+        decoration: BoxDecoration(
+          color: colors.primaryContainer,
+          borderRadius: BorderRadius.circular(AppTheme.shapeExtraExtraLarge),
+        ),
+        child: Icon(
+          Icons.account_tree_outlined,
+          size: 44,
+          color: colors.onPrimaryContainer,
+        ),
+      ),
     );
   }
 }

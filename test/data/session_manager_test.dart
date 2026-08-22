@@ -40,11 +40,15 @@ void main() {
   SessionManager managerWith({
     UnlockGate gate = const OpenGate(),
     Duration keepAlive = Duration.zero,
+    // Long enough that "was held off" and "was not" cannot be confused for
+    // scheduler noise. A 20ms backoff left a 5ms margin, which a loaded
+    // machine crosses on its own.
+    Duration backoff = const Duration(milliseconds: 300),
   }) => SessionManager(
     CredentialStore(secrets, gate),
     clientFactory: clientFactoryFor(server),
     keepAliveInterval: keepAlive,
-    signInBackoff: const Duration(milliseconds: 20),
+    signInBackoff: backoff,
   );
 
   Future<SessionManager> signedInManager({
@@ -222,7 +226,7 @@ void main() {
       // webtrees does not rate-limit sign-in at all, so the restraint that
       // keeps a stale password out of the site's authentication log has to be
       // here.
-      expect(clock.elapsedMilliseconds, greaterThanOrEqualTo(15));
+      expect(clock.elapsedMilliseconds, greaterThanOrEqualTo(300));
     });
 
     test('stops holding off once the password is accepted', () async {
@@ -237,7 +241,7 @@ void main() {
       final clock = Stopwatch()..start();
       expect(await manager.signIn('mobile', 'correct'), isTrue);
       clock.stop();
-      expect(clock.elapsedMilliseconds, lessThan(15));
+      expect(clock.elapsedMilliseconds, lessThan(150));
     });
   });
 

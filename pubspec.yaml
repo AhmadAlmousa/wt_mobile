@@ -36,6 +36,10 @@ dependencies:
   # better than the regexes used for the protocol spike.
   html: ^0.15.6
   meta: ^1.18.0
+  shared_preferences: ^2.5.5
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +51,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  shared_preferences_platform_interface: ^2.4.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -58,6 +63,29 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Generates lib/l10n/app_localizations.dart from the ARB files.
+  generate: true
+
+  fonts:
+    # Cairo (SIL Open Font License 1.1 — assets/fonts/Cairo-OFL.txt) covers
+    # Arabic and Latin in one family, so the interface keeps its voice in
+    # both directions instead of falling back to a system face for Arabic.
+    # Instanced from the upstream variable font at five static weights:
+    # a variable font would need `fontVariations` on every style, which any
+    # widget calling `copyWith(fontWeight:)` would silently ignore.
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Cairo-ExtraBold.ttf
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

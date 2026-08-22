@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/access_probe.dart';
 import '../../data/session_manager.dart';
+import '../../data/settings_store.dart';
 import '../../domain/access.dart';
+import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
+import '../shared/messages.dart';
+import '../shared/settings_sheet.dart';
 
 /// Shows who is signed in, which trees they can reach, and what they may do.
 ///
@@ -13,12 +18,14 @@ import '../shared/message_panel.dart';
 class AccessScreen extends StatefulWidget {
   const AccessScreen({
     required this.session,
+    required this.settings,
     required this.onSignedOut,
     required this.onBrowseTree,
     super.key,
   });
 
   final SessionManager session;
+  final SettingsStore settings;
   final VoidCallback onSignedOut;
 
   /// Opens a tree for browsing. Reading is available to every role, so this is
@@ -64,27 +71,33 @@ class _AccessScreenState extends State<AccessScreen> {
   @override
   Widget build(BuildContext context) {
     final instance = widget.session.instance;
+    final text = AppText.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your access'),
+        title: Text(text.yourAccess),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Check again',
+            tooltip: text.checkAgain,
             onPressed: _load,
           ),
           IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: text.settings,
+            onPressed: () => SettingsSheet.show(context, widget.settings),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
+            tooltip: text.signOut,
             onPressed: _signOut,
           ),
           PopupMenuButton<void>(
-            tooltip: 'More',
+            tooltip: text.more,
             itemBuilder: (context) => [
               PopupMenuItem<void>(
                 onTap: _forgetSite,
-                child: const Text('Forget this site'),
+                child: Text(text.forgetThisSite),
               ),
             ],
           ),
@@ -107,14 +120,11 @@ class _AccessScreenState extends State<AccessScreen> {
                   children: [
                     MessagePanel.error(
                       error is WebtreesError
-                          ? error.message
-                          : 'Something went wrong reading your access.',
+                          ? error.localized(text)
+                          : text.accessReadFailed,
                     ),
                     const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _load,
-                      child: const Text('Try again'),
-                    ),
+                    FilledButton(onPressed: _load, child: Text(text.tryAgain)),
                   ],
                 );
               }
@@ -129,15 +139,14 @@ class _AccessScreenState extends State<AccessScreen> {
                     version: instance?.version ?? '',
                     isAdministrator: summary.isAdministrator,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                   Text(
-                    'FAMILY TREES',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      letterSpacing: 1.2,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    text.familyTrees,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   for (final tree in summary.trees)
                     _TreeCard(
                       tree: tree,
@@ -145,7 +154,7 @@ class _AccessScreenState extends State<AccessScreen> {
                     ),
                   for (final warning in summary.warnings) ...[
                     const SizedBox(height: 12),
-                    MessagePanel.warning(warning),
+                    MessagePanel.warning(warning.localized(text)),
                   ],
                 ],
               );
@@ -173,19 +182,21 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final text = AppText.of(context);
 
     return Card(
+      color: theme.colorScheme.primaryContainer,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             CircleAvatar(
-              radius: 26,
-              backgroundColor: theme.colorScheme.primaryContainer,
+              radius: 30,
+              backgroundColor: theme.colorScheme.primary,
               child: Text(
                 _initials(account.displayName),
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onPrimaryContainer,
+                  color: theme.colorScheme.onPrimary,
                 ),
               ),
             ),
@@ -194,25 +205,30 @@ class _AccountCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(account.displayName, style: theme.textTheme.titleMedium),
+                  Text(
+                    account.displayName,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     account.email ?? account.username,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    version.isEmpty ? host : '$host · webtrees $version',
+                    version.isEmpty ? host : text.hostAndVersion(host, version),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                   if (isAdministrator) ...[
-                    const SizedBox(height: 8),
-                    const _RoleChip(
-                      label: 'Site administrator',
+                    const SizedBox(height: 10),
+                    _RoleChip(
+                      label: text.siteAdministrator,
                       icon: Icons.shield_outlined,
                     ),
                   ],
@@ -246,127 +262,152 @@ class _TreeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final text = AppText.of(context);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-      onTap: onOpen,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.park_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    tree.title ?? tree.name,
-                    style: theme.textTheme.titleMedium,
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(AppTheme.shapeMedium),
+                    ),
+                    child: Icon(
+                      Icons.park_outlined,
+                      size: 22,
+                      color: theme.colorScheme.onTertiaryContainer,
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.chevron_right,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      tree.title ?? tree.name,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ),
+                  // Mirrors with the layout, unlike a hardcoded chevron_right.
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _describe(tree.role, text),
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _describe(tree.role),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _RoleChip(
-                  label: _roleName(tree.role),
-                  icon: Icons.badge_outlined,
-                ),
-                if (tree.role.canEdit)
-                  const _RoleChip(label: 'Can edit', icon: Icons.edit_outlined),
-                if (tree.role.canModerate)
-                  const _RoleChip(
-                    label: 'Can approve changes',
-                    icon: Icons.task_alt,
-                  ),
-                if (tree.role.canManage)
-                  const _RoleChip(
-                    label: 'Can manage',
-                    icon: Icons.settings_outlined,
-                  ),
-                if (tree.myXref != null)
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
                   _RoleChip(
-                    label: 'Linked to ${tree.myXref}',
-                    icon: Icons.person_pin_circle_outlined,
+                    label: _roleName(tree.role, text),
+                    icon: Icons.badge_outlined,
+                    emphasised: true,
                   ),
-              ],
-            ),
-          ],
+                  if (tree.role.canEdit)
+                    _RoleChip(label: text.canEdit, icon: Icons.edit_outlined),
+                  if (tree.role.canModerate)
+                    _RoleChip(
+                      label: text.canApproveChanges,
+                      icon: Icons.task_alt,
+                    ),
+                  if (tree.role.canManage)
+                    _RoleChip(
+                      label: text.canManage,
+                      icon: Icons.settings_outlined,
+                    ),
+                  if (tree.myXref != null)
+                    _RoleChip(
+                      label: text.linkedTo(tree.myXref!),
+                      icon: Icons.person_pin_circle_outlined,
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
-  static String _roleName(TreeRole role) => switch (role) {
-    TreeRole.administrator => 'Administrator',
-    TreeRole.manager => 'Manager',
-    TreeRole.moderator => 'Moderator',
-    TreeRole.editor => 'Editor',
-    TreeRole.member => 'Member',
-    TreeRole.memberOrVisitor => 'Read-only',
+  static String _roleName(TreeRole role, AppText text) => switch (role) {
+    TreeRole.administrator => text.roleAdministrator,
+    TreeRole.manager => text.roleManager,
+    TreeRole.moderator => text.roleModerator,
+    TreeRole.editor => text.roleEditor,
+    TreeRole.member => text.roleMember,
+    TreeRole.memberOrVisitor => text.roleReadOnly,
   };
 
-  static String _describe(TreeRole role) => switch (role) {
-    TreeRole.administrator =>
-      'You administer this site, so you manage every tree in it.',
-    TreeRole.manager => 'You can change this tree and its settings.',
-    TreeRole.moderator =>
-      'You can edit records and approve changes other people submit.',
-    TreeRole.editor =>
-      'You can edit records. Your changes wait for a moderator to approve them.',
-    TreeRole.member => 'You can view this tree, including living relatives.',
+  static String _describe(TreeRole role, AppText text) => switch (role) {
+    TreeRole.administrator => text.describeAdministrator,
+    TreeRole.manager => text.describeManager,
+    TreeRole.moderator => text.describeModerator,
+    TreeRole.editor => text.describeEditor,
+    TreeRole.member => text.describeMember,
     // Being unable to tell Member from Visitor is a genuine limit of reading a
     // stock webtrees site, so the interface says so rather than guessing.
-    TreeRole.memberOrVisitor =>
-      'You can view this tree. It is public, so the app cannot tell whether '
-          'you are signed in as a member or seeing it as any visitor would.',
+    TreeRole.memberOrVisitor => text.describeMemberOrVisitor,
   };
 }
 
 class _RoleChip extends StatelessWidget {
-  const _RoleChip({required this.label, required this.icon});
+  const _RoleChip({
+    required this.label,
+    required this.icon,
+    this.emphasised = false,
+  });
 
   final String label;
   final IconData icon;
 
+  /// Marks the chip naming the role itself, which outranks the capability
+  /// chips beside it.
+  final bool emphasised;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final background = emphasised
+        ? colors.secondaryContainer
+        : colors.surfaceContainerHighest;
+    final foreground = emphasised
+        ? colors.onSecondaryContainer
+        : colors.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        color: background,
+        // A stadium chip is the Expressive shape for a status pill.
+        borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 6),
+          Icon(icon, size: 15, color: foreground),
+          const SizedBox(width: 7),
           Text(
             label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: foreground),
           ),
         ],
       ),

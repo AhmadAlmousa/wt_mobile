@@ -65,7 +65,9 @@ void main() {
     session = sessionManagerFor(server);
     addTearDown(session.dispose);
 
-    await tester.pumpWidget(WebtreesMobileApp(session: session));
+    await tester.pumpWidget(
+      WebtreesMobileApp(session: session, settings: testSettings()),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField), 'host');
@@ -204,7 +206,9 @@ void main() {
     session = sessionManagerFor(server);
     addTearDown(session.dispose);
 
-    await tester.pumpWidget(WebtreesMobileApp(session: session));
+    await tester.pumpWidget(
+      WebtreesMobileApp(session: session, settings: testSettings()),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'host');
     await tester.tap(find.widgetWithText(FilledButton, 'Connect'));

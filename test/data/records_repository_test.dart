@@ -8,6 +8,7 @@ import 'package:webtrees_mobile/core/errors.dart';
 import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
+import 'package:webtrees_mobile/domain/notice.dart';
 
 import '../support/fake_webtrees.dart';
 
@@ -272,10 +273,7 @@ void main() {
 
   group('a missing tab', () {
     test('costs that section and says so, not the whole record', () async {
-      serve({
-        ...site(),
-        tabRoute('relatives'): (_) => const Canned(403),
-      });
+      serve({...site(), tabRoute('relatives'): (_) => const Canned(403)});
 
       final person = await records.individual('main', 'X42');
 
@@ -284,7 +282,14 @@ void main() {
       expect(person.name, 'عبد الله الموسى');
       expect(person.primaryFacts, isNotEmpty);
       expect(person.families, isEmpty);
-      expect(person.warnings.single, contains('Family members'));
+      expect(
+        person.warnings.single,
+        isA<SectionUnavailable>().having(
+          (notice) => notice.module,
+          'module',
+          'relatives',
+        ),
+      );
     });
 
     test('is not invented when the site never offered it', () async {
@@ -299,7 +304,14 @@ void main() {
       final person = await records.individual('main', 'X42');
 
       expect(server.routes, isNot(contains(tabRoute('relatives'))));
-      expect(person.warnings.single, contains('Family members'));
+      expect(
+        person.warnings.single,
+        isA<SectionUnavailable>().having(
+          (notice) => notice.module,
+          'module',
+          'relatives',
+        ),
+      );
     });
   });
 

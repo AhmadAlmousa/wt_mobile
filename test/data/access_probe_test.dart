@@ -6,6 +6,7 @@ import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/domain/access.dart';
+import 'package:webtrees_mobile/domain/notice.dart';
 
 import '../support/fake_webtrees.dart';
 
@@ -148,7 +149,7 @@ ${withMyRecord ? '<a href="/tree/$tree/individual/X42/slug" class="menu-myrecord
       final summary = await probe.describe();
 
       expect(summary.trees.map((t) => t.name), ['main']);
-      expect(summary.warnings.single, contains('Only one family tree'));
+      expect(summary.warnings.single, isA<OnlyOneTreeFound>());
     });
 
     test('reads every tree from the header menu', () async {
@@ -204,7 +205,7 @@ ${withMyRecord ? '<a href="/tree/$tree/individual/X42/slug" class="menu-myrecord
       final summary = await probe.describe();
 
       expect(summary.trees, isEmpty);
-      expect(summary.warnings.single, contains('cannot see any family tree'));
+      expect(summary.warnings.single, isA<NoTreesVisible>());
     });
   });
 
@@ -247,10 +248,7 @@ ${withMyRecord ? '<a href="/tree/$tree/individual/X42/slug" class="menu-myrecord
         '/tree/main/pending': (_) => const Canned(500),
       });
 
-      await expectLater(
-        probe.describe(),
-        throwsA(isA<UnexpectedResponse>()),
-      );
+      await expectLater(probe.describe(), throwsA(isA<UnexpectedResponse>()));
     });
 
     test('a failing server is not proof of a private tree', () async {

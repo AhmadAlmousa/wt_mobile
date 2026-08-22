@@ -24,7 +24,9 @@ void main() {
     // otherwise reuse its State, carrying the old session across what is meant
     // to represent a fresh launch of the app.
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpWidget(WebtreesMobileApp(session: session));
+    await tester.pumpWidget(
+      WebtreesMobileApp(session: session, settings: testSettings()),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -194,7 +196,7 @@ void main() {
       // Relaunch against the same storage, as though the app restarted.
       await launch(tester, secrets: secrets);
 
-      expect(find.text('RECENT'), findsOne);
+      expect(find.text('Recent'), findsOne);
       expect(find.text('host'), findsOne);
       expect(find.textContaining('mobile'), findsOne);
     });

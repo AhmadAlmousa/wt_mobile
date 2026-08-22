@@ -5,6 +5,7 @@ import 'core/secret_store.dart';
 import 'core/unlock_gate.dart';
 import 'data/credential_store.dart';
 import 'data/session_manager.dart';
+import 'data/settings_store.dart';
 
 /// Composition root.
 ///
@@ -18,7 +19,15 @@ Future<void> main() async {
   final secrets = await PlatformSecretStore.open();
   final gate = await BiometricGate.open();
 
+  // Read before the first frame: the sign-in screen has to be drawn in the
+  // right language and reading direction, not corrected a moment later.
+  final settings = SettingsStore();
+  await settings.load();
+
   runApp(
-    WebtreesMobileApp(session: SessionManager(CredentialStore(secrets, gate))),
+    WebtreesMobileApp(
+      session: SessionManager(CredentialStore(secrets, gate)),
+      settings: settings,
+    ),
   );
 }

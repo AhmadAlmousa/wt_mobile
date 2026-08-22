@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'notice.dart';
 
 /// A person's recorded sex, as webtrees renders it.
 enum Sex {
@@ -157,7 +158,7 @@ final class IndividualRecord {
     this.alternateName,
     this.thumbnailUrl,
     this.sex = Sex.unknown,
-    List<String> warnings = const [],
+    List<Notice> warnings = const [],
   }) : facts = List.unmodifiable(facts),
        families = List.unmodifiable(families),
        warnings = List.unmodifiable(warnings);
@@ -176,7 +177,7 @@ final class IndividualRecord {
   /// A tab may be switched off or restricted per tree, and markup drifts
   /// between themes and versions. Losing the relatives tab should cost the
   /// relatives section and say so — not the whole page.
-  final List<String> warnings;
+  final List<Notice> warnings;
 
   /// The facts worth showing without the user asking for more.
   Iterable<FactEntry> get primaryFacts =>

@@ -7,6 +7,7 @@ import 'package:html/parser.dart' as html;
 import '../../core/errors.dart';
 import '../../core/response_status.dart';
 import '../../core/webtrees_client.dart';
+import '../../domain/notice.dart';
 import '../../domain/records.dart';
 import 'dom.dart';
 import 'media_cache.dart';
@@ -43,11 +44,7 @@ final class RecordsRepository {
   /// instance that answers JSON. It is **search**, not enumeration: webtrees
   /// returns an empty collection for an empty query, so a blank [query] is
   /// answered here rather than wasting a request.
-  Future<SearchPage> search(
-    String tree,
-    String query, {
-    int page = 1,
-  }) async {
+  Future<SearchPage> search(String tree, String query, {int page = 1}) async {
     if (query.trim().isEmpty) {
       return const SearchPage(people: [], hasMore: false);
     }
@@ -146,7 +143,7 @@ final class RecordsRepository {
     );
 
     final page = _parser.parseIndividualPage(reply.body, xref: xref);
-    final warnings = <String>[];
+    final warnings = <Notice>[];
 
     final factsHtml = await _tabContent(page, 'personal_facts', warnings);
     final relativesHtml = await _tabContent(page, 'relatives', warnings);
@@ -201,14 +198,14 @@ final class RecordsRepository {
   Future<String?> _tabContent(
     IndividualPage page,
     String module,
-    List<String> warnings,
+    List<Notice> warnings,
   ) async {
     final inline = page.inlineTabs[module];
     if (inline != null) return inline;
 
     final url = page.tabs[module];
     if (url == null) {
-      warnings.add(_missing(module));
+      warnings.add(SectionUnavailable(module));
       return null;
     }
 
@@ -227,21 +224,15 @@ final class RecordsRepository {
         name: _log,
         level: 900,
       );
-      warnings.add(_missing(module));
+      warnings.add(SectionUnavailable(module));
       return null;
     } on WebtreesError catch (problem) {
       // One unreachable tab should cost that section, not the whole record.
       developer.log('Tab $module failed: ${problem.message}', name: _log);
-      warnings.add(_missing(module));
+      warnings.add(SectionUnavailable(module));
       return null;
     }
   }
-
-  static String _missing(String module) => switch (module) {
-    'personal_facts' => 'Facts and events could not be loaded for this person.',
-    'relatives' => 'Family members could not be loaded for this person.',
-    _ => 'The $module section could not be loaded.',
-  };
 
   /// The query parameters of a server-supplied URL.
   ///

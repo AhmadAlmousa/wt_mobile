@@ -6,6 +6,7 @@ import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/domain/instance.dart';
+import 'package:webtrees_mobile/domain/notice.dart';
 
 import '../support/fake_webtrees.dart';
 
@@ -69,7 +70,14 @@ void main() {
       final instance = await probe.connect();
 
       expect(instance.url.base.host, 'tree.example.com');
-      expect(instance.warnings.single, contains('tree.example.com'));
+      expect(
+        instance.warnings.single,
+        isA<SiteRenamedItself>().having(
+          (notice) => notice.canonical.host,
+          'canonical host',
+          'tree.example.com',
+        ),
+      );
     });
 
     test('a subdirectory install keeps its prefix', () async {
@@ -137,7 +145,7 @@ void main() {
       final instance = await probe.connect();
 
       expect(instance.version, isEmpty);
-      expect(instance.warnings.single, contains('did not identify itself'));
+      expect(instance.warnings.single, isA<SiteUnidentified>());
     });
 
     test('the bot cookie challenge is reported as a block', () async {

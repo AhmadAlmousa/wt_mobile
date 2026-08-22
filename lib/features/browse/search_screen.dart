@@ -6,7 +6,9 @@ import '../../core/errors.dart';
 import '../../data/session_manager.dart';
 import '../../data/stock/records_repository.dart';
 import '../../domain/records.dart';
+import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
+import '../shared/messages.dart';
 import 'authenticated_image.dart';
 
 /// Finds people in one tree by name.
@@ -97,6 +99,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppText.of(context);
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.tree)),
       body: SafeArea(
@@ -109,8 +113,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  labelText: 'Search for a person',
-                  hintText: 'A name, or a record id such as I42',
+                  labelText: text.searchForAPerson,
+                  hintText: text.searchHint,
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searching
                       ? const Padding(
@@ -134,11 +138,12 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _body(BuildContext context) {
+    final text = AppText.of(context);
     final error = _error;
     if (error != null) {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: MessagePanel.error(error.message),
+        child: MessagePanel.error(error.localized(text)),
       );
     }
 
@@ -147,27 +152,36 @@ class _SearchScreenState extends State<SearchScreen> {
         // Three different silences, and saying which one it is saves the user
         // guessing whether the app is broken.
         message: !_hasSearched
-            ? 'Type a name to search this family tree.'
+            ? text.searchPrompt
             : _searching
-            ? 'Searching…'
-            : 'Nobody matched that name. Try a different spelling, or part '
-                  'of the name.',
+            ? text.searching
+            : text.noMatches,
+        icon: !_hasSearched
+            ? Icons.search
+            : _searching
+            ? Icons.hourglass_empty
+            : Icons.person_search_outlined,
       );
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
       itemCount: _results.length,
       itemBuilder: (context, index) {
         final person = _results[index];
-        return ListTile(
-          leading: AuthenticatedImage(
-            url: person.thumbnailUrl,
-            records: widget.records,
-            size: 44,
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            leading: AuthenticatedImage(
+              url: person.thumbnailUrl,
+              records: widget.records,
+              size: 48,
+            ),
+            title: Text(person.name),
+            subtitle: person.lifespan == null ? null : Text(person.lifespan!),
+            onTap: () => widget.onOpenPerson(person.xref),
           ),
-          title: Text(person.name),
-          subtitle: person.lifespan == null ? null : Text(person.lifespan!),
-          onTap: () => widget.onOpenPerson(person.xref),
         );
       },
     );
@@ -175,21 +189,40 @@ class _SearchScreenState extends State<SearchScreen> {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message});
+  const _EmptyState({required this.message, required this.icon});
 
   final String message;
+  final IconData icon;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 32, color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }

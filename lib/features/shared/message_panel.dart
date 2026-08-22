@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
+
 /// How prominent a message is.
 enum MessageTone { error, warning, info }
 
@@ -31,6 +33,7 @@ class MessagePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final semantic = SemanticColors.of(context);
 
     final (Color background, Color foreground, IconData icon) = switch (tone) {
       MessageTone.error => (
@@ -39,8 +42,8 @@ class MessagePanel extends StatelessWidget {
         Icons.error_outline,
       ),
       MessageTone.warning => (
-        colors.tertiaryContainer,
-        colors.onTertiaryContainer,
+        semantic.warningContainer,
+        semantic.onWarningContainer,
         Icons.warning_amber_outlined,
       ),
       MessageTone.info => (
@@ -54,10 +57,10 @@ class MessagePanel extends StatelessWidget {
       liveRegion: tone == MessageTone.error,
       container: true,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppTheme.shapeLarge),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

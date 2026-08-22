@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/session_manager.dart';
+import '../data/settings_store.dart';
 import '../data/stock/media_cache.dart';
 import '../data/stock/records_repository.dart';
 import '../features/access/access_screen.dart';
@@ -9,13 +10,19 @@ import '../features/auth/sign_in_screen.dart';
 import '../features/browse/person_screen.dart';
 import '../features/browse/search_screen.dart';
 import '../features/connect/connect_screen.dart';
+import '../l10n/app_localizations.dart';
 import 'theme.dart';
 
 /// The application shell.
 class WebtreesMobileApp extends StatefulWidget {
-  const WebtreesMobileApp({required this.session, super.key});
+  const WebtreesMobileApp({
+    required this.session,
+    required this.settings,
+    super.key,
+  });
 
   final SessionManager session;
+  final SettingsStore settings;
 
   @override
   State<WebtreesMobileApp> createState() => _WebtreesMobileAppState();
@@ -75,6 +82,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
         path: Routes.connect,
         builder: (context, state) => ConnectScreen(
           session: widget.session,
+          settings: widget.settings,
           onConnected: () => _router.go(Routes.signIn),
           onSignedIn: () => _router.go(Routes.access),
         ),
@@ -91,6 +99,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
         path: Routes.access,
         builder: (context, state) => AccessScreen(
           session: widget.session,
+          settings: widget.settings,
           onSignedOut: () => _router.go(Routes.connect),
           onBrowseTree: (tree) => _router.go(Routes.searchIn(tree)),
         ),
@@ -134,12 +143,28 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp.router(
-    title: 'webtrees',
-    theme: AppTheme.light(),
-    darkTheme: AppTheme.dark(),
-    routerConfig: _router,
-    debugShowCheckedModeBanner: false,
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.settings,
+    builder: (context, _) {
+      // The theme is built per-locale, because Arabic needs different letter
+      // spacing and leading from Latin (see AppTheme). So the resolved
+      // locale has to be known here, not left to MaterialApp to work out.
+      final locale = widget.settings.resolve(
+        View.of(context).platformDispatcher.locale,
+      );
+
+      return MaterialApp.router(
+        onGenerateTitle: (context) => AppText.of(context).appTitle,
+        theme: AppTheme.light(locale),
+        darkTheme: AppTheme.dark(locale),
+        themeMode: widget.settings.themeMode,
+        locale: widget.settings.locale,
+        localizationsDelegates: AppText.localizationsDelegates,
+        supportedLocales: SettingsStore.supportedLocales,
+        routerConfig: _router,
+        debugShowCheckedModeBanner: false,
+      );
+    },
   );
 }
 

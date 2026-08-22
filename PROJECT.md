@@ -229,6 +229,39 @@ anonymous `/my-account`.
 - The user's own XREF is **not** on the account page (disabled control, empty
   value). Read `a.menu-myrecord[href]` from any page of that tree.
 
+### Languages
+
+The interface is English and Arabic, and both are first class — the tree this
+was built against is Arabic, so RTL is the case the layout was designed for
+rather than a late adaptation.
+
+- **The data layer never writes a sentence.** `domain/notice.dart` carries the
+  facts of a caveat and `core/errors.dart` the facts of a failure; both are
+  sealed, and `features/shared/messages.dart` turns them into words with
+  exhaustive switches. A new case fails to compile until it has been given
+  words in both languages.
+- **Tracking is Latin-only.** `letterSpacing` inserts space *between* glyphs.
+  Arabic is cursive and joins, so the negative tracking that sharpens a Latin
+  headline pulls Arabic words apart. `AppTheme` therefore takes the resolved
+  locale and zeroes tracking for Arabic, and adds a little leading.
+- **Identifiers stay LTR inside an RTL page.** A hostname, an xref and a
+  version are Latin whichever way the interface reads, so those specific runs
+  pin `TextDirection.ltr`; the rows around them still mirror.
+- **Directional icons must mirror.** `Icons.chevron_right` points right in
+  Arabic too, which is backwards; `Icons.arrow_forward_ios` follows the
+  reading direction.
+- Language and theme are chosen in a sheet reachable from the **first** screen,
+  because someone who reads Arabic should not have to work through an English
+  sign-in form to find the switch. Both default to following the device.
+
+### Typography
+
+**Cairo** (SIL OFL, `assets/fonts/Cairo-OFL.txt`) covers Arabic and Latin in
+one family, so the interface keeps one voice in both directions instead of
+falling back to a system face for Arabic. Instanced from the upstream variable
+font at five static weights: a variable font needs `fontVariations` on every
+style, and any widget calling `copyWith(fontWeight:)` would silently ignore it.
+
 ### Platform
 
 **No CORS headers → Flutter Web cannot work.** Mobile and desktop only.
@@ -269,12 +302,13 @@ it. A real signing config is needed before any distribution.
 webtrees_mobile/lib/
   core/      webtrees_url · webtrees_client · errors · response_status
              secret_store · unlock_gate
+  l10n/      app_en.arb · app_ar.arb  (generated AppText)
   data/      instance_probe · session · access_probe
-             credential_store · session_manager
+             credential_store · session_manager · settings_store
     stock/   dom · record_parser · records_repository · media_cache
     module/  ModuleTransport  (JSON)                           ← v2
-  domain/    instance · access · records
-  features/  connect · auth · access · browse
+  domain/    instance · access · records · notice
+  features/  connect · auth · access · browse · shared
 ```
 
 Repositories depend on a transport **interface**; a capability probe at connect
@@ -312,7 +346,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **2d** | Stabilization — status interpretation, resume, credential semantics | ✅ |
 | **3a** | Vertical slice — search → person → facts → relatives → photo | ✅ |
 | **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ⬜ |
-| **4** | Interface (theme, navigation, person/family views) | 🚧 |
+| **4** | Interface (Material 3 Expressive theme, Arabic/RTL, navigation) | ✅ |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
 | **v2** | Offline sync · editing · moderation · charts · PHP module | ⬜ |
 
@@ -577,6 +611,48 @@ instance that has media before it can be called verified.
 changes, which is the design working: the page states its tabs, the app does
 not guess.
 
+### 2026-08-22 (later still) — Phase 4: Material 3 Expressive, and Arabic
+
+**Expressive is not one flag.** Flutter 3.44 offers
+`DynamicSchemeVariant.expressive` and little else of the 2025 update — no
+button group, split button or FAB menu yet. So the idiom is assembled in
+`app/theme.dart` from the parts that carry it: the expressive scheme, a type
+scale with real weight contrast (800 at display, 400 at body), a *varied*
+shape scale rather than one radius everywhere, stadium buttons and pill
+fields, the 2024 progress indicator, and `FadeForwards` page motion — which
+also happens to be the transition that reads correctly mirrored.
+
+**The seed no longer decides the colour, and that is the point.** The
+expressive variant rotates hues far from the seed: the project's archival
+green comes out as warm sepia and amber, with cyan as tertiary. For a
+genealogy app that reads as aged paper, so it stays — but it is recorded here
+because a reader of `AppTheme` would otherwise expect green.
+
+**One thing had to be taken back from the scheme.** With tertiary rotated to
+cyan, `MessagePanel.warning` was rendering caution in *cyan*, which reads as
+information. Caution is amber in almost every interface anyone has used, so it
+is now a `ThemeExtension` (`SemanticColors`) with fixed amber for both themes,
+tested at **9.8:1** and **9.1:1** against WCAG's 4.5:1.
+
+**Arabic is a first-class language, not a translation pass.** See §3 for what
+that cost: locale-dependent tracking, LTR islands for identifiers, mirroring
+icons, and a data layer that emits typed `Notice`s instead of English
+sentences. Terminology follows webtrees' own Arabic translation
+(`resources/lang/ar/messages.po`) — شجرات العائلة, معلومات وأحداث, الوالدان —
+so the app reads like the site the family already uses.
+
+**The interface can now be looked at without a device.**
+`tool/preview/render_preview.dart` renders real screens to PNGs, with the app's
+own fonts *and* the icon font loaded — a test binding registers neither, and
+without them Arabic renders as boxes and every icon as an empty square. It
+lives outside `test/` and is not named `*_test.dart`, so a normal run does not
+collect it. This caught both colour problems above before any build.
+
+**201 tests** green (186 → 201), analyzer clean. The new ones assert the things
+that would otherwise only be noticed on a device: that the tree mirrors, that
+a hostname does not, that Arabic drops tracking, and that every sealed error
+and notice has words in both languages.
+
 ---
 
 ## 8. Tooling
@@ -588,9 +664,16 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 # Exercise the app's own data layer end to end
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 
-flutter test          # 182 tests
+flutter test          # 201 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
+
+# Render real screens to build/preview/*.png, in both languages and themes.
+# Not collected by `flutter test`: it writes files and asserts nothing.
+flutter test tool/preview/render_preview.dart --update-goldens
+
+# Sideloadable builds, one per ABI (~25MB each, against 54MB fat)
+flutter build apk --release --split-per-abi
 ```
 
 Running the GUI on Linux needs a toolchain this machine does not yet have:

@@ -5,6 +5,7 @@ import '../core/errors.dart';
 import '../core/webtrees_client.dart';
 import '../core/webtrees_url.dart';
 import '../domain/instance.dart';
+import '../domain/notice.dart';
 
 /// Works out how to talk to a webtrees site, before anyone signs in.
 ///
@@ -21,7 +22,7 @@ class InstanceProbe {
   /// style and the server's own canonical address, so the caller can carry on
   /// using the same client afterwards.
   Future<WebtreesInstance> connect() async {
-    final warnings = <String>[];
+    final warnings = <Notice>[];
 
     await _detectUrlStyle(warnings);
     await _checkUserAgent(warnings);
@@ -41,7 +42,7 @@ class InstanceProbe {
   /// A site with pretty URLs answers `308` and its `Location` is the canonical
   /// form, which also reveals the `base_url` the administrator configured. A
   /// site with ugly URLs simply answers `200`.
-  Future<void> _detectUrlStyle(List<String> warnings) async {
+  Future<void> _detectUrlStyle(List<Notice> warnings) async {
     final typed = _client.url.base;
     _client.url = WebtreesUrl(base: typed, style: UrlStyle.ugly);
 
@@ -63,10 +64,7 @@ class InstanceProbe {
       developer.log('Pretty URLs, canonical $base', name: 'webtrees.connect');
 
       if (base.host != typed.host || base.scheme != typed.scheme) {
-        warnings.add(
-          'This site calls itself $base. The app will use that address, '
-          'because its sign-in cookie is issued for that host.',
-        );
+        warnings.add(SiteRenamedItself(base));
       }
       return;
     }
@@ -85,12 +83,12 @@ class InstanceProbe {
   /// webtrees publishes its blocklist at `/robots.txt` and matches it as a
   /// case-sensitive substring, so a collision is silent and total: every
   /// request would answer 406. Better to say so plainly at connect time.
-  Future<void> _checkUserAgent(List<String> warnings) async {
+  Future<void> _checkUserAgent(List<Notice> warnings) async {
     final Reply reply;
     try {
       reply = await _client.get('/robots.txt');
     } on WebtreesError catch (error) {
-      warnings.add('Could not check the site blocklist: ${error.message}');
+      warnings.add(BlocklistUnchecked(error.message));
       return;
     }
 
@@ -132,10 +130,10 @@ class InstanceProbe {
   ///
   /// Every page built on the default layout carries it, including this one,
   /// which anonymous visitors can always reach.
-  Future<String> _readVersion(List<String> warnings) async {
+  Future<String> _readVersion(List<Notice> warnings) async {
     final reply = await _client.get('/login');
     if (!reply.isOk) {
-      warnings.add('Could not read the site version.');
+      warnings.add(const VersionUnreadable());
       return '';
     }
 
@@ -148,10 +146,7 @@ class InstanceProbe {
     ).firstMatch(reply.body)?.group(1);
 
     if (version == null) {
-      warnings.add(
-        'This site did not identify itself as webtrees. The app will '
-        'continue, but some features may not work.',
-      );
+      warnings.add(const SiteUnidentified());
       return '';
     }
     return version;

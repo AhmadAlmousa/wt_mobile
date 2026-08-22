@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import '../core/webtrees_url.dart';
+import 'notice.dart';
 
 /// What `/ping` reports about the server's own configuration.
 enum ServerHealth {
@@ -32,7 +33,7 @@ final class WebtreesInstance {
 
   /// Non-fatal findings worth showing on a diagnostics screen — for example
   /// that the site's canonical address differs from the one that was typed.
-  final List<String> warnings;
+  final List<Notice> warnings;
 
   /// The major.minor version as a comparable pair, or `null` if unreadable.
   ///

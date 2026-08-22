@@ -1,11 +1,29 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:webtrees_mobile/core/secret_store.dart';
 import 'package:webtrees_mobile/core/unlock_gate.dart';
 import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/data/credential_store.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
+import 'package:webtrees_mobile/data/settings_store.dart';
 
 import 'fake_webtrees.dart';
+
+/// A settings store backed by in-memory preferences.
+///
+/// Widget tests need one that never touches the platform channel, and that
+/// starts from a known locale: an English default keeps assertions about copy
+/// stable regardless of the machine the suite runs on.
+SettingsStore testSettings({Locale? locale, ThemeMode? theme}) {
+  SharedPreferencesAsyncPlatform.instance =
+      InMemorySharedPreferencesAsync.empty();
+  final settings = SettingsStore();
+  if (locale != null) settings.setLocale(locale);
+  if (theme != null) settings.setThemeMode(theme);
+  return settings;
+}
 
 /// Builds a [SessionManager] wired to [server] instead of the network.
 SessionManager sessionManagerFor(

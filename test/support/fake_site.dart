@@ -58,16 +58,17 @@ final class FakeSite {
         : const Canned(302, location: 'https://host/login'),
     '/admin': (_) => const Canned(403),
     '/': (_) => const Canned(302, location: 'https://host/tree/main/my-page'),
-    '/tree/main': (request) => request.anonymous
-        ? const Canned(404)
-        : Canned(200, body: _treeHome),
+    '/tree/main': (request) =>
+        request.anonymous ? const Canned(404) : Canned(200, body: _treeHome),
     '/tree/main/autocomplete/place': (_) => const Canned(403),
     '/tree/main/pending': (_) => const Canned(403),
     '/tree/main/changes-log': (_) => const Canned(403),
   };
 
   Canned _login(Sent request) {
-    if (request.method != 'POST') return Canned(200, body: pageWith(csrf: csrf));
+    if (request.method != 'POST') {
+      return Canned(200, body: pageWith(csrf: csrf));
+    }
 
     // webtrees checks the token before the credentials, and answers a failed
     // check by redirecting to the sign-in page *without* echoing the username.

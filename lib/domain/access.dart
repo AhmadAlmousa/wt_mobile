@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'notice.dart';
 
 /// What a signed-in user may do in one tree.
 ///
@@ -82,7 +83,7 @@ final class AccessSummary {
     required this.account,
     required List<TreeAccess> trees,
     required this.isAdministrator,
-    List<String> warnings = const [],
+    List<Notice> warnings = const [],
   }) : trees = List.unmodifiable(trees),
        warnings = List.unmodifiable(warnings);
 
@@ -93,5 +94,5 @@ final class AccessSummary {
   final bool isAdministrator;
 
   /// Non-fatal findings, such as being unable to enumerate every tree.
-  final List<String> warnings;
+  final List<Notice> warnings;
 }
