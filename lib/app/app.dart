@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 
 import '../data/session_manager.dart';
 import '../data/settings_store.dart';
+import '../data/stock/charts_repository.dart';
 import '../data/stock/media_cache.dart';
 import '../data/stock/records_repository.dart';
+import '../domain/charts.dart';
 import '../features/access/access_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/browse/person_screen.dart';
 import '../features/browse/search_screen.dart';
+import '../features/charts/chart_screen.dart';
 import '../features/connect/connect_screen.dart';
 import '../features/launch/launch_screen.dart';
 import '../l10n/app_localizations.dart';
@@ -46,6 +49,13 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     widget.session.client,
     version: widget.session.instance?.version,
     mediaCache: _media,
+  );
+
+  /// Charts are read through the same client, and the same reasoning: it is
+  /// replaced whenever the app reconnects, so nothing may hold one.
+  ChartsRepository get _charts => ChartsRepository(
+    widget.session.client,
+    version: widget.session.instance?.version,
   );
 
   /// Whether the app has already walked into the account's only tree.
@@ -191,8 +201,42 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
                 // can be walked back down again.
                 onOpenPerson: (xref) =>
                     _router.push(Routes.personIn(tree, xref)),
+                onOpenChart: (kind) => _router.push(
+                  Routes.chartIn(tree, state.pathParameters['xref']!, kind),
+                ),
               );
             },
+            routes: [
+              // Nested again: a chart is opened from a person, and closing it
+              // should put that person back on screen.
+              GoRoute(
+                path: Routes.chartUnderPerson,
+                builder: (context, state) {
+                  final tree = state.pathParameters['tree']!;
+                  final xref = state.pathParameters['xref']!;
+                  final kind = ChartKind.values.firstWhere(
+                    (candidate) =>
+                        candidate.name == state.pathParameters['kind'],
+                    orElse: () => ChartKind.ancestors,
+                  );
+
+                  return ChartScreen(
+                    session: widget.session,
+                    records: _records,
+                    charts: _charts,
+                    tree: tree,
+                    xref: xref,
+                    kind: kind,
+                    onOpenPerson: (xref) =>
+                        _router.push(Routes.personIn(tree, xref)),
+                    // The same chart, drawn around somebody else: how a
+                    // reader walks a tree without leaving the chart.
+                    onOpenChart: (xref) =>
+                        _router.push(Routes.chartIn(tree, xref, kind)),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -248,8 +292,14 @@ abstract final class Routes {
   /// on top of the search results in the navigation stack.
   static const String personUnderSearch = 'person/:xref';
 
+  /// Declared relative to the person, for the same reason.
+  static const String chartUnderPerson = 'chart/:kind';
+
   static String searchIn(String tree) => '/tree/${Uri.encodeComponent(tree)}';
 
   static String personIn(String tree, String xref) =>
       '${searchIn(tree)}/person/${Uri.encodeComponent(xref)}';
+
+  static String chartIn(String tree, String xref, ChartKind kind) =>
+      '${personIn(tree, xref)}/chart/${kind.name}';
 }

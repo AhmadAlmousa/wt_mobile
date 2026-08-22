@@ -296,6 +296,56 @@ anonymous `/my-account`.
 - The user's own XREF is **not** on the account page (disabled control, empty
   value). Read `a.menu-myrecord[href]` from any page of that tree.
 
+### Charts
+
+webtrees draws twelve charts, and the app cannot show any of them as they
+arrive: they are HTML for a wide screen, positioned with floats, background
+images and a reading direction baked into the stylesheet. What the app takes
+is the **shape** — who descends from whom — and draws it again.
+
+- **A site states which charts it runs, per person.** Every link webtrees makes
+  to a chart carries a class naming it: `menu-chart-ancestry`,
+  `menu-chart-descendants`, `menu-chart-fanchart`, `menu-chart-compact`,
+  `menu-chart-hourglass`, `menu-chart-familybook`, `menu-chart-pedigree`,
+  `menu-chart-pedigreemap`, `menu-chart-relationship`, `menu-chart-tree`,
+  `menu-chart-timeline`, `menu-chart-lifespan`, `menu-chart-statistics`. The
+  same vocabulary in 2.2.6 and 2.3. The page menu (`li.menu-chart`) holds the
+  links for *this* person; the identical classes also appear inside every
+  chart box on the page, each pointing at whoever that box holds.
+- **The URL is the site's, settings and all.** A chart route carries its
+  parameters as path segments — `/tree/{t}/ancestors-{style}-{generations}/{x}`
+  — so the number of generations is the administrator's choice, in the link.
+  Rebuilding that URL would quietly overrule them. Live, this instance offers
+  `ancestors-tree-4`, `descendants-tree-3`, `fan-chart-3-4-100`,
+  `hourglass-3-0`, `family-book-2-5-0`, `pedigree-right-4`,
+  `relationships-1-3`, `compact`.
+- **`?ajax=1` answers the chart alone**, which is how webtrees' own JavaScript
+  asks; without it every chart route sends a whole page — form, menu, footer —
+  around the same markup.
+- **The ancestors chart states the structure twice**, and only one of them can
+  be read safely. Each box is followed by a `div.wt-sosa-number` holding its
+  Sosa-Stradonitz number — rendered with `I18N::number`, so in Arabic it
+  arrives as `٤` — while the nesting says the same thing in every language.
+  The app reads the nesting and computes the numbering itself, by webtrees'
+  own rule (parents of *n* are 2*n* and 2*n*+1, the even slot going to whoever
+  is *not* recorded female). The parser tests check that derivation against the
+  numbers the server printed.
+- **The descendants chart numbers people in plain digits**, because a
+  d'Aboville number (`1.2.1`) is built by joining integers rather than
+  formatting a number. Two numbering schemes on two charts, one localized and
+  one not — which is exactly why neither is depended on.
+- A descendants family block holds the spouse's box directly, before the rows
+  holding the children: it is the one chart box there that is nobody's
+  subtree. Each family is announced by a control carrying webtrees' own
+  summary — *Marriage 1925 — 2 children* — already translated.
+- The two charts' markup is identical in 2.2.6 and 2.3 but for one thing: 2.3
+  keeps the calendar link inside a marriage date on that control, where 2.2.6
+  strips the tags. Read as text, both say the same.
+- **A chart can hold the same person twice.** Cousins marry, and this project's
+  own tree is a family where that is ordinary — so anything that looked a box
+  up by person rather than remembering where it placed it would find the wrong
+  one of them.
+
 ### Languages
 
 The interface is English and Arabic, and both are first class — the tree this
@@ -388,11 +438,22 @@ webtrees_mobile/lib/
   l10n/      app_en.arb · app_ar.arb  (generated AppText)
   data/      instance_probe · session · access_probe
              credential_store · session_manager · settings_store
-    stock/   dom · record_parser · records_repository · media_cache
+    stock/   dom · chart_box · record_parser · records_repository
+             chart_parser · charts_repository · media_cache
     module/  ModuleTransport  (JSON)                           ← v2
-  domain/    instance · access · records · dates · notice
-  features/  launch · connect · auth · access · browse · shared
+  domain/    instance · access · records · charts · dates · notice
+  features/  launch · connect · auth · access · browse · charts · shared
 ```
+
+`data/stock/chart_box.dart` is shared on purpose: `chart-box` is the one piece
+of markup every part of webtrees agrees on — the relatives tab, a pedigree, a
+fan chart and a relationship path all draw a person with it — so one reader
+serves every parser.
+
+`features/charts/chart_layout.dart` holds no widgets. Where a box lands is
+arithmetic, and arithmetic can be tested without pumping a frame; mirroring
+the finished layout for Arabic is then one flag rather than a second
+algorithm.
 
 `domain/dates.dart` is the one place the app reasons *about* a date without
 re-formatting it: webtrees' own rendering is kept verbatim, and the structure
@@ -438,7 +499,29 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **4** | Interface (Material 3 Expressive theme, Arabic/RTL, navigation) | ✅ |
 | **4a** | Getting out of the way — resume, one-tree, back stack, calendar choice | ✅ |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
-| **v2** | Offline sync · editing · moderation · charts · PHP module | ⬜ |
+| **6a** | Charts: discovery, ancestors and descendants, drawn natively | ✅ |
+| **6b** | Charts: fan/circle, hourglass, compact — the same data, redrawn | ⬜ |
+| **6c** | Tools: relationships, timeline, lifespans, statistics | ⬜ |
+| **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
+
+**Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
+markup, because all of it is HTML for a wide mouse-driven screen. What it takes
+is the shape, and what it does with the shape is its own business — which is
+the only way a chart mirrors for Arabic, fits a phone, and lets a reader walk
+from a box to the person.
+
+| webtrees chart | Where its shape comes from | State |
+|---|---|---|
+| Ancestry, Pedigree | the ancestors chart, read from its nesting | ✅ 6a |
+| Descendancy | the descendants chart, read from its nesting | ✅ 6a |
+| Interactive | not a fetch: pan, zoom, and tap to redraw around anyone | ✅ 6a |
+| Circle (fan), Compact | the same ancestors data, laid out differently | 6b |
+| Hourglass, Family book | ancestors *and* descendants of one person, together | 6b |
+| Relationships | the server's own path between two people; its grid layout has to be walked | 6c |
+| Timeline | positioned event boxes, with the years in a `<script>` beside them | 6c |
+| Lifespan | years per person, which means reading numerals the server localized | 6c |
+| Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | 6c |
+| Pedigree map | a map. Out of scope for v1 — no map dependency is worth the weight yet | — |
 
 **Exit criteria**
 
@@ -555,6 +638,55 @@ facts dropdown the fixtures do not — and its one recorded marriage arrives wit
 an empty field, which is what a marriage with no date and no place looks like.
 The notes, sources and media parsers have **no live evidence at all**: that
 instance runs none of those modules (§9).
+
+### 2026-08-22 (later still) — Phase 6a: charts, drawn again
+
+The app has read a person for two phases. This one gets it out of a list and
+onto a canvas: the ancestors above someone, the descendants below them, drawn
+by the app rather than shown as the site drew them.
+
+**Nothing of webtrees' own chart markup survives, and nothing of it needs to.**
+Its charts are HTML for a wide screen — floated boxes, background images for
+the joining lines, a reading direction in the stylesheet. What they also
+contain is the *shape*, stated by nesting one recursion of a template inside
+the next, and the shape is all the app wants. It arrives as a `ChartParser`
+answer and leaves as arithmetic in `chart_layout.dart`, which is why mirroring
+the whole thing for Arabic is one flag and not a second algorithm.
+
+**Two numbering schemes, neither of them read.** The ancestors chart prints a
+Sosa-Stradonitz number beside every box — in the reader's own numerals, so `٤`
+here — and the descendants chart prints a d'Aboville number in plain digits,
+because one is formatted and the other is built by joining integers. A parser
+keyed on either would have worked in English and failed in Arabic, or worked
+today and failed on a site rendering in Hindi. The nesting says the same thing
+in every language, so the app reads that and *computes* the numbering by
+webtrees' own rule. The tests then check the computed numbers against the ones
+the server printed — the fixtures carry Arabic numerals precisely so that
+check means something.
+
+**A chart can hold the same person twice.** Cousins marry, and in this family
+that is ordinary rather than a curiosity. The first layout looked each box up
+by person to draw a line to it, which finds the wrong one of them the first
+time a tree folds back on itself. Positions are now carried out of the
+recursion that computed them, and nothing is ever looked up by who it is.
+
+**What a site runs is the site's business.** Chart links carry a class naming
+the chart, so the person's own page — already fetched — says which of the
+twelve this instance offers and at what address, generations and all. The app
+shows buttons only for the charts it can actually draw: offering one it cannot
+would be a promise the next tap breaks. `tree.almou.sa` offers all thirteen
+kinds; the app draws two of them and says nothing about the rest.
+
+**The first view answers "where am I".** A pedigree is wider than a phone, and
+in Arabic it is mirrored — so an untouched canvas would open on the oldest
+generation with the person the reader asked about somewhere off the right-hand
+edge. The chart is fitted to the screen first, and zoomed after.
+
+Released as **0.4.0**. **331 tests** green (275 → 331), analyzer clean, and
+`tool/live_check.dart` passes against `tree.almou.sa`, where it now reports the
+thirteen charts that instance offers and reads two of them: seven people over
+four generations of ancestors, nine people over three of descendants. The
+previews walk into both charts, in both languages and both themes.
 
 ---
 
@@ -885,13 +1017,14 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 275 tests
+flutter test          # 331 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
-# to family, photos, notes and sources) → account → settings.
+# to family, photos, notes and sources) → account → settings, and into the
+# ancestors and descendants charts.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -930,7 +1063,18 @@ Both tools read the password from the terminal with echo disabled, or from
    app cannot ask for a bigger copy — the full image lives behind the media
    *record* page, which v1 has no screen for. The gallery therefore shows
    thumbnails that do not open. Worth revisiting with a media record screen.
-3. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+3. **A chart is only as small as the tree it draws.** The app places one
+   widget per person, which a chart of a few dozen handles without noticing.
+   A large family at three generations of descendants is already ninety-odd
+   boxes on this instance, and a site whose administrator allows nine
+   generations could ask for thousands. Nothing bounds that yet: no limit on
+   what is fetched, no culling of what is off screen. Worth measuring on a
+   real device before it is worth solving.
+4. **The charts have been read on 2.2.6 only.** Both parsers run against
+   fixtures for 2.2.6 and 2.3, and the two versions' chart templates differ by
+   one attribute — but 2.3 has never answered a real request here, so that is
+   an argument from source, not evidence.
+5. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    tab fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
@@ -940,21 +1084,21 @@ Both tools read the password from the terminal with echo disabled, or from
    parsers, which read them correctly, including a chart box carrying a whole
    facts dropdown no fixture has. Sanitized real captures in `test/fixtures/`
    are still the right next step.
-4. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
+6. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
-5. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
+7. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
    default tree; consider letting the user enter a tree name manually.
-6. **`local_auth` has no Linux support** — the biometric gate must degrade
+8. **`local_auth` has no Linux support** — the biometric gate must degrade
    gracefully on the development machine.
-7. **Upstream module API churn.** webtrees does not guarantee stability for
+9. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
    is built (v2), isolate volatile core APIs behind one adapter and run CI
    against both 2.2.x and 2.3.
-8. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
+10. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-9. **Nothing has run on a real device.** This is now the largest gap by some
+11. **Nothing has run on a real device.** This is now the largest gap by some
    way: three of the six things Phase 4a changed — resuming through the
    biometric gate at launch, the Android back gesture, and the keystore that
    makes resuming possible at all — are *device* behaviours that a widget test
@@ -964,19 +1108,20 @@ Both tools read the password from the terminal with echo disabled, or from
    networking still cannot be validated without hardware. Sideloadable builds
    exist (`flutter build apk --release --split-per-abi`, ~20MB for arm64), so
    this is now waiting on a device rather than on the toolchain.
-10. **"Works against any webtrees instance" is a goal, not a tested claim.**
+12. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 **live end to end** — connect, sign in,
    roles, search and its second page, opening a person, facts, relatives and
    family facts across 40 real records, the language switch and the calendar
    structure of real dates — and 2.3.0-dev by source; both URL styles; both
    tab-route shapes; one private tree; the default theme; one non-stock tab
-   module (`_vytux_cousins_`), which discovery handled without changes.
+   module (`_vytux_cousins_`), which discovery handled without changes; and
+   the ancestors and descendants charts, read live from that instance.
    Untested: non-default themes, subdirectory installs, multiple trees, notes,
    sources, media, and 2.3 against a running server. The app now reports the
    sections an instance offers (`sections offered` in `tool/live_check.dart`),
    which is the raw material for the compatibility matrix this still needs
    before release.
-11. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
+13. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
    on the `cal` parameter of the calendar links webtrees wraps each date in;
    2.3's rewritten `Date::display` emits no links, so nothing states which
    calendar a rendered date is in and the app shows both. Two further 2.3
@@ -985,13 +1130,13 @@ Both tools read the password from the terminal with echo disabled, or from
    which would drop it from ordinary single dates; and it is bracketed rather
    than parenthesised. Worth reproducing on a 2.3 install and reporting
    upstream before building around it.
-12. **The app writes the account's language preference.** Aligning the server's
+14. **The app writes the account's language preference.** Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
    account with. Disclosed in the settings sheet; an optional module could
    avoid it, nothing stock can.
-13. **The Android compile-SDK override** rewrites every plugin subproject
+15. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.

@@ -235,6 +235,27 @@ class AppTextEn extends AppText {
   String get sources => 'Sources';
 
   @override
+  String get charts => 'Charts';
+
+  @override
+  String get chartAncestors => 'Ancestors';
+
+  @override
+  String get chartDescendants => 'Descendants';
+
+  @override
+  String get openThisPerson => 'Open this person';
+
+  @override
+  String get chartFromHere => 'Draw the chart from here';
+
+  @override
+  String get chartFailed => 'This chart could not be drawn.';
+
+  @override
+  String get chartEmpty => 'Nobody else is recorded here yet.';
+
+  @override
   String get showMoreResults => 'Show more';
 
   @override

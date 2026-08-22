@@ -5,9 +5,11 @@ import '../../core/errors.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
 import '../../data/stock/records_repository.dart';
+import '../../domain/charts.dart';
 import '../../domain/dates.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
+import '../charts/chart_screen.dart' show chartTitle;
 import '../shared/bidi.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
@@ -22,6 +24,7 @@ class PersonScreen extends StatefulWidget {
     required this.tree,
     required this.xref,
     required this.onOpenPerson,
+    required this.onOpenChart,
     super.key,
   });
 
@@ -31,6 +34,9 @@ class PersonScreen extends StatefulWidget {
   final String tree;
   final String xref;
   final void Function(String xref) onOpenPerson;
+
+  /// Opens one of the charts this site draws for this person.
+  final void Function(ChartKind kind) onOpenChart;
 
   @override
   State<PersonScreen> createState() => _PersonScreenState();
@@ -103,6 +109,7 @@ class _PersonScreenState extends State<PersonScreen> {
                 records: widget.records,
                 calendar: widget.settings.calendarView,
                 onOpenPerson: widget.onOpenPerson,
+                onOpenChart: widget.onOpenChart,
               ),
             );
           },
@@ -118,12 +125,14 @@ class _PersonBody extends StatelessWidget {
     required this.records,
     required this.calendar,
     required this.onOpenPerson,
+    required this.onOpenChart,
   });
 
   final IndividualRecord person;
   final RecordsRepository records;
   final CalendarView calendar;
   final void Function(String xref) onOpenPerson;
+  final void Function(ChartKind kind) onOpenChart;
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +155,14 @@ class _PersonBody extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         _Header(person: person, records: records),
+
+        // Only the charts this site actually runs, and only those the app can
+        // draw for itself — offering one it cannot draw would be a promise
+        // the next tap breaks.
+        _Charts(
+          kinds: person.charts.keys.where(ChartKind.drawable.contains).toList(),
+          onOpen: onOpenChart,
+        ),
 
         // Each warning names a section that could not be loaded. Saying so is
         // the difference between a known gap and an app that looks broken.
@@ -604,6 +621,41 @@ class _Photos extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The charts a reader can open from here.
+class _Charts extends StatelessWidget {
+  const _Charts({required this.kinds, required this.onOpen});
+
+  final List<ChartKind> kinds;
+  final void Function(ChartKind kind) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kinds.isEmpty) return const SizedBox.shrink();
+    final text = AppText.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final kind in kinds)
+            ActionChip(
+              avatar: Icon(
+                kind == ChartKind.ancestors
+                    ? Icons.account_tree_outlined
+                    : Icons.family_restroom_outlined,
+                size: 18,
+              ),
+              label: Text(chartTitle(kind, text)),
+              onPressed: () => onOpen(kind),
+            ),
+        ],
+      ),
     );
   }
 }

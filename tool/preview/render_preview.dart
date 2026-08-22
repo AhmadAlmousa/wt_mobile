@@ -60,6 +60,10 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('tab_sources.html')),
     '/module/media/Tab/main': (_) =>
         Canned(200, body: fixture('tab_media.html')),
+    '/tree/main/ancestors-tree-4/X42': (_) =>
+        Canned(200, body: fixture('chart_ancestors.html')),
+    '/tree/main/descendants-tree-3/X42': (_) =>
+        Canned(200, body: fixture('chart_descendants.html')),
   };
 }
 
@@ -127,14 +131,14 @@ Future<void> main() async {
     }
     // Signing in lands in the tree, because this account can reach exactly
     // one — so the account screen is a step further in, not a step back.
-    if (steps >= 3) {
+    if (steps >= 3 && steps <= 5) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(find.text('عبد الله الموسى'));
       await tester.pumpAndSettle();
     }
-    if (steps >= 4) {
+    if (steps >= 4 && steps <= 5) {
       // The Android back gesture, which is how anyone actually leaves this
       // screen. `pageBack()` hunts for a back button and finds none here.
       // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
@@ -143,8 +147,21 @@ Future<void> main() async {
       await tester.tap(find.byIcon(Icons.account_circle_outlined));
       await tester.pumpAndSettle();
     }
-    if (steps >= 5) {
+    if (steps == 5) {
       await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+    }
+    // The charts are opened from the person rather than from the account
+    // screen, so these steps rejoin the walk at step 3.
+    if (steps == 6 || steps == 7) {
+      await tester.enterText(find.byType(TextField), 'الموسى');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('عبد الله الموسى'));
+      await tester.pumpAndSettle();
+      // Found by position rather than by label: the labels are translated
+      // and this runs in both languages.
+      await tester.tap(find.byType(ActionChip).at(steps == 6 ? 0 : 1));
       await tester.pumpAndSettle();
     }
 
@@ -235,6 +252,26 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 5,
+        );
+      });
+
+      testWidgets('ancestors chart $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-ancestors-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 6,
+        );
+      });
+
+      testWidgets('descendants chart $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-descendants-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 7,
         );
       });
     }

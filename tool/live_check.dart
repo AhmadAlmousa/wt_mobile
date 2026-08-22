@@ -22,7 +22,9 @@ import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/data/session.dart';
+import 'package:webtrees_mobile/data/stock/charts_repository.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
+import 'package:webtrees_mobile/domain/charts.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
 import 'package:webtrees_mobile/domain/records.dart';
 
@@ -287,6 +289,56 @@ Future<void> main(List<String> args) async {
           report('date, hijri only', sample.display(CalendarView.hijri));
         }
 
+        // The charts a site runs are the app's to discover, not to assume:
+        // every one of them is a module an administrator can switch off.
+        stdout.writeln('\n=== Charts ===');
+        report(
+          'charts offered',
+          person.charts.keys.map((kind) => kind.name).join(', '),
+          ok: person.charts.isNotEmpty,
+        );
+
+        final chartRepository = ChartsRepository(
+          client,
+          version: instance.version,
+        );
+        for (final kind in ChartKind.drawable) {
+          if (person.charts[kind] == null) {
+            stdout.writeln(
+              '  SKIP  this site does not run the ${kind.name} chart',
+            );
+            continue;
+          }
+
+          // A chart of one person parses perfectly and proves nothing, so
+          // where the first record has no family recorded, try a few more.
+          var drawn = person;
+          var chart = await chartRepository.chart(
+            kind,
+            person.charts[kind]!,
+            subject: PersonRef(xref: person.xref, name: person.name),
+          );
+          for (final candidate in found.people.take(8)) {
+            if (chart.size > 1) break;
+            final other = await records.individual(tree.name, candidate.xref);
+            final url = other.charts[kind];
+            if (url == null) continue;
+            drawn = other;
+            chart = await chartRepository.chart(
+              kind,
+              url,
+              subject: PersonRef(xref: other.xref, name: other.name),
+            );
+          }
+
+          report(
+            '${kind.name} chart',
+            '${drawn.xref}: ${chart.size} people, '
+                '${_generationsIn(chart)} generations',
+            ok: chart.size > 1,
+          );
+        }
+
         final photo = person.thumbnailUrl;
         if (photo == null) {
           stdout.writeln('  SKIP  no photo on this record');
@@ -319,6 +371,16 @@ Future<void> main(List<String> args) async {
     failures == 0 ? '\nAll checks passed.' : '\n$failures failed.',
   );
   exitCode = failures == 0 ? 0 : 1;
+}
+
+/// How many generations a chart turned out to hold.
+int _generationsIn(ChartData chart) {
+  final ancestors = chart.ancestors;
+  if (ancestors != null) return ancestors.depth;
+
+  return chart.descendants!.everyone
+      .map((node) => node.depth)
+      .fold(1, (deepest, depth) => depth > deepest ? depth : deepest);
 }
 
 String _readPassword(String username) {

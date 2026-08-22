@@ -47,6 +47,15 @@ version and pass the other.
 fragment URL carry, and therefore all the app ever sees — stayed `sources_tab`
 in both.
 
-None of the three has been seen from a running server: `tree.almou.sa` runs
+| `chart_ancestors.html` | `modules/ancestors-chart/tree.phtml`, `chart-box.phtml` |
+| `chart_descendants.html` | `modules/descendancy_chart/tree.phtml`, `chart-box.phtml` |
+
+The two chart fixtures were written from markup **captured from the live
+2.2.6 server** and then given this project's invented family — including the
+Sosa numbers in Arabic-Indic digits, which is the detail that makes the
+parser tests worth running: the app computes its own numbering and the tests
+check it against what the server printed.
+
+None of the three tab fixtures has been seen from a running server: `tree.almou.sa` runs
 none of those modules (§9 of `PROJECT.md`), so these fixtures are the only
 thing standing behind those parsers.

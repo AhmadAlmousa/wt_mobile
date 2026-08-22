@@ -197,6 +197,9 @@ final class RecordsRepository {
       // rarely run the same modules, and that is what decides how much of a
       // record the app can show.
       sections: page.tabs.keys.toList(),
+      // Discovered from the same page, so the reader can be offered exactly
+      // the charts this instance draws.
+      charts: page.charts,
       warnings: warnings,
     );
   }

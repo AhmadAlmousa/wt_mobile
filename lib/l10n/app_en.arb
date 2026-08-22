@@ -82,6 +82,13 @@
   "photos": "Photos",
   "notes": "Notes",
   "sources": "Sources",
+  "charts": "Charts",
+  "chartAncestors": "Ancestors",
+  "chartDescendants": "Descendants",
+  "openThisPerson": "Open this person",
+  "chartFromHere": "Draw the chart from here",
+  "chartFailed": "This chart could not be drawn.",
+  "chartEmpty": "Nobody else is recorded here yet.",
   "showMoreResults": "Show more",
   "eventsOfCloseRelatives": "Events of close relatives",
 

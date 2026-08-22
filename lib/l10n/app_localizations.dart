@@ -511,6 +511,48 @@ abstract class AppText {
   /// **'Sources'**
   String get sources;
 
+  /// No description provided for @charts.
+  ///
+  /// In en, this message translates to:
+  /// **'Charts'**
+  String get charts;
+
+  /// No description provided for @chartAncestors.
+  ///
+  /// In en, this message translates to:
+  /// **'Ancestors'**
+  String get chartAncestors;
+
+  /// No description provided for @chartDescendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Descendants'**
+  String get chartDescendants;
+
+  /// No description provided for @openThisPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Open this person'**
+  String get openThisPerson;
+
+  /// No description provided for @chartFromHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw the chart from here'**
+  String get chartFromHere;
+
+  /// No description provided for @chartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This chart could not be drawn.'**
+  String get chartFailed;
+
+  /// No description provided for @chartEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody else is recorded here yet.'**
+  String get chartEmpty;
+
   /// No description provided for @showMoreResults.
   ///
   /// In en, this message translates to:

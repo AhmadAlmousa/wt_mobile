@@ -94,6 +94,10 @@ void main() {
         Canned(200, body: fixture('tab_media.html')),
     '/tree/main/media-thumbnail/M12/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
+    '/tree/main/ancestors-tree-4/X42': (_) =>
+        Canned(200, body: fixture('chart_ancestors.html')),
+    '/tree/main/descendants-tree-3/X42': (_) =>
+        Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/media-thumbnail/M11/1': (_) =>
         const Canned(200, body: 'x', contentType: 'image/png'),
     '/tree/main/media-thumbnail/M3/1': (_) =>
@@ -256,6 +260,80 @@ void main() {
     expect(find.text('F2'), findsNothing);
   });
 
+  testWidgets('offers only the charts the site draws and the app can', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ActionChip, 'Ancestors'), findsOne);
+    expect(find.widgetWithText(ActionChip, 'Descendants'), findsOne);
+    // The site offers these two as well, and the app cannot draw either — a
+    // button it could not honour would be a promise the next tap breaks.
+    expect(find.textContaining('Fan'), findsNothing);
+    expect(find.textContaining('Statistics'), findsNothing);
+  });
+
+  testWidgets('draws the ancestors a site charted', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Ancestors'));
+    await tester.pumpAndSettle();
+
+    // Four generations, read from the shape webtrees described rather than
+    // from its layout.
+    expect(find.text('محمد الموسى'), findsOne);
+    expect(find.text('سالم الموسى'), findsOne);
+    expect(find.text('لطيفة العلي'), findsOne);
+    // Asked for as a chart, not as the page webtrees wraps it in.
+    final chart = server.requests.lastWhere(
+      (request) => request.route == '/tree/main/ancestors-tree-4/X42',
+    );
+    expect(chart.query['ajax'], '1');
+  });
+
+  testWidgets('walks from a chart to the person tapped on it', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Ancestors'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('سالم الموسى'));
+    await tester.pumpAndSettle();
+
+    // Two things are worth doing with a box and neither is the obvious
+    // default, so the sheet says both out loud.
+    expect(find.text('Open this person'), findsOne);
+    expect(find.text('Draw the chart from here'), findsOne);
+
+    await tester.tap(find.text('Open this person'));
+    await tester.pumpAndSettle();
+
+    expect(server.routes, contains('/tree/main/individual/X20'));
+  });
+
+  testWidgets('the back gesture leaves a chart for the person', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Descendants'));
+    await tester.pumpAndSettle();
+    expect(find.text('هند الموسى'), findsOne);
+
+    expect(await WidgetsBinding.instance.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    // Back onto the person the chart was drawn for, not out of the app.
+    expect(find.text('Facts and events'), findsOne);
+  });
+
   testWidgets('shows the notes and sources a tree publishes', (tester) async {
     await openTree(tester);
     await search(tester, 'الموسى');
@@ -384,6 +462,10 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    // Found is not the same as reachable: the row may still be half off the
+    // bottom of the screen, and a tap there lands on nothing.
+    await tester.ensureVisible(find.text('محمد الموسى'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('محمد الموسى'));
     await tester.pumpAndSettle();
 
@@ -402,6 +484,10 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    // Found is not the same as reachable: the row may still be half off the
+    // bottom of the screen, and a tap there lands on nothing.
+    await tester.ensureVisible(find.text('محمد الموسى'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('محمد الموسى'));
     await tester.pumpAndSettle();
 

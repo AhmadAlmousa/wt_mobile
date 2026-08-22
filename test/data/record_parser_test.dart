@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/core/errors.dart';
 import 'package:webtrees_mobile/data/stock/record_parser.dart';
+import 'package:webtrees_mobile/domain/charts.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
 import 'package:webtrees_mobile/domain/records.dart';
 
@@ -56,6 +57,33 @@ void main() {
       test('finds the signed thumbnail', () {
         expect(page.thumbnailUrl, contains('media-thumbnail/M11/1'));
         expect(page.thumbnailUrl, contains('s=6f1c9a0b2e'));
+      });
+
+      test('finds the charts this site draws for this person', () {
+        // Discovered the same way tabs are: webtrees marks its own links with
+        // a class per chart, so a site with a chart module switched off
+        // simply never emits one.
+        expect(
+          page.charts.keys,
+          containsAll(<ChartKind>[
+            ChartKind.ancestors,
+            ChartKind.descendants,
+            ChartKind.fan,
+          ]),
+        );
+      });
+
+      test('takes each chart URL from the server verbatim', () {
+        // The URL carries the number of generations this site's administrator
+        // settled on. Rebuilding it would quietly overrule them.
+        expect(
+          page.charts[ChartKind.ancestors],
+          '/tree/main/ancestors-tree-4/X42',
+        );
+        expect(
+          page.charts[ChartKind.descendants],
+          contains('descendants-tree-3'),
+        );
       });
 
       test('reports no inline content when every tab loads over ajax', () {

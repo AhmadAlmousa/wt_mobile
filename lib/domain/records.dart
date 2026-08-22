@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'charts.dart';
 import 'dates.dart';
 import 'notice.dart';
 
@@ -278,6 +279,7 @@ final class IndividualRecord {
     List<SourceCitation> sources = const [],
     List<MediaItem> media = const [],
     List<String> sections = const [],
+    Map<ChartKind, String> charts = const {},
     List<Notice> warnings = const [],
   }) : facts = List.unmodifiable(facts),
        families = List.unmodifiable(families),
@@ -285,6 +287,7 @@ final class IndividualRecord {
        sources = List.unmodifiable(sources),
        media = List.unmodifiable(media),
        sections = List.unmodifiable(sections),
+       charts = Map.unmodifiable(charts),
        warnings = List.unmodifiable(warnings);
 
   final String xref;
@@ -311,6 +314,13 @@ final class IndividualRecord {
   /// which modules a site runs decides what the app can show at all, and no
   /// two instances agree. A custom tab appears here beside the core ones.
   final List<String> sections;
+
+  /// The charts this site offers for this person, at the URLs it gave.
+  ///
+  /// Read from the page the app already fetched, so knowing what a site can
+  /// draw costs nothing. The URLs carry that instance's own settings — how
+  /// many generations its administrator chose — and are used as they arrived.
+  final Map<ChartKind, String> charts;
 
   /// Parts that could not be read, named so the interface can say which.
   ///

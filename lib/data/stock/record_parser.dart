@@ -3,8 +3,10 @@ import 'package:html/parser.dart' as html;
 import 'package:meta/meta.dart';
 
 import '../../core/errors.dart';
+import '../../domain/charts.dart';
 import '../../domain/dates.dart';
 import '../../domain/records.dart';
+import 'chart_box.dart';
 import 'dom.dart';
 
 /// Reads individuals out of the HTML a stock webtrees site renders.
@@ -57,6 +59,7 @@ final class RecordParser {
           ?.attributes['src'],
       tabs: _tabs(document),
       inlineTabs: _inlineTabs(document),
+      charts: _charts(document, xref),
     );
   }
 
@@ -93,6 +96,47 @@ final class RecordParser {
       if (module.isNotEmpty) tabs[module] = href;
     }
     return tabs;
+  }
+
+  /// The charts this site offers for this person, by kind.
+  ///
+  /// webtrees puts its own class on every link to a chart —
+  /// `menu-chart-ancestry` — so the app discovers what an instance runs the
+  /// same way it discovers tabs, and a site with a chart module switched off
+  /// simply never emits the link. The URLs carry that site's own settings,
+  /// such as how many generations its administrator chose, so they are used
+  /// exactly as they arrived.
+  ///
+  /// The page's own menu is preferred because its links are for *this*
+  /// person; the same classes appear inside every chart box on the page, each
+  /// pointing at whoever that box holds.
+  Map<ChartKind, String> _charts(Document document, String xref) {
+    final charts = <ChartKind, String>{};
+
+    void collect(Iterable<Element> links) {
+      for (final link in links) {
+        final href = link.attributes['href'];
+        if (href == null) continue;
+
+        for (final name in link.classes) {
+          final kind = ChartKind.fromMenuClass(name);
+          if (kind != null) charts.putIfAbsent(kind, () => href);
+        }
+      }
+    }
+
+    collect(document.querySelectorAll('.menu-chart a[href]'));
+    if (charts.isNotEmpty) return charts;
+
+    // No recognisable menu — a theme that lays its navigation out
+    // differently. Any link to a chart will do, so long as it is a link to
+    // *this* person's chart: the boxes on the page each carry their own.
+    collect(
+      document
+          .querySelectorAll('a[href]')
+          .where((link) => (link.attributes['href'] ?? '').contains(xref)),
+    );
+    return charts;
   }
 
   /// Tab panes whose content webtrees already rendered into the page.
@@ -552,7 +596,7 @@ final class RecordParser {
         continue;
       }
 
-      final person = _personFrom(box);
+      final person = personFromChartBox(box);
       if (person == null) continue;
 
       if (!seenDivider && spouses.length < 2) {
@@ -604,36 +648,6 @@ final class RecordParser {
     // Step-families list neither the viewer as spouse nor as child.
     return FamilyKind.step;
   }
-
-  /// Reads one `chart-box`, webtrees' standard person card.
-  PersonRef? _personFrom(Element box) {
-    final xref = box.attributes['data-wt-chart-xref'];
-    if (xref == null || xref.isEmpty) return null;
-
-    final nameBox = box.querySelector(
-      '.wt-chart-box-name:not(.wt-chart-box-name-alt)',
-    );
-
-    return PersonRef(
-      xref: xref,
-      name: textOf(nameBox) ?? textOf(box.querySelector('a[href]')) ?? xref,
-      alternateName: textOf(box.querySelector('.wt-chart-box-name-alt')),
-      lifespan: textOf(box.querySelector('.wt-chart-box-lifespan')),
-      sex: _sexOf(box),
-      thumbnailUrl: box
-          .querySelector('.wt-chart-box-thumbnail img')
-          ?.attributes['src'],
-    );
-  }
-
-  static Sex _sexOf(Element box) {
-    for (final name in box.classes) {
-      if (name.startsWith('wt-chart-box-') && name.length == 14) {
-        return Sex.fromCssSuffix(name.substring(13));
-      }
-    }
-    return Sex.unknown;
-  }
 }
 
 /// The parts of an individual's page that are not in a tab.
@@ -644,10 +658,12 @@ final class IndividualPage {
     required this.name,
     required Map<String, String> tabs,
     required Map<String, String> inlineTabs,
+    Map<ChartKind, String> charts = const {},
     this.alternateName,
     this.thumbnailUrl,
   }) : tabs = Map.unmodifiable(tabs),
-       inlineTabs = Map.unmodifiable(inlineTabs);
+       inlineTabs = Map.unmodifiable(inlineTabs),
+       charts = Map.unmodifiable(charts);
 
   final String xref;
   final String name;
@@ -659,4 +675,7 @@ final class IndividualPage {
 
   /// Module name to already-rendered content, for tabs that do not use AJAX.
   final Map<String, String> inlineTabs;
+
+  /// Each chart this site offers for this person, at the URL it gave.
+  final Map<ChartKind, String> charts;
 }

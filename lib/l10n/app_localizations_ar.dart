@@ -235,6 +235,27 @@ class AppTextAr extends AppText {
   String get sources => 'مصادر';
 
   @override
+  String get charts => 'مخططات';
+
+  @override
+  String get chartAncestors => 'أسلاف';
+
+  @override
+  String get chartDescendants => 'أنسال';
+
+  @override
+  String get openThisPerson => 'فتح صفحة الشخص';
+
+  @override
+  String get chartFromHere => 'ارسم المخطط من هنا';
+
+  @override
+  String get chartFailed => 'تعذّر رسم هذا المخطط.';
+
+  @override
+  String get chartEmpty => 'لا أحد آخر مسجّل هنا بعد.';
+
+  @override
   String get showMoreResults => 'عرض المزيد';
 
   @override

@@ -81,6 +81,13 @@
   "photos": "صور",
   "notes": "ملاحظات",
   "sources": "مصادر",
+  "charts": "مخططات",
+  "chartAncestors": "أسلاف",
+  "chartDescendants": "أنسال",
+  "openThisPerson": "فتح صفحة الشخص",
+  "chartFromHere": "ارسم المخطط من هنا",
+  "chartFailed": "تعذّر رسم هذا المخطط.",
+  "chartEmpty": "لا أحد آخر مسجّل هنا بعد.",
   "showMoreResults": "عرض المزيد",
   "eventsOfCloseRelatives": "أحداث الأقارب",
 
