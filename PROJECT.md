@@ -692,38 +692,48 @@ Both tools read the password from the terminal with echo disabled, or from
 
 ## 9. Open questions and risks
 
-1. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+1. **The authenticated image path has never run against a real thumbnail.**
+   `tree.almou.sa` has no media at all — `/tree/main/media-list` renders with
+   zero thumbnails — so `AuthenticatedImage`, `MediaCache` and the
+   `canShow()`-before-signature rule that motivated them are proven only by
+   unit tests. Needs an instance that has media. This is a gap in the *data*
+   available, not in the code.
+2. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    AJAX fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
    site, so no non-default theme, language or module configuration has ever
    been parsed. Sanitized real captures are the next step.
-2. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
+3. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
-3. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
+4. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
    default tree; consider letting the user enter a tree name manually.
-4. **`local_auth` has no Linux support** — the biometric gate must degrade
+5. **`local_auth` has no Linux support** — the biometric gate must degrade
    gracefully on the development machine.
-5. **Upstream module API churn.** webtrees does not guarantee stability for
+6. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
    is built (v2), isolate volatile core APIs behind one adapter and run CI
    against both 2.2.x and 2.3.
-6. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
+7. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-7. **Nothing has run on a real device, or as a GUI at all.** Secure storage,
-   biometrics, backgrounding, session renewal and cleartext networking cannot
-   be validated by widget tests. Device smoke-testing should move ahead of
-   Phase 5 rather than waiting for it.
-8. **"Works against any webtrees instance" is a goal, not a tested claim.**
-   What is actually verified: 2.2.6 live and 2.3.0-dev by source; both URL
-   styles; both tab-route shapes; one private tree; the default theme. Parsers
-   are exercised against Arabic/RTL fixtures. Untested: non-default themes,
-   subdirectory installs, multiple trees, and module configurations other than
-   the stock set. This belongs in an explicit compatibility matrix before
-   release.
-9. **The Android compile-SDK override** rewrites every plugin subproject
+8. **Nothing has run on a real device.** The screens can now be *seen* —
+   `tool/preview/render_preview.dart` renders them with the real fonts — but
+   secure storage, biometrics, backgrounding, session renewal and cleartext
+   networking still cannot be validated without hardware. Sideloadable builds
+   exist (`flutter build apk --release --split-per-abi`, ~20MB for arm64), so
+   this is now waiting on a device rather than on the toolchain.
+9. **"Works against any webtrees instance" is a goal, not a tested claim.**
+   What is actually verified: 2.2.6 **live end to end** — connect, sign in,
+   roles, search, opening a person, facts and relatives across 40 real records
+   — and 2.3.0-dev by source; both URL styles; both tab-route shapes; one
+   private tree; the default theme; one non-stock tab module
+   (`_vytux_cousins_`), which discovery handled without changes. Untested:
+   non-default themes, subdirectory installs, multiple trees, media, and 2.3
+   against a running server. This belongs in an explicit compatibility matrix
+   before release.
+10. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.
