@@ -40,6 +40,9 @@ class AppTextAr extends AppText {
   String get signIn => 'تسجيل دخول';
 
   @override
+  String get signingIn => 'جارٍ تسجيل دخولك…';
+
+  @override
   String get usernameOrEmail => 'إسم المستخدم أو عنوان البريد الإلكتروني';
 
   @override
@@ -196,6 +199,9 @@ class AppTextAr extends AppText {
       'لم يطابق هذا الاسم أحد. جرّب تهجئة أخرى، أو جزءاً من الاسم.';
 
   @override
+  String get yourAccount => 'حسابك';
+
+  @override
   String get person => 'فرد';
 
   @override
@@ -248,6 +254,26 @@ class AppTextAr extends AppText {
 
   @override
   String get languageArabic => 'العربية';
+
+  @override
+  String get languageAffectsSite =>
+      'التواريخ وأسماء الشهور وعناوين الأحداث يكتبها موقع webtrees الخاص بك، لذا يطلب التطبيق منه هذه اللغة أيضاً. وهذا يغيّر كذلك اللغة التي يستقبلك بها الموقع.';
+
+  @override
+  String get calendar => 'التقويم';
+
+  @override
+  String get calendarBoth => 'كلاهما';
+
+  @override
+  String get calendarGregorian => 'ميلادي';
+
+  @override
+  String get calendarHijri => 'هجري';
+
+  @override
+  String get calendarOnlyWhenOffered =>
+      'لا يظهر التاريخ بالتقويم الذي تختاره إلا إذا حوّله الموقع. وإلا فسيظهر كما كتبه الموقع.';
 
   @override
   String get done => 'تم';

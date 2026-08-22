@@ -21,6 +21,7 @@ class AccessScreen extends StatefulWidget {
     required this.settings,
     required this.onSignedOut,
     required this.onBrowseTree,
+    required this.onOnlyTree,
     super.key,
   });
 
@@ -31,6 +32,13 @@ class AccessScreen extends StatefulWidget {
   /// Opens a tree for browsing. Reading is available to every role, so this is
   /// offered whatever the badges on the card say.
   final void Function(String tree) onBrowseTree;
+
+  /// Called when the account can reach exactly one tree.
+  ///
+  /// A list of one is not a choice, so the app goes straight in. The screen
+  /// itself stays reachable — it doubles as the diagnostics view — which is
+  /// why this is a separate callback the shell can decline to act on.
+  final void Function(String tree) onOnlyTree;
 
   @override
   State<AccessScreen> createState() => _AccessScreenState();
@@ -53,6 +61,9 @@ class _AccessScreenState extends State<AccessScreen> {
             // The real name is only discoverable here, so this is the one
             // chance to label the connection for next time.
             await widget.session.noteAccountName(summary.account.realName);
+            if (summary.trees.length == 1 && mounted) {
+              widget.onOnlyTree(summary.trees.single.name);
+            }
             return summary;
           });
     });

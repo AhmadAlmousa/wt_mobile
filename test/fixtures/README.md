@@ -22,4 +22,12 @@ Sources, all under `webtrees/resources/views/`:
 |---|---|
 | `individual_page.html` | `individual-page.phtml`, `-title`, `-names`, `-images`, `-tabs` |
 | `tab_personal_facts.html` | `fact.phtml`, `fact-date.phtml`, `fact-place.phtml` |
+
+The date markup in `v2_2_6/tab_personal_facts.html` is the exception: it was
+**captured from `tree.almou.sa`** and then rewritten with invented dates. The
+transcribed version had the 2.3 shape — `1901 [1318]` as plain text — which
+2.2.6 never emits. What it really sends is a link to the calendar page per
+date, with the converted date in a `dir`-bearing span beside it, and the `cal`
+parameter of those links is the only place a stock site says which calendar a
+rendered date is in.
 | `tab_relatives.html` | `modules/relatives/tab.phtml`, `family.phtml`, `chart-box.phtml` |

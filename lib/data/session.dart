@@ -118,6 +118,28 @@ class WebtreesSession {
   /// Returns false when the session has already gone.
   Future<bool> keepAlive() => isSignedIn();
 
+  /// Asks the server to render in [languageTag] from now on.
+  ///
+  /// webtrees decides the language of everything it renders — fact labels,
+  /// month names, even the numerals — from a value in *its own* session, which
+  /// [Login] seeds from the account's stored preference. `Accept-Language` is
+  /// consulted only before that value exists, so an app in Arabic keeps
+  /// receiving English dates until it says otherwise.
+  ///
+  /// The route is CSRF-exempt in both supported versions, and answers `204`.
+  ///
+  /// **This also writes the account's own language preference**, because
+  /// `SelectLanguage` sets both — so the website will greet this user in the
+  /// same language next time. There is no stock route that changes only the
+  /// session.
+  Future<void> useLanguage(String languageTag) async {
+    final reply = await _client.postForm('/language/$languageTag', const {});
+    if (reply.status != 204 && !reply.isOk && !reply.isRedirect) {
+      throw failureFor(reply.status, probe: 'setting the language');
+    }
+    developer.log('Server language set to $languageTag', name: 'webtrees.auth');
+  }
+
   /// Ends the session.
   ///
   /// Sign-out is exempt from the CSRF check, and the `XMLHttpRequest` header

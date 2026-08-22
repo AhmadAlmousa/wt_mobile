@@ -157,6 +157,12 @@ abstract class AppText {
   /// **'Sign in'**
   String get signIn;
 
+  /// No description provided for @signingIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing you in…'**
+  String get signingIn;
+
   /// No description provided for @usernameOrEmail.
   ///
   /// In en, this message translates to:
@@ -433,6 +439,12 @@ abstract class AppText {
   /// **'Nobody matched that name. Try a different spelling, or part of the name.'**
   String get noMatches;
 
+  /// No description provided for @yourAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account'**
+  String get yourAccount;
+
   /// No description provided for @person.
   ///
   /// In en, this message translates to:
@@ -540,6 +552,42 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'العربية'**
   String get languageArabic;
+
+  /// No description provided for @languageAffectsSite.
+  ///
+  /// In en, this message translates to:
+  /// **'Dates, month names and event labels are written by your webtrees site, so the app asks it for this language too. That also changes the language its website greets you in.'**
+  String get languageAffectsSite;
+
+  /// No description provided for @calendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get calendar;
+
+  /// No description provided for @calendarBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get calendarBoth;
+
+  /// No description provided for @calendarGregorian.
+  ///
+  /// In en, this message translates to:
+  /// **'Gregorian'**
+  String get calendarGregorian;
+
+  /// No description provided for @calendarHijri.
+  ///
+  /// In en, this message translates to:
+  /// **'Hijri'**
+  String get calendarHijri;
+
+  /// No description provided for @calendarOnlyWhenOffered.
+  ///
+  /// In en, this message translates to:
+  /// **'A date is only shown in the calendar you choose when the site converts it. Otherwise it appears as the site wrote it.'**
+  String get calendarOnlyWhenOffered;
 
   /// No description provided for @done.
   ///

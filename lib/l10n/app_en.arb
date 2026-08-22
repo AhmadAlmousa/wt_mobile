@@ -14,6 +14,7 @@
   "recentSites": "Recent",
 
   "signIn": "Sign in",
+  "signingIn": "Signing you in…",
   "usernameOrEmail": "Username or email",
   "usernameRequired": "Enter your username or email address.",
   "password": "Password",
@@ -69,6 +70,7 @@
   "searching": "Searching…",
   "noMatches": "Nobody matched that name. Try a different spelling, or part of the name.",
 
+  "yourAccount": "Your account",
   "person": "Person",
   "reload": "Reload",
   "personOpenFailed": "This person could not be opened.",
@@ -88,6 +90,12 @@
   "languageSystem": "Follow the device",
   "languageEnglish": "English",
   "languageArabic": "العربية",
+  "languageAffectsSite": "Dates, month names and event labels are written by your webtrees site, so the app asks it for this language too. That also changes the language its website greets you in.",
+  "calendar": "Calendar",
+  "calendarBoth": "Both",
+  "calendarGregorian": "Gregorian",
+  "calendarHijri": "Hijri",
+  "calendarOnlyWhenOffered": "A date is only shown in the calendar you choose when the site converts it. Otherwise it appears as the site wrote it.",
   "done": "Done",
 
   "errorUnreachableHost": "Could not reach {address}.{detail} Check the address and your connection.",

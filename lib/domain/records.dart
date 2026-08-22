@@ -1,4 +1,6 @@
 import 'package:meta/meta.dart';
+
+import 'dates.dart';
 import 'notice.dart';
 
 /// A person's recorded sex, as webtrees renders it.
@@ -84,14 +86,15 @@ final class FactEntry {
   /// The fact's own value, where it has one beyond a date and a place.
   final String? value;
 
-  /// The date exactly as webtrees rendered it.
+  /// The date exactly as webtrees rendered it, and the calendars it used.
   ///
-  /// Kept as text on purpose. webtrees supports Gregorian, Julian, Hebrew,
-  /// Hijri, French Republican and Jalali calendars, plus approximations
-  /// (`about`, `between … and …`), and it has already done that formatting in
-  /// the tree's language. Re-parsing it into a `DateTime` would discard the
-  /// calendar, lose the qualifiers, and get the conversion wrong.
-  final String? date;
+  /// Never a `DateTime`. webtrees supports Gregorian, Julian, Hebrew, Hijri,
+  /// French Republican and Jalali calendars, plus approximations (`about`,
+  /// `between … and …`), and it has already done that formatting in the
+  /// reader's language. Parsing it into a `DateTime` would discard the
+  /// calendar, lose the qualifiers, and get the conversion wrong — so the
+  /// structure exists only to *choose between* the calendars on offer.
+  final RenderedDate? date;
 
   final String? place;
 

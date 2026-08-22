@@ -23,6 +23,7 @@ class SearchScreen extends StatefulWidget {
     required this.records,
     required this.tree,
     required this.onOpenPerson,
+    required this.onShowAccount,
     super.key,
   });
 
@@ -30,6 +31,12 @@ class SearchScreen extends StatefulWidget {
   final RecordsRepository records;
   final String tree;
   final void Function(String xref) onOpenPerson;
+
+  /// Opens the account screen.
+  ///
+  /// An account with one tree comes straight here, so this is the only route
+  /// back to what the app knows about the site, the role and the session.
+  final VoidCallback onShowAccount;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -102,7 +109,16 @@ class _SearchScreenState extends State<SearchScreen> {
     final text = AppText.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.tree)),
+      appBar: AppBar(
+        title: Text(widget.tree),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: text.yourAccount,
+            onPressed: widget.onShowAccount,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -176,6 +192,7 @@ class _SearchScreenState extends State<SearchScreen> {
             leading: AuthenticatedImage(
               url: person.thumbnailUrl,
               records: widget.records,
+              name: person.name,
               size: 48,
             ),
             title: Text(person.name),

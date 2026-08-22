@@ -13,6 +13,7 @@
   "recentSites": "المواقع الأخيرة",
 
   "signIn": "تسجيل دخول",
+  "signingIn": "جارٍ تسجيل دخولك…",
   "usernameOrEmail": "إسم المستخدم أو عنوان البريد الإلكتروني",
   "usernameRequired": "أدخل اسم المستخدم أو البريد الإلكتروني.",
   "password": "كلمة المرور",
@@ -68,6 +69,7 @@
   "searching": "جارٍ البحث…",
   "noMatches": "لم يطابق هذا الاسم أحد. جرّب تهجئة أخرى، أو جزءاً من الاسم.",
 
+  "yourAccount": "حسابك",
   "person": "فرد",
   "reload": "إعادة التحميل",
   "personOpenFailed": "تعذّر فتح هذا الشخص.",
@@ -87,6 +89,12 @@
   "languageSystem": "حسب الجهاز",
   "languageEnglish": "English",
   "languageArabic": "العربية",
+  "languageAffectsSite": "التواريخ وأسماء الشهور وعناوين الأحداث يكتبها موقع webtrees الخاص بك، لذا يطلب التطبيق منه هذه اللغة أيضاً. وهذا يغيّر كذلك اللغة التي يستقبلك بها الموقع.",
+  "calendar": "التقويم",
+  "calendarBoth": "كلاهما",
+  "calendarGregorian": "ميلادي",
+  "calendarHijri": "هجري",
+  "calendarOnlyWhenOffered": "لا يظهر التاريخ بالتقويم الذي تختاره إلا إذا حوّله الموقع. وإلا فسيظهر كما كتبه الموقع.",
   "done": "تم",
 
   "errorUnreachableHost": "تعذّر الوصول إلى {address}.{detail} تحقّق من العنوان ومن اتصالك.",

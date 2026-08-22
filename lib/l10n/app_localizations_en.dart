@@ -40,6 +40,9 @@ class AppTextEn extends AppText {
   String get signIn => 'Sign in';
 
   @override
+  String get signingIn => 'Signing you in…';
+
+  @override
   String get usernameOrEmail => 'Username or email';
 
   @override
@@ -196,6 +199,9 @@ class AppTextEn extends AppText {
       'Nobody matched that name. Try a different spelling, or part of the name.';
 
   @override
+  String get yourAccount => 'Your account';
+
+  @override
   String get person => 'Person';
 
   @override
@@ -248,6 +254,26 @@ class AppTextEn extends AppText {
 
   @override
   String get languageArabic => 'العربية';
+
+  @override
+  String get languageAffectsSite =>
+      'Dates, month names and event labels are written by your webtrees site, so the app asks it for this language too. That also changes the language its website greets you in.';
+
+  @override
+  String get calendar => 'Calendar';
+
+  @override
+  String get calendarBoth => 'Both';
+
+  @override
+  String get calendarGregorian => 'Gregorian';
+
+  @override
+  String get calendarHijri => 'Hijri';
+
+  @override
+  String get calendarOnlyWhenOffered =>
+      'A date is only shown in the calendar you choose when the site converts it. Otherwise it appears as the site wrote it.';
 
   @override
   String get done => 'Done';

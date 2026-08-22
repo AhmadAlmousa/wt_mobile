@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +12,7 @@ import '../features/auth/sign_in_screen.dart';
 import '../features/browse/person_screen.dart';
 import '../features/browse/search_screen.dart';
 import '../features/connect/connect_screen.dart';
+import '../features/launch/launch_screen.dart';
 import '../l10n/app_localizations.dart';
 import 'theme.dart';
 
@@ -45,18 +48,46 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     mediaCache: _media,
   );
 
+  /// Whether the app has already walked into the account's only tree.
+  ///
+  /// Once is helpful; every time would trap the reader, because the account
+  /// screen would bounce them straight back out of it.
+  bool _openedOnlyTree = false;
+
   @override
   void initState() {
     super.initState();
-    widget.session.addListener(_forgetImagesWhenSignedOut);
+    widget.session.addListener(_onSessionChanged);
+    widget.settings.addListener(_onSettingsChanged);
   }
 
-  void _forgetImagesWhenSignedOut() {
-    if (!widget.session.isSignedIn) _media.clear();
+  void _onSessionChanged() {
+    if (widget.session.isSignedIn) return;
+    // Family photographs must not outlive the account that fetched them, and
+    // the next account may not see the same single tree.
+    _media.clear();
+    _openedOnlyTree = false;
+  }
+
+  /// Keeps the server rendering in the language the app is reading in.
+  ///
+  /// webtrees writes the dates, month names and fact labels, and it does so in
+  /// the language held in its own session — so a language change here has to
+  /// travel to the server or half the screen stays in the old one.
+  void _onSettingsChanged() {
+    unawaited(widget.session.syncContentLanguage());
+  }
+
+  void _openOnlyTree(String tree) {
+    if (_openedOnlyTree) return;
+    _openedOnlyTree = true;
+    // Replaces rather than stacks: with one tree this *is* the home screen,
+    // and a back gesture should leave the app, not return to a list of one.
+    _router.go(Routes.searchIn(tree));
   }
 
   late final GoRouter _router = GoRouter(
-    initialLocation: Routes.connect,
+    initialLocation: Routes.launch,
     // Rebuilds the routing decision whenever the session changes, so an
     // expired session cannot leave a signed-out user on a signed-in screen.
     refreshListenable: widget.session,
@@ -67,10 +98,15 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
 
       if (signedIn) {
         // Any signed-in screen is fine; only a signed-out one is not.
-        return location == Routes.connect || location == Routes.signIn
+        return location == Routes.connect ||
+                location == Routes.signIn ||
+                location == Routes.launch
             ? Routes.access
             : null;
       }
+      // The launch screen is deciding whether there is anything to resume, so
+      // nothing may move the app off it until it says so.
+      if (location == Routes.launch) return null;
       if (location != Routes.connect && location != Routes.signIn) {
         return connected ? Routes.signIn : Routes.connect;
       }
@@ -78,6 +114,13 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
       return null;
     },
     routes: [
+      GoRoute(
+        path: Routes.launch,
+        builder: (context, state) => LaunchScreen(
+          session: widget.session,
+          onNothingToResume: () => _router.go(Routes.connect),
+        ),
+      ),
       GoRoute(
         path: Routes.connect,
         builder: (context, state) => ConnectScreen(
@@ -101,7 +144,10 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           session: widget.session,
           settings: widget.settings,
           onSignedOut: () => _router.go(Routes.connect),
-          onBrowseTree: (tree) => _router.go(Routes.searchIn(tree)),
+          // Stacked, so a reader who chose one of several trees can go back
+          // to the list with the system back gesture.
+          onBrowseTree: (tree) => _router.push(Routes.searchIn(tree)),
+          onOnlyTree: _openOnlyTree,
         ),
       ),
       GoRoute(
@@ -112,31 +158,41 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
             session: widget.session,
             records: _records,
             tree: tree,
-            onOpenPerson: (xref) => _router.go(Routes.personIn(tree, xref)),
-          );
-        },
-      ),
-      GoRoute(
-        path: Routes.person,
-        builder: (context, state) {
-          final tree = state.pathParameters['tree']!;
-          return PersonScreen(
-            session: widget.session,
-            records: _records,
-            tree: tree,
-            xref: state.pathParameters['xref']!,
-            // Pushed rather than replaced, so walking up a family tree can be
-            // walked back down again.
             onOpenPerson: (xref) => _router.push(Routes.personIn(tree, xref)),
+            onShowAccount: () => _router.push(Routes.access),
           );
         },
+        routes: [
+          // Nested, so opening a person by URL still puts the search screen
+          // underneath them. As siblings these two shared no stack, and the
+          // first back gesture left the app instead of returning to the
+          // search results.
+          GoRoute(
+            path: Routes.personUnderSearch,
+            builder: (context, state) {
+              final tree = state.pathParameters['tree']!;
+              return PersonScreen(
+                session: widget.session,
+                records: _records,
+                settings: widget.settings,
+                tree: tree,
+                xref: state.pathParameters['xref']!,
+                // Pushed rather than replaced, so walking up a family tree
+                // can be walked back down again.
+                onOpenPerson: (xref) =>
+                    _router.push(Routes.personIn(tree, xref)),
+              );
+            },
+          ),
+        ],
       ),
     ],
   );
 
   @override
   void dispose() {
-    widget.session.removeListener(_forgetImagesWhenSignedOut);
+    widget.session.removeListener(_onSessionChanged);
+    widget.settings.removeListener(_onSettingsChanged);
     _media.clear();
     _router.dispose();
     super.dispose();
@@ -170,11 +226,17 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
 
 /// Every route in the app.
 abstract final class Routes {
+  /// Where every launch starts: resume the last site, or ask for one.
+  static const String launch = '/';
+
   static const String connect = '/connect';
   static const String signIn = '/sign-in';
   static const String access = '/access';
   static const String search = '/tree/:tree';
-  static const String person = '/tree/:tree/person/:xref';
+
+  /// Declared relative to [search], which is what makes a person's page sit
+  /// on top of the search results in the navigation stack.
+  static const String personUnderSearch = 'person/:xref';
 
   static String searchIn(String tree) => '/tree/${Uri.encodeComponent(tree)}';
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../data/settings_store.dart';
+import '../../domain/dates.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Lets the reader choose the theme and the language.
@@ -66,6 +67,34 @@ class SettingsSheet extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              // The site, not the app, writes the dates — so choosing a
+              // language here reaches further than the interface, and saying
+              // so is better than surprising someone on the website later.
+              _Footnote(text.languageAffectsSite),
+              const SizedBox(height: 28),
+
+              _GroupLabel(text.calendar),
+              const SizedBox(height: 8),
+              _Choices<CalendarView>(
+                value: settings.calendarView,
+                onSelected: settings.setCalendarView,
+                options: [
+                  (CalendarView.both, text.calendarBoth, Icons.calendar_month),
+                  (
+                    CalendarView.gregorian,
+                    text.calendarGregorian,
+                    Icons.calendar_today_outlined,
+                  ),
+                  (
+                    CalendarView.hijri,
+                    text.calendarHijri,
+                    Icons.nightlight_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _Footnote(text.calendarOnlyWhenOffered),
               const SizedBox(height: 28),
 
               FilledButton(
@@ -78,6 +107,22 @@ class SettingsSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A quiet line under a choice group, for a consequence worth stating but not
+/// worth interrupting anyone over.
+class _Footnote extends StatelessWidget {
+  const _Footnote(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
 }
 
 class _GroupLabel extends StatelessWidget {

@@ -51,7 +51,16 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   Future<void> _loadSaved() async {
     final saved = await widget.session.savedConnections();
-    if (mounted) setState(() => _saved = saved);
+    if (!mounted) return;
+    setState(() {
+      _saved = saved;
+      // The address of the site used last, ready to go. Someone who has been
+      // here before is almost always coming back to the same site, and this
+      // screen is only reached at all when it could not be opened outright.
+      if (_address.text.isEmpty && saved.isNotEmpty) {
+        _address.text = saved.first.base.toString();
+      }
+    });
   }
 
   Future<void> _connect(String address) async {

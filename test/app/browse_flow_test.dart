@@ -80,11 +80,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Signs in and opens the tree for browsing.
+  /// Signs in, which lands in the tree: this account can reach exactly one,
+  /// and a list of one is not a choice worth making anybody make.
   Future<void> openTree(WidgetTester tester) async {
     await signIn(tester);
-    await tester.tap(find.text('main'));
-    await tester.pumpAndSettle();
   }
 
   Future<void> search(WidgetTester tester, String query) async {
@@ -93,10 +92,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a tree can be opened from the access screen', (tester) async {
+  testWidgets('an account with one tree lands straight in it', (tester) async {
     await openTree(tester);
 
+    // The account screen is not a destination when it holds a single card.
     expect(find.text('Search for a person'), findsOne);
+    expect(find.text('Your access'), findsNothing);
+  });
+
+  testWidgets('the account screen is still reachable', (tester) async {
+    await openTree(tester);
+
+    await tester.tap(find.byTooltip('Your account'));
+    await tester.pumpAndSettle();
+
+    // And it must not bounce straight back into the tree it came from.
+    expect(find.text('Your access'), findsOne);
+    expect(find.text('Member'), findsOne);
   });
 
   testWidgets('asks for a name before searching', (tester) async {
@@ -137,7 +149,8 @@ void main() {
 
     expect(find.text('الميلاد'), findsOne);
     // The date keeps the calendar conversion webtrees rendered.
-    expect(find.textContaining('12 مارس 1901'), findsOne);
+    expect(find.textContaining('١٢ مارس ١٩٠١'), findsOne);
+    expect(find.textContaining('٢١ ذو القعدة ١٣١٨'), findsOne);
     expect(find.textContaining('الرياض'), findsOne);
   });
 
@@ -216,8 +229,6 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(0), 'mobile');
     await tester.enterText(find.byType(TextFormField).at(1), 'correct');
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('main'));
     await tester.pumpAndSettle();
     await search(tester, 'الموسى');
     await tester.tap(find.text('عبد الله الموسى'));

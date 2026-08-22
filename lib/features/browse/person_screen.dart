@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
+import '../../data/settings_store.dart';
 import '../../data/stock/records_repository.dart';
+import '../../domain/dates.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
@@ -15,6 +17,7 @@ class PersonScreen extends StatefulWidget {
   const PersonScreen({
     required this.session,
     required this.records,
+    required this.settings,
     required this.tree,
     required this.xref,
     required this.onOpenPerson,
@@ -23,6 +26,7 @@ class PersonScreen extends StatefulWidget {
 
   final SessionManager session;
   final RecordsRepository records;
+  final SettingsStore settings;
   final String tree;
   final String xref;
   final void Function(String xref) onOpenPerson;
@@ -89,10 +93,16 @@ class _PersonScreenState extends State<PersonScreen> {
               );
             }
 
-            return _PersonBody(
-              person: snapshot.data!,
-              records: widget.records,
-              onOpenPerson: widget.onOpenPerson,
+            // Rebuilt on a settings change so switching calendar takes
+            // effect without reloading the record from the server.
+            return ListenableBuilder(
+              listenable: widget.settings,
+              builder: (context, _) => _PersonBody(
+                person: snapshot.data!,
+                records: widget.records,
+                calendar: widget.settings.calendarView,
+                onOpenPerson: widget.onOpenPerson,
+              ),
             );
           },
         ),
@@ -105,11 +115,13 @@ class _PersonBody extends StatelessWidget {
   const _PersonBody({
     required this.person,
     required this.records,
+    required this.calendar,
     required this.onOpenPerson,
   });
 
   final IndividualRecord person;
   final RecordsRepository records;
+  final CalendarView calendar;
   final void Function(String xref) onOpenPerson;
 
   @override
@@ -134,7 +146,8 @@ class _PersonBody extends StatelessWidget {
           const SizedBox(height: 28),
           _SectionTitle(text.factsAndEvents),
           const SizedBox(height: 8),
-          for (final fact in person.primaryFacts) _FactTile(fact: fact),
+          for (final fact in person.primaryFacts)
+            _FactTile(fact: fact, calendar: calendar),
         ],
 
         _Relatives(
@@ -174,7 +187,10 @@ class _PersonBody extends StatelessWidget {
               shape: const Border(),
               childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               expandedCrossAxisAlignment: CrossAxisAlignment.start,
-              children: [for (final fact in secondary) _FactTile(fact: fact)],
+              children: [
+                for (final fact in secondary)
+                  _FactTile(fact: fact, calendar: calendar),
+              ],
             ),
           ),
         ],
@@ -200,6 +216,7 @@ class _Header extends StatelessWidget {
         AuthenticatedImage(
           url: person.thumbnailUrl,
           records: records,
+          name: person.name,
           size: 104,
         ),
         const SizedBox(width: 18),
@@ -259,17 +276,18 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _FactTile extends StatelessWidget {
-  const _FactTile({required this.fact});
+  const _FactTile({required this.fact, required this.calendar});
 
   final FactEntry fact;
+  final CalendarView calendar;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Date and place are shown exactly as webtrees rendered them: it has
-    // already applied the tree's calendar and language, and re-formatting
-    // would lose the calendar and the approximations.
-    final detail = [?fact.date, ?fact.place].join(' · ');
+    // The date is shown exactly as webtrees wrote it, in whichever calendars
+    // the reader asked to keep: it has already applied the tree's calendar and
+    // language, and re-formatting would lose the approximations.
+    final detail = [?fact.date?.display(calendar), ?fact.place].join(' · ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -333,6 +351,7 @@ class _Relatives extends StatelessWidget {
               leading: AuthenticatedImage(
                 url: person.thumbnailUrl,
                 records: records,
+                name: person.name,
                 size: 48,
               ),
               title: Text(person.name),

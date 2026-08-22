@@ -44,6 +44,7 @@ class SessionManager extends ChangeNotifier {
     this._credentials, {
     CookieJar? cookies,
     ClientFactory? clientFactory,
+    this.contentLanguage,
     this.keepAliveInterval = const Duration(minutes: 10),
     this.signInBackoff = const Duration(seconds: 2),
   }) : _cookies = cookies ?? CookieJar(),
@@ -55,6 +56,13 @@ class SessionManager extends ChangeNotifier {
   final CredentialStore _credentials;
   final CookieJar _cookies;
   final ClientFactory _clientFactory;
+
+  /// The webtrees language tag the server should render in, asked for fresh
+  /// each time because the reader can change it while signed in.
+  ///
+  /// A function rather than a value so the session never has to be told about
+  /// a settings change it would otherwise have to subscribe to.
+  final String Function()? contentLanguage;
 
   /// How often to refresh the server's idle timer.
   ///
@@ -186,6 +194,7 @@ class SessionManager extends ChangeNotifier {
       );
 
       _stage = ConnectionStage.signedIn;
+      await _applyContentLanguage();
       _startKeepAlive();
       return true;
     });
@@ -212,6 +221,32 @@ class SessionManager extends ChangeNotifier {
       await _credentials.forgetPassword(saved);
     }
     return false;
+  }
+
+  /// Signs back in to the site used last, without asking anything.
+  ///
+  /// The point of the app remembering a password is that the second launch
+  /// costs nothing: no address to type, no list to choose from. Returns false
+  /// when there is nothing to resume, the unlock was declined, or the stored
+  /// password no longer works — all of which mean the interface should ask.
+  Future<bool> resumeLastUsed() async {
+    final saved = await _credentials.connections();
+    if (saved.isEmpty) return false;
+
+    // The list is kept most-recent-first, so this is the site the user was
+    // last signed in to.
+    final last = saved.first;
+    if (!await _credentials.hasPassword(last)) return false;
+    return resume(last);
+  }
+
+  /// Tells the server which language to render in, if anything is listening.
+  ///
+  /// Safe to call whenever the reader changes language; it does nothing when
+  /// nobody is signed in, and the next sign-in will carry the new choice.
+  Future<void> syncContentLanguage() async {
+    if (!isSignedIn) return;
+    await _applyContentLanguage();
   }
 
   /// Runs [action], signing in again once if the session has expired.
@@ -280,6 +315,29 @@ class SessionManager extends ChangeNotifier {
   // --------------------------------------------------------------- internals
 
   static const String _log = 'webtrees.session';
+
+  /// Aligns the server's rendering language with the app's.
+  ///
+  /// webtrees renders dates, month names and fact labels in the language held
+  /// in its own session, seeded from the account's preference — so without
+  /// this an Arabic interface still shows English dates. A failure here is not
+  /// worth failing a sign-in over: the app would merely read a little of the
+  /// record in the wrong language.
+  Future<void> _applyContentLanguage() async {
+    final tag = contentLanguage?.call();
+    final session = _session;
+    if (tag == null || session == null) return;
+
+    try {
+      await session.useLanguage(tag);
+    } on WebtreesError catch (problem) {
+      developer.log(
+        'Could not set the server language: ${problem.message}',
+        name: _log,
+        level: 900,
+      );
+    }
+  }
 
   /// The real name already recorded for this account, if any.
   Future<String?> _knownNameFor(Uri base, String username) async {
@@ -377,6 +435,7 @@ class SessionManager extends ChangeNotifier {
       // fresh one rather than spending a round trip proving it is stale.
       session.invalidateCsrf();
       await _submit(session, saved.username, password);
+      await _applyContentLanguage();
       _startKeepAlive();
       return true;
     } on WebtreesError catch (problem) {

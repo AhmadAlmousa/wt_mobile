@@ -3,6 +3,7 @@ import 'package:html/parser.dart' as html;
 import 'package:meta/meta.dart';
 
 import '../../core/errors.dart';
+import '../../domain/dates.dart';
 import '../../domain/records.dart';
 import 'dom.dart';
 
@@ -134,10 +135,7 @@ final class RecordParser {
           value: value,
           // The date box also holds computed ages, which belong to the
           // rendering rather than to the fact.
-          date: textWithout(row.querySelector('.wt-fact-date-age'), const [
-            '.age',
-            '.label',
-          ]),
+          date: _dateOf(row),
           place: place,
           type: textOf(row.querySelector('.wt-fact-type')),
           // webtrees collapses relatives' events, historical events and
@@ -147,6 +145,129 @@ final class RecordParser {
       );
     }
     return facts;
+  }
+
+  /// Reads the date box of a fact row.
+  ///
+  /// The text webtrees produced is kept verbatim — it has already applied the
+  /// tree's calendar, the reader's language and its own numerals. The pieces
+  /// beside it exist only so the interface can *drop* a calendar the reader
+  /// did not ask for; nothing here ever rebuilds a date from components.
+  RenderedDate? _dateOf(Element row) {
+    final box = row.querySelector('.wt-fact-date-age');
+    if (box == null) return null;
+
+    // The box also holds computed ages, which belong to the rendering rather
+    // than to the fact.
+    final copy = box.clone(true);
+    for (final selector in const ['.age', '.label']) {
+      for (final unwanted in copy.querySelectorAll(selector)) {
+        unwanted.remove();
+      }
+    }
+
+    final text = cleanText(copy.text);
+    if (text == null) return null;
+
+    final pieces = <DatePiece>[];
+    _readDatePieces(copy, pieces);
+    return RenderedDate(
+      text: text,
+      // Structure is only useful when at least one calendar was named. A
+      // rendering that drops the calendar links says nothing about which
+      // calendar anything is in, and guessing would be worse than showing
+      // the reader everything the server sent.
+      pieces: pieces.any(_namesACalendar) ? pieces : const [],
+    );
+  }
+
+  static bool _namesACalendar(DatePiece piece) =>
+      piece is DateValue &&
+      (piece.calendar != DateCalendar.unknown ||
+          piece.conversions.any(
+            (conversion) => conversion.calendar != DateCalendar.unknown,
+          ));
+
+  /// Walks a date box, in document order, collecting words and dates.
+  ///
+  /// webtrees renders each date as a link to its own calendar page, and each
+  /// conversion as a `dir`-bearing span holding another such link. The `cal`
+  /// parameter of those links is the only place a stock site states which
+  /// calendar a rendered date is in.
+  void _readDatePieces(Node node, List<DatePiece> pieces) {
+    for (final child in node.nodes) {
+      if (child is Text) {
+        final words = cleanText(child.text);
+        if (words != null) pieces.add(DateWords(words));
+        continue;
+      }
+      if (child is! Element) continue;
+
+      final calendar = _calendarOf(child);
+      if (child.localName == 'a' && calendar != null) {
+        final text = textOf(child);
+        if (text != null) pieces.add(DateValue(text: text, calendar: calendar));
+        continue;
+      }
+
+      // A conversion: webtrees wraps it in a span carrying the reading
+      // direction, because a converted date may read the other way round.
+      if (child.localName == 'span' && child.attributes.containsKey('dir')) {
+        _attachConversion(child, pieces);
+        continue;
+      }
+
+      _readDatePieces(child, pieces);
+    }
+  }
+
+  /// Hangs a converted date off the date it converts.
+  void _attachConversion(Element group, List<DatePiece> pieces) {
+    final text = _unbracket(textOf(group));
+    if (text == null) return;
+
+    final conversion = DateValue(
+      text: text,
+      calendar:
+          _calendarOf(group.querySelector('a[href]')) ?? DateCalendar.unknown,
+    );
+
+    final index = pieces.lastIndexWhere((piece) => piece is DateValue);
+    if (index < 0) {
+      // A conversion with nothing to convert. Not a shape webtrees emits, but
+      // losing the date would be worse than showing it unattached.
+      pieces.add(conversion);
+      return;
+    }
+
+    final converted = pieces[index] as DateValue;
+    pieces[index] = DateValue(
+      text: converted.text,
+      calendar: converted.calendar,
+      conversions: [...converted.conversions, conversion],
+    );
+  }
+
+  /// The calendar a webtrees calendar link points at, or null if it is not one.
+  static DateCalendar? _calendarOf(Element? link) {
+    final href = link?.attributes['href'];
+    if (href == null) return null;
+
+    // Parsed before decoding, not after: the escape is `@#DGREGORIAN@`, and
+    // decoding the whole URL first turns its `#` into a fragment marker that
+    // swallows the rest of the query. `Uri.queryParameters` decodes the value
+    // on its own, which is exactly what is wanted.
+    final escape = Uri.tryParse(href)?.queryParameters['cal'];
+    if (escape == null) return null;
+    return DateCalendar.fromGedcomEscape(escape);
+  }
+
+  /// Strips the brackets webtrees wraps a conversion in — round in 2.2.6,
+  /// square in 2.3.
+  static String? _unbracket(String? text) {
+    if (text == null) return null;
+    final trimmed = text.replaceAll(RegExp(r'^[(\[]|[)\]]$'), '').trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   /// Reads the family blocks of a relatives tab.

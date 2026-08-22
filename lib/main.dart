@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
@@ -26,7 +28,17 @@ Future<void> main() async {
 
   runApp(
     WebtreesMobileApp(
-      session: SessionManager(CredentialStore(secrets, gate)),
+      session: SessionManager(
+        CredentialStore(secrets, gate),
+        // webtrees renders every date, month name and fact label in the
+        // language held in its own session — so the app has to ask for the
+        // one it is reading in, or an Arabic screen fills with English dates.
+        // Read on each sign-in rather than captured, because the reader can
+        // change it at any time.
+        contentLanguage: () => SettingsStore.webtreesLanguageTag(
+          settings.resolve(PlatformDispatcher.instance.locale),
+        ),
+      ),
       settings: settings,
     ),
   );
