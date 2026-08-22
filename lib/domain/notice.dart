@@ -10,6 +10,24 @@
 /// silently falling through to a blank line.
 sealed class Notice {
   const Notice();
+
+  /// A developer-facing description, for logs and the command-line tools.
+  ///
+  /// Deliberately *not* the sentence a reader sees: that one is translated and
+  /// lives in the presentation layer. This one exists because a diagnostic
+  /// that prints `Instance of 'OnlyOneTreeFound'` wastes the reader's time.
+  String get diagnostic => switch (this) {
+    SiteRenamedItself(:final canonical) => 'site calls itself $canonical',
+    BlocklistUnchecked(:final reason) => 'blocklist unchecked: $reason',
+    VersionUnreadable() => 'site version unreadable',
+    SiteUnidentified() => 'site did not identify itself as webtrees',
+    NoTreesVisible() => 'no family tree visible to this account',
+    OnlyOneTreeFound() => 'only one family tree found',
+    SectionUnavailable(:final module) => 'section unavailable: $module',
+  };
+
+  @override
+  String toString() => diagnostic;
 }
 
 /// The site's canonical address differs from the one that was typed.
