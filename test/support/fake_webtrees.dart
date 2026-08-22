@@ -26,13 +26,24 @@ final class Sent {
     this.route,
     this.fields,
     this.headers, {
+    required this.query,
     required this.ugly,
     required this.anonymous,
   });
 
   final String method;
   final String route;
+
+  /// The submitted form body. Empty for a GET — see [query].
   final Map<String, String> fields;
+
+  /// The URL's query parameters, minus the `route` the ugly style adds.
+  ///
+  /// Distinct from [fields] because webtrees carries a search term, an xref
+  /// and a page number here, and a handler that reads the body instead sees
+  /// nothing at all.
+  final Map<String, String> query;
+
   final Map<String, String> headers;
 
   /// Whether the request was addressed in `index.php?route=` form. A site with
@@ -74,6 +85,10 @@ final class FakeWebtrees implements HttpClientAdapter {
       route,
       _fieldsOf(options.data),
       options.headers.map((k, v) => MapEntry(k, '$v')),
+      query: {
+        for (final entry in options.uri.queryParameters.entries)
+          if (entry.key != 'route') entry.key: entry.value,
+      },
       ugly: options.uri.queryParameters.containsKey('route'),
       anonymous: options.extra[anonymousRequest] == true,
     );

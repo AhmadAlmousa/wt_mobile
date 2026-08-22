@@ -22,6 +22,7 @@ import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/data/session.dart';
+import 'package:webtrees_mobile/data/stock/records_repository.dart';
 
 Future<void> main(List<String> args) async {
   final options = <String, String>{};
@@ -33,7 +34,7 @@ Future<void> main(List<String> args) async {
   if (address == null) {
     stderr.writeln(
       'Usage: dart run tool/live_check.dart --url HOST '
-      '[--user NAME]',
+      '[--user NAME] [--search TERM]',
     );
     exitCode = 64;
     return;
@@ -121,6 +122,70 @@ Future<void> main(List<String> args) async {
     }
     for (final warning in access.warnings) {
       stdout.writeln('  WARN  $warning');
+    }
+
+    // The parsers are the part most likely to break against a real site:
+    // fixtures are transcribed from upstream templates, so only a live tree
+    // proves the selectors survive this instance's theme, language and
+    // modules.
+    stdout.writeln('\n=== Records ===');
+    final tree = access.trees.isEmpty ? null : access.trees.first;
+    if (tree == null) {
+      stdout.writeln('  SKIP  no readable tree');
+    } else {
+      final records = RecordsRepository(client, version: instance.version);
+
+      final term = options['search'] ?? tree.myXref ?? 'a';
+      final found = await records.search(tree.name, term);
+      report(
+        'search "$term"',
+        '${found.people.length} result(s)'
+            '${found.hasMore ? ' (more available)' : ''}',
+        ok: found.people.isNotEmpty,
+      );
+
+      // Prefer the account's own record: it is certain to be visible to this
+      // user, which a search hit is not.
+      final xref = tree.myXref ?? (found.people.isEmpty
+          ? null
+          : found.people.first.xref);
+      if (xref == null) {
+        stdout.writeln('  SKIP  nobody to open');
+      } else {
+        final person = await records.individual(tree.name, xref);
+        report('opened', '$xref — ${person.name}');
+        report('alternate name', person.alternateName ?? '(none)');
+
+        final secondary = person.facts.length - person.primaryFacts.length;
+        report(
+          'facts',
+          '${person.primaryFacts.length} primary, $secondary secondary',
+          ok: person.facts.isNotEmpty,
+        );
+        report(
+          'families',
+          'parents=${person.parents.length} '
+              'siblings=${person.siblings.length} '
+              'spouses=${person.spouses.length} '
+              'children=${person.children.length}',
+          ok: person.families.isNotEmpty,
+        );
+        for (final warning in person.warnings) {
+          stdout.writeln('  WARN  $warning');
+        }
+
+        final photo = person.thumbnailUrl;
+        if (photo == null) {
+          stdout.writeln('  SKIP  no photo on this record');
+        } else {
+          final bytes = await records.image(photo);
+          report(
+            'photo over the session',
+            '${bytes.length} bytes',
+            ok: bytes.isNotEmpty,
+          );
+        }
+      }
     }
 
     stdout.writeln('\n=== Sign out ===');

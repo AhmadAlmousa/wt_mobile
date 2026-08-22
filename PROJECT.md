@@ -180,11 +180,34 @@ anonymous `/my-account`.
   validating the signature, and picks watermarking per user. Images must
   therefore be fetched through the authenticated session, and any cache
   partitioned by site and account and cleared on sign-out.
-- Record detail comes from AJAX tab fragments
-  `GET /module/{tab}/Tab?tree={t}&xref={x}` (~10× less markup than a full page).
-  Core tabs: `personal_facts`, `relatives`, `media`.
-  Only send `X-Requested-With` on fragment routes — elsewhere it downgrades 4xx
+- Record detail comes from AJAX tab fragments (~10× less markup than a full
+  page). **Do not build these URLs.** The individual page renders every tab it
+  offers as `<a data-wt-href="…" href="#{module}">`, so the server states the
+  exact URL, and which tabs this tree actually has. That matters twice over:
+  the route shape differs by version — `/module/{m}/Tab/{tree}` in 2.3 against
+  `/module/{m}/Tab?tree={t}` in 2.2.6 — and core tabs can be disabled or
+  access-restricted per tree.
+- **The tab anchor has no `id` in 2.2.6**; 2.3 added `id="{module}-tab"`. Key
+  on the `href="#{module}"` fragment, which both emit. A parser keyed on the id
+  finds *no tabs at all* on 2.2.6 — the version the target server runs.
+- A tab whose module returns `canLoadAjax() === false` is already rendered into
+  the page; re-requesting it fetches the same bytes twice.
+- Only send `X-Requested-With` on fragment routes — elsewhere it downgrades 4xx
   to 200.
+- Record markup is class-based and stable across both versions:
+  `span.NAME` (every rendered name), `.wt-fact-label`, `.wt-fact-value`,
+  `.wt-fact-date-age`, `.wt-fact-place`, `.wt-fact-type`, and `chart-box` with
+  `data-wt-chart-xref`, `.wt-chart-box-name`, `-name-alt`, `-lifespan`,
+  `-thumbnail`.
+- **Dates stay text.** webtrees has already formatted them in the tree's
+  language and calendar, and appends conversions in brackets — `12 مارس 1901
+  [٢١ ذو القعدة ١٣١٨ هـ]`. Parsing to `DateTime` would drop the second
+  calendar and the `about`/`between` qualifiers.
+- Relatives carry **no machine-readable role**. The family view emits its
+  `FAMC`/`FAMS` type only inside editor-only link text, and the `<th>`
+  relationship names are translated. Role is therefore derived structurally:
+  spouses render before any marriage-fact row, children after, and the family
+  is a birth family or the person's own according to which block holds them.
 - **No machine-readable tree list.** Sources, in order: the post-sign-in
   redirect (default tree), the header menu `a[class*=menu-tree-]`, the search
   page `input[name="search_trees[]"]`. The latter two need
@@ -234,10 +257,10 @@ webtrees_mobile/lib/
              secret_store · unlock_gate
   data/      instance_probe · session · access_probe
              credential_store · session_manager
-    stock/   StockTransport   (session + HTML/JSON scraping)   ← v1
+    stock/   dom · record_parser · records_repository · media_cache
     module/  ModuleTransport  (JSON)                           ← v2
-  domain/    instance · access · (records, v1 Phase 3)
-  features/  connect · auth · access · browse · search
+  domain/    instance · access · records
+  features/  connect · auth · access · browse
 ```
 
 Repositories depend on a transport **interface**; a capability probe at connect
@@ -273,8 +296,9 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **2b** | Capability probe for the optional module | ⏸ deferred — see §2 |
 | **2c** | "Your access" screen | ✅ |
 | **2d** | Stabilization — status interpretation, resume, credential semantics | ✅ |
-| **3** | Read model + stock transport (records, facts, search, media) | ⬜ |
-| **4** | Interface (theme, navigation, person/family views) | ⬜ |
+| **3a** | Vertical slice — search → person → facts → relatives → photo | ✅ |
+| **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ⬜ |
+| **4** | Interface (theme, navigation, person/family views) | 🚧 |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
 | **v2** | Offline sync · editing · moderation · charts · PHP module | ⬜ |
 
@@ -357,6 +381,7 @@ turned out to be decidable for private trees (§3).
 | 10 | `resume()` was never called by anything — the returning-user path did not exist | **External review** |
 | 11 | Every non-`200` read as a definitive answer about the account | **External review** |
 | 12 | `tom-select-individual` documented as an enumeration API; it requires a query | **External review** |
+| 13 | Tab discovery keyed on an `id` that only 2.3 emits, so 2.2.6 found no tabs | **Two-version fixtures** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bug 7 is the
@@ -443,12 +468,57 @@ enforces the CSRF token, so an expiry can be simulated honestly. The older
 `workingSite()` fixture flips a boolean and ignores the token — fine for
 testing what a screen shows, useless for testing recovery.
 
+### 2026-08-22 (later still) — Phase 3a, the vertical slice
+
+Search a tree → open a person → read their facts and relatives → load their
+photo through the session. Wired into the interface: a tree card on the access
+screen opens search; a result opens the person; a relative opens *them*, so a
+family can be walked.
+
+**The individual page states its own tabs.** The most useful thing found in the
+source: each tab is rendered as `<a data-wt-href="…" href="#{module}">`, so the
+server supplies the exact fragment URL and the list of tabs this tree actually
+has (§3). Nothing is constructed or assumed, which is why the version
+difference below costs nothing and a disabled tab degrades instead of failing.
+
+**Fixtures caught a real compatibility bug before any device did.** The tab
+anchor carries no `id` in 2.2.6 — 2.3 added it. The first parser keyed on that
+id, so it found **zero tabs on 2.2.6**, the version `tree.almou.sa` runs. Every
+parser test runs against both versions; reverting the fix fails the 2.2.6 cases
+and passes the 2.3 ones, which is exactly what the matrix is for.
+
+**Structure over language.** This tree is Arabic. Roles come from
+`data-wt-chart-xref` and document position, never from the translated captions
+and relationship names, and dates are kept as webtrees rendered them so the
+Hijri conversion survives. Fixtures are Arabic and RTL throughout.
+
+**Photos go through the session.** `MediaFileThumbnail` checks `canShow()` for
+the current user *before* validating the signature, so `Image.network` would
+fetch as a stranger. `AuthenticatedImage` fetches bytes through the signed-in
+client, and `MediaCache` is memory-only, bounded, and cleared whenever the
+session ends — family photographs must not outlive the account that fetched
+them.
+
+**A lost section is named, not blank.** A tab that is disabled, restricted or
+failing costs that section and adds a warning the person screen shows;
+`ParseFailure` carries the parser, the selector and the webtrees version so a
+bug report is actionable.
+
+**182 tests** green (110 → 182), analyzer clean under the strict modes.
+
+**The fixtures' limitation is real and recorded** in `test/fixtures/README.md`:
+they are transcribed from the upstream templates, not captured from a running
+server, so they prove the parsers handle what the templates emit and nothing
+more. They cannot catch a theme that restructures a page. Replace them with
+sanitized real captures once a password is available.
+
 **Not verified:** the authenticated live check has not been run against
 `tree.almou.sa` since these transport changes, because `WEBTREES_PASSWORD` is
 not set in this environment. Bug #5 was invisible to unit tests, so **run
-`tool/live_check.dart` before trusting Phase 2d on real hardware.** The
+`tool/live_check.dart` before trusting Phase 2d or 3a on real hardware.** The
 anonymous status codes the new privacy logic depends on *were* re-confirmed
-live.
+live, and the tool now exercises search, opening a person, the parsers and an
+authenticated photo fetch as well.
 
 ---
 
@@ -461,7 +531,7 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 # Exercise the app's own data layer end to end
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 
-flutter test          # 110 tests
+flutter test          # 182 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 ```
@@ -482,9 +552,12 @@ Both tools read the password from the terminal with echo disabled, or from
 
 ## 9. Open questions and risks
 
-1. **HTML parsing is theme- and version-coupled.** Mitigation: parse AJAX
-   fragments rather than full pages, golden-file tests, and a diagnostics screen
-   that names the failing parser instead of showing a blank page.
+1. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+   AJAX fragments rather than whole pages, a two-version fixture matrix, and
+   `ParseFailure` naming the parser, selector and version. **Still open:** the
+   fixtures are transcribed from upstream templates, not captured from a live
+   site, so no non-default theme, language or module configuration has ever
+   been parsed. Sanitized real captures are the next step.
 2. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
@@ -505,9 +578,11 @@ Both tools read the password from the terminal with echo disabled, or from
    Phase 5 rather than waiting for it.
 8. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 live and 2.3.0-dev by source; both URL
-   styles; one private tree; the default theme; English. Themes, languages,
-   subdirectory installs, multiple trees and module configurations are
-   untested. This belongs in an explicit compatibility matrix before release.
+   styles; both tab-route shapes; one private tree; the default theme. Parsers
+   are exercised against Arabic/RTL fixtures. Untested: non-default themes,
+   subdirectory installs, multiple trees, and module configurations other than
+   the stock set. This belongs in an explicit compatibility matrix before
+   release.
 9. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —

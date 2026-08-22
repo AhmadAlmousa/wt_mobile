@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/session_manager.dart';
+import '../data/stock/media_cache.dart';
+import '../data/stock/records_repository.dart';
 import '../features/access/access_screen.dart';
 import '../features/auth/sign_in_screen.dart';
+import '../features/browse/person_screen.dart';
+import '../features/browse/search_screen.dart';
 import '../features/connect/connect_screen.dart';
 import 'theme.dart';
 
@@ -18,6 +22,32 @@ class WebtreesMobileApp extends StatefulWidget {
 }
 
 class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
+  /// Shared by every browsing screen, and emptied the moment nobody is signed
+  /// in. Family photographs are private to the account that fetched them, so
+  /// the cache must not outlive the session that filled it.
+  final MediaCache _media = MediaCache();
+
+  /// A repository bound to the current signed-in client.
+  ///
+  /// Built per navigation rather than held, because the client is replaced
+  /// whenever the app reconnects or signs in again — a cached repository would
+  /// go on talking through a closed one.
+  RecordsRepository get _records => RecordsRepository(
+    widget.session.client,
+    version: widget.session.instance?.version,
+    mediaCache: _media,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.addListener(_forgetImagesWhenSignedOut);
+  }
+
+  void _forgetImagesWhenSignedOut() {
+    if (!widget.session.isSignedIn) _media.clear();
+  }
+
   late final GoRouter _router = GoRouter(
     initialLocation: Routes.connect,
     // Rebuilds the routing decision whenever the session changes, so an
@@ -29,9 +59,12 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
       final location = state.matchedLocation;
 
       if (signedIn) {
-        return location == Routes.access ? null : Routes.access;
+        // Any signed-in screen is fine; only a signed-out one is not.
+        return location == Routes.connect || location == Routes.signIn
+            ? Routes.access
+            : null;
       }
-      if (location == Routes.access) {
+      if (location != Routes.connect && location != Routes.signIn) {
         return connected ? Routes.signIn : Routes.connect;
       }
       if (location == Routes.signIn && !connected) return Routes.connect;
@@ -59,13 +92,43 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
         builder: (context, state) => AccessScreen(
           session: widget.session,
           onSignedOut: () => _router.go(Routes.connect),
+          onBrowseTree: (tree) => _router.go(Routes.searchIn(tree)),
         ),
+      ),
+      GoRoute(
+        path: Routes.search,
+        builder: (context, state) {
+          final tree = state.pathParameters['tree']!;
+          return SearchScreen(
+            session: widget.session,
+            records: _records,
+            tree: tree,
+            onOpenPerson: (xref) => _router.go(Routes.personIn(tree, xref)),
+          );
+        },
+      ),
+      GoRoute(
+        path: Routes.person,
+        builder: (context, state) {
+          final tree = state.pathParameters['tree']!;
+          return PersonScreen(
+            session: widget.session,
+            records: _records,
+            tree: tree,
+            xref: state.pathParameters['xref']!,
+            // Pushed rather than replaced, so walking up a family tree can be
+            // walked back down again.
+            onOpenPerson: (xref) => _router.push(Routes.personIn(tree, xref)),
+          );
+        },
       ),
     ],
   );
 
   @override
   void dispose() {
+    widget.session.removeListener(_forgetImagesWhenSignedOut);
+    _media.clear();
     _router.dispose();
     super.dispose();
   }
@@ -85,4 +148,11 @@ abstract final class Routes {
   static const String connect = '/connect';
   static const String signIn = '/sign-in';
   static const String access = '/access';
+  static const String search = '/tree/:tree';
+  static const String person = '/tree/:tree/person/:xref';
+
+  static String searchIn(String tree) => '/tree/${Uri.encodeComponent(tree)}';
+
+  static String personIn(String tree, String xref) =>
+      '${searchIn(tree)}/person/${Uri.encodeComponent(xref)}';
 }

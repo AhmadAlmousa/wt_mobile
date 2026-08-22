@@ -14,11 +14,16 @@ class AccessScreen extends StatefulWidget {
   const AccessScreen({
     required this.session,
     required this.onSignedOut,
+    required this.onBrowseTree,
     super.key,
   });
 
   final SessionManager session;
   final VoidCallback onSignedOut;
+
+  /// Opens a tree for browsing. Reading is available to every role, so this is
+  /// offered whatever the badges on the card say.
+  final void Function(String tree) onBrowseTree;
 
   @override
   State<AccessScreen> createState() => _AccessScreenState();
@@ -133,7 +138,11 @@ class _AccessScreenState extends State<AccessScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  for (final tree in summary.trees) _TreeCard(tree: tree),
+                  for (final tree in summary.trees)
+                    _TreeCard(
+                      tree: tree,
+                      onOpen: () => widget.onBrowseTree(tree.name),
+                    ),
                   for (final warning in summary.warnings) ...[
                     const SizedBox(height: 12),
                     MessagePanel.warning(warning),
@@ -226,9 +235,13 @@ class _AccountCard extends StatelessWidget {
 }
 
 class _TreeCard extends StatelessWidget {
-  const _TreeCard({required this.tree});
+  const _TreeCard({required this.tree, required this.onOpen});
 
   final TreeAccess tree;
+
+  /// Opens the tree for browsing. Every role can read, so this is offered
+  /// whatever the badges below it say.
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +249,9 @@ class _TreeCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+      onTap: onOpen,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -250,6 +266,10 @@ class _TreeCard extends StatelessWidget {
                     tree.title ?? tree.name,
                     style: theme.textTheme.titleMedium,
                   ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -290,6 +310,7 @@ class _TreeCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

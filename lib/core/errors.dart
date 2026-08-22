@@ -154,3 +154,36 @@ final class CannotRead extends WebtreesError {
       'Could not read $what from this webtrees version. '
       'It may use a theme or version this app has not seen yet.';
 }
+
+/// A parser found markup it did not recognise.
+///
+/// Richer than [CannotRead] because HTML parsing is the app's most
+/// version-fragile surface. When a site upgrades, or uses a theme this app has
+/// never seen, the useful bug report says which parser gave up, what it was
+/// looking for and which webtrees version produced the page. Without those
+/// three the only symptom is a blank section.
+final class ParseFailure extends WebtreesError {
+  const ParseFailure({
+    required this.parser,
+    required this.expected,
+    this.version,
+  });
+
+  /// The parser that failed, e.g. `relatives tab`.
+  final String parser;
+
+  /// What it was looking for — a selector, or a description of the shape.
+  final String expected;
+
+  /// The webtrees version that produced the page, when known.
+  final String? version;
+
+  /// A one-line summary for a bug report or a diagnostics screen.
+  String get diagnostic =>
+      'parser=$parser expected=$expected version=${version ?? 'unknown'}';
+
+  @override
+  String get message =>
+      'Could not read the $parser on this site. It may use a theme or a '
+      'webtrees version this app has not seen yet.';
+}

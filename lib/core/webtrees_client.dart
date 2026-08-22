@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -55,6 +56,22 @@ final class Reply {
   bool get isJson => contentType?.contains('application/json') ?? false;
 }
 
+/// A binary response, for media.
+final class BytesReply {
+  const BytesReply({
+    required this.status,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final int status;
+  final Uint8List bytes;
+  final String? contentType;
+
+  bool get isOk => status == 200;
+  bool get isRedirect => status >= 300 && status < 400;
+}
+
 /// Talks HTTP to one webtrees instance.
 ///
 /// Redirects are never followed automatically. webtrees encodes meaning in
@@ -101,6 +118,33 @@ class WebtreesClient {
       options: Options(headers: headers.isEmpty ? null : headers),
     ),
   );
+
+  /// Fetches binary content — an image — through the signed-in session.
+  ///
+  /// Separate from [get] because the response must not be decoded as text.
+  /// Media is the one thing this app fetches that is not markup, and it still
+  /// has to travel over the authenticated session: webtrees checks the current
+  /// user's permission on every thumbnail, signed URL or not.
+  Future<BytesReply> getBytes(
+    String route, {
+    Map<String, String> query = const {},
+  }) async {
+    final Response<List<int>> response;
+    try {
+      response = await _dio.getUri<List<int>>(
+        url(route, query),
+        options: Options(responseType: ResponseType.bytes),
+      );
+    } on DioException catch (error) {
+      throw _asWebtreesError(error);
+    }
+
+    return BytesReply(
+      status: response.statusCode ?? 0,
+      bytes: Uint8List.fromList(response.data ?? const []),
+      contentType: response.headers.value('content-type'),
+    );
+  }
 
   /// Submits an `application/x-www-form-urlencoded` body.
   ///

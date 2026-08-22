@@ -30,13 +30,17 @@ bool grantsAccess(Reply reply, {required String probe}) {
 ///
 /// [probe] names what was being attempted, so an unexpected status reaches the
 /// user as something actionable rather than a bare number.
-WebtreesError failureFrom(Reply reply, {required String probe}) {
+WebtreesError failureFrom(Reply reply, {required String probe}) =>
+    failureFor(reply.status, probe: probe);
+
+/// The same judgement, for responses that are not text — media, chiefly.
+WebtreesError failureFor(int status, {required String probe}) {
   // Middleware bounces an unauthenticated caller to the sign-in page, so a
   // redirect out of a guarded route means the session is gone.
-  if (reply.isRedirect) return const SessionExpired();
-  if (reply.status == 403) return NotPermitted(detail: 'Denied while $probe.');
-  if (reply.status == 404) return NotFound(detail: 'Not found while $probe.');
-  return UnexpectedResponse(reply.status, detail: 'Failed while $probe.');
+  if (status >= 300 && status < 400) return const SessionExpired();
+  if (status == 403) return NotPermitted(detail: 'Denied while $probe.');
+  if (status == 404) return NotFound(detail: 'Not found while $probe.');
+  return UnexpectedResponse(status, detail: 'Failed while $probe.');
 }
 
 /// What an anonymous request revealed about a tree.
