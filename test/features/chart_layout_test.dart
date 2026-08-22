@@ -210,6 +210,99 @@ void main() {
     });
   });
 
+  group('an hourglass', () {
+    late ChartLayout layout;
+
+    setUp(() {
+      layout = layoutHourglass(
+        ancestor(
+          'X1',
+          parents: [ancestor('X2', sosa: 2), ancestor('X3', sosa: 3)],
+        ),
+        descendant(
+          'X1',
+          families: [
+            DescendantFamily(
+              xref: 'F1',
+              spouse: person('X9'),
+              children: [
+                descendant('X10', number: '1.1'),
+                descendant('X11', number: '1.2'),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+
+    test('draws the person in the middle exactly once', () {
+      // They belong to both halves, and stitching two charts together is
+      // where a second copy of somebody comes from.
+      expect(
+        layout.people.where((placed) => placed.person.xref == 'X1'),
+        hasLength(1),
+      );
+      expect(layout.people, hasLength(6));
+    });
+
+    test('puts the ancestors above and the descendants below', () {
+      double rowOf(String xref) => layout.people
+          .firstWhere((placed) => placed.person.xref == xref)
+          .topLeft
+          .dy;
+
+      expect(rowOf('X2'), lessThan(rowOf('X1')));
+      expect(rowOf('X3'), lessThan(rowOf('X1')));
+      expect(rowOf('X10'), greaterThan(rowOf('X1')));
+      // A spouse belongs to the middle row, beside the person they married.
+      expect(rowOf('X9'), rowOf('X1'));
+    });
+
+    test('draws nobody on top of anybody', () {
+      expect(overlapsIn(layout), isEmpty);
+    });
+
+    test('keeps everybody on the canvas', () {
+      for (final placed in layout.people) {
+        expect(placed.topLeft.dx, greaterThanOrEqualTo(0));
+        expect(placed.topLeft.dy, greaterThanOrEqualTo(0));
+        expect(
+          placed.topLeft.dx + metrics.boxWidth,
+          lessThanOrEqualTo(layout.size.width + 0.01),
+        );
+      }
+    });
+  });
+
+  group('ancestors stacked upwards', () {
+    test('runs the generations up from the person', () {
+      final layout = layoutAncestorsUpwards(
+        ancestor(
+          'X1',
+          parents: [
+            ancestor(
+              'X2',
+              sosa: 2,
+              parents: [ancestor('X4', sosa: 4), ancestor('X5', sosa: 5)],
+            ),
+            ancestor('X3', sosa: 3),
+          ],
+        ),
+      );
+
+      double rowOf(String xref) => layout.people
+          .firstWhere((placed) => placed.person.xref == xref)
+          .topLeft
+          .dy;
+
+      // Three generations: the subject at the bottom, the oldest at the top.
+      expect(rowOf('X4'), 0);
+      expect(rowOf('X2'), metrics.boxHeight + metrics.generationGap);
+      expect(rowOf('X1'), 2 * (metrics.boxHeight + metrics.generationGap));
+      expect(overlapsIn(layout), isEmpty);
+    });
+  });
+
   group('mirroring for a right-to-left reader', () {
     test('turns the chart round without reshaping it', () {
       final layout = layoutAncestors(

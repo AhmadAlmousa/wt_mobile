@@ -43,6 +43,68 @@ void main() {
         Canned(200, body: fixture(version, 'chart_descendants.html')),
   };
 
+  group('what the app offers to draw', () {
+    test('only what this site runs', () {
+      // A site that has switched a chart module off never links to it, and
+      // the app has nothing to offer for it either.
+      expect(ChartKind.drawnFrom({ChartKind.ancestors: '/a'}), [
+        ChartKind.ancestors,
+      ]);
+      expect(ChartKind.drawnFrom(const {}), isEmpty);
+    });
+
+    test('and not an hourglass with only one half', () {
+      // The hourglass is stitched from the two charts either side of a
+      // person, so the site running the hourglass module is not enough.
+      expect(
+        ChartKind.drawnFrom({
+          ChartKind.hourglass: '/h',
+          ChartKind.ancestors: '/a',
+        }),
+        [ChartKind.ancestors],
+      );
+      expect(
+        ChartKind.drawnFrom({
+          ChartKind.hourglass: '/h',
+          ChartKind.ancestors: '/a',
+          ChartKind.descendants: '/d',
+        }),
+        containsAll(<ChartKind>[ChartKind.hourglass]),
+      );
+    });
+
+    test('never a chart it has no way to draw', () {
+      // Maps, statistics and reports are all things a site offers; none of
+      // them is a shape this app knows how to redraw.
+      expect(
+        ChartKind.drawnFrom({
+          ChartKind.statistics: '/s',
+          ChartKind.pedigreeMap: '/m',
+        }),
+        isEmpty,
+      );
+    });
+  });
+
+  group('reading an hourglass', () {
+    test('is the two charts either side of a person, stitched', () async {
+      serve(site());
+
+      final chart = await charts.hourglass(
+        ancestorsUrl: '/tree/main/ancestors-tree-4/X42',
+        descendantsUrl: '/tree/main/descendants-tree-3/X42',
+        subject: subject,
+      );
+
+      expect(chart.kind, ChartKind.hourglass);
+      expect(chart.ancestors?.person.xref, 'X42');
+      expect(chart.descendants?.person.xref, 'X42');
+      // webtrees draws its own hourglass; asking for it would be a third
+      // rendering of the same two families and a third parser to keep.
+      expect(server.routes, hasLength(2));
+    });
+  });
+
   group('reading a chart', () {
     test('asks for the chart rather than the page around it', () async {
       serve(site());

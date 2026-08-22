@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
+import 'package:webtrees_mobile/features/charts/chart_screen.dart';
 
 import '../../test/support/fake_webtrees.dart';
 import '../../test/support/test_app.dart';
@@ -153,7 +154,7 @@ Future<void> main() async {
     }
     // The charts are opened from the person rather than from the account
     // screen, so these steps rejoin the walk at step 3.
-    if (steps == 6 || steps == 7) {
+    if (steps >= 6) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
@@ -161,7 +162,21 @@ Future<void> main() async {
       await tester.pumpAndSettle();
       // Found by position rather than by label: the labels are translated
       // and this runs in both languages.
-      await tester.tap(find.byType(ActionChip).at(steps == 6 ? 0 : 1));
+      await tester.tap(
+        find.byType(ActionChip).at(switch (steps) {
+          7 => 1,
+          9 => 2,
+          _ => 0,
+        }),
+      );
+      await tester.pumpAndSettle();
+    }
+    // The fan is the ancestors chart bent round a circle: same fetch, same
+    // people, a different way of looking at them.
+    if (steps == 8) {
+      await tester.tap(find.byIcon(Icons.donut_small_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuItem<ChartView>).at(1));
       await tester.pumpAndSettle();
     }
 
@@ -272,6 +287,26 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 7,
+        );
+      });
+
+      testWidgets('fan chart $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-fan-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 8,
+        );
+      });
+
+      testWidgets('hourglass chart $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-hourglass-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 9,
         );
       });
     }

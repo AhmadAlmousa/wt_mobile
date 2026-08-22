@@ -244,6 +244,21 @@ class AppTextAr extends AppText {
   String get chartDescendants => 'أنسال';
 
   @override
+  String get chartHourglass => 'ساعة رملية';
+
+  @override
+  String get chartView => 'طريقة الرسم';
+
+  @override
+  String get chartViewTree => 'شجرة';
+
+  @override
+  String get chartViewCircle => 'دائرة';
+
+  @override
+  String get chartViewCompact => 'مدمجة';
+
+  @override
   String get openThisPerson => 'فتح صفحة الشخص';
 
   @override

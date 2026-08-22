@@ -345,4 +345,161 @@ ChartLayout layoutDescendants(
   );
 }
 
+/// Lays an ancestor chart out with generations running *upwards*.
+///
+/// The sideways pedigree is the better read on its own, but an hourglass has
+/// to stack: ancestors climbing away from the subject, descendants falling
+/// from them, and one person in the middle belonging to both halves.
+ChartLayout layoutAncestorsUpwards(
+  AncestorNode root, {
+  ChartMetrics metrics = const ChartMetrics(),
+}) {
+  final people = <ChartPlacement>[];
+  final edges = <ChartEdge>[];
+  final filled = <int, double>{};
+  final generations = root.depth;
+
+  double place(AncestorNode node, int generation) {
+    final y =
+        (generations - 1 - generation) *
+        (metrics.boxHeight + metrics.generationGap);
+
+    final parentCentres = [
+      for (final parent in node.parents) place(parent, generation + 1),
+    ];
+
+    final start = filled[generation] ?? 0;
+    var left = parentCentres.isEmpty
+        ? start
+        : (parentCentres.first + parentCentres.last) / 2 - metrics.boxWidth / 2;
+    if (left < start) left = start;
+
+    people.add(
+      ChartPlacement(
+        person: node.person,
+        topLeft: Offset(left, y),
+        generation: generation,
+        isSubject: generation == 0,
+      ),
+    );
+
+    for (final parentCentre in parentCentres) {
+      edges.add(
+        ChartEdge(
+          from: Offset(left + metrics.boxWidth / 2, y),
+          to: Offset(parentCentre, y - metrics.generationGap),
+        ),
+      );
+    }
+
+    filled[generation] = left + metrics.boxWidth + metrics.siblingGap;
+    return left + metrics.boxWidth / 2;
+  }
+
+  place(root, 0);
+
+  return ChartLayout(
+    metrics: metrics,
+    flow: ChartFlow.downwards,
+    people: people,
+    edges: edges,
+    size: Size(
+      (filled.values.fold(0.0, _larger) - metrics.siblingGap).clamp(
+        metrics.boxWidth,
+        double.infinity,
+      ),
+      generations * metrics.boxHeight +
+          (generations - 1) * metrics.generationGap,
+    ),
+  );
+}
+
+/// Lays one person's ancestors and descendants out around them.
+///
+/// The person appears once, in the middle, belonging to both halves — which
+/// is the whole point of an hourglass and the one thing stitching two charts
+/// together has to get right.
+ChartLayout layoutHourglass(
+  AncestorNode ancestors,
+  DescendantNode descendants, {
+  ChartMetrics metrics = const ChartMetrics(),
+}) {
+  final above = layoutAncestorsUpwards(ancestors, metrics: metrics);
+  final below = layoutDescendants(descendants, metrics: metrics);
+
+  final subjectAbove = above.people.firstWhere((person) => person.isSubject);
+  final subjectBelow = below.people.firstWhere((person) => person.isSubject);
+  final shift = subjectAbove.topLeft - subjectBelow.topLeft;
+
+  final people = <ChartPlacement>[
+    ...above.people,
+    // The subject is in both halves and drawn once, from the half that
+    // decided where the middle is.
+    for (final placement in below.people)
+      if (!placement.isSubject)
+        ChartPlacement(
+          person: placement.person,
+          topLeft: placement.topLeft + shift,
+          generation: placement.generation,
+          isSpouse: placement.isSpouse,
+        ),
+  ];
+  final edges = <ChartEdge>[
+    ...above.edges,
+    for (final edge in below.edges)
+      ChartEdge(
+        from: edge.from + shift,
+        to: edge.to + shift,
+        isCouple: edge.isCouple,
+      ),
+  ];
+
+  // The descendants may reach further left than the ancestors do, so the
+  // whole thing is nudged back onto the canvas rather than drawn off it.
+  final left = people.fold(
+    0.0,
+    (least, p) => p.topLeft.dx < least ? p.topLeft.dx : least,
+  );
+  final nudge = Offset(-left, 0);
+
+  final placed = [
+    for (final placement in people)
+      ChartPlacement(
+        person: placement.person,
+        topLeft: placement.topLeft + nudge,
+        generation: placement.generation,
+        isSubject: placement.isSubject,
+        isSpouse: placement.isSpouse,
+      ),
+  ];
+
+  return ChartLayout(
+    metrics: metrics,
+    flow: ChartFlow.downwards,
+    people: placed,
+    edges: [
+      for (final edge in edges)
+        ChartEdge(
+          from: edge.from + nudge,
+          to: edge.to + nudge,
+          isCouple: edge.isCouple,
+        ),
+    ],
+    size: Size(
+      placed.fold(
+        0.0,
+        (widest, p) => p.topLeft.dx + metrics.boxWidth > widest
+            ? p.topLeft.dx + metrics.boxWidth
+            : widest,
+      ),
+      placed.fold(
+        0.0,
+        (tallest, p) => p.topLeft.dy + metrics.boxHeight > tallest
+            ? p.topLeft.dy + metrics.boxHeight
+            : tallest,
+      ),
+    ),
+  );
+}
+
 double _larger(double a, double b) => a > b ? a : b;

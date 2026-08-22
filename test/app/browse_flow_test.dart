@@ -6,8 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
-
 import 'package:webtrees_mobile/domain/dates.dart';
+import 'package:webtrees_mobile/features/charts/fan_canvas.dart';
 
 import '../support/fake_webtrees.dart';
 import '../support/test_app.dart';
@@ -270,6 +270,9 @@ void main() {
 
     expect(find.widgetWithText(ActionChip, 'Ancestors'), findsOne);
     expect(find.widgetWithText(ActionChip, 'Descendants'), findsOne);
+    // An hourglass is not fetched at all: it is those two charts stacked, so
+    // it is offered exactly when both of them are.
+    expect(find.widgetWithText(ActionChip, 'Hourglass'), findsOne);
     // The site offers these two as well, and the app cannot draw either — a
     // button it could not honour would be a promise the next tap breaks.
     expect(find.textContaining('Fan'), findsNothing);
@@ -294,6 +297,48 @@ void main() {
       (request) => request.route == '/tree/main/ancestors-tree-4/X42',
     );
     expect(chart.query['ajax'], '1');
+  });
+
+  testWidgets('stacks an hourglass out of the two charts', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Hourglass'));
+    await tester.pumpAndSettle();
+
+    // A grandfather above and a granddaughter below, on one canvas, with the
+    // person they have in common drawn once between them.
+    expect(find.text('سالم الموسى'), findsOne);
+    expect(find.text('ريم الموسى'), findsOne);
+    expect(find.text('عبد الله الموسى'), findsOne);
+
+    expect(server.routes, contains('/tree/main/ancestors-tree-4/X42'));
+    expect(server.routes, contains('/tree/main/descendants-tree-3/X42'));
+    // webtrees offers an hourglass of its own; the app never asks for it.
+    expect(server.routes, isNot(contains('/tree/main/hourglass-3-0/X42')));
+  });
+
+  testWidgets('bends the ancestors round a circle when asked', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Ancestors'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FanCanvas), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.donut_small_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Circle'));
+    await tester.pumpAndSettle();
+
+    // The same fetch, the same people, a different way of looking at them.
+    expect(find.byType(FanCanvas), findsOne);
+    expect(
+      server.routes.where((route) => route.contains('ancestors-tree-4')),
+      hasLength(1),
+    );
   });
 
   testWidgets('walks from a chart to the person tapped on it', (tester) async {

@@ -20,13 +20,40 @@ final class ChartsRepository {
   final WebtreesClient _client;
   final ChartParser _parser;
 
+  /// Reads the two charts either side of a person and hands back both.
+  ///
+  /// webtrees draws its own hourglass, but the app never asks for it: that
+  /// page is a third layout of the same two families, and stitching the two
+  /// charts it already knows how to read costs one request more and no new
+  /// parser.
+  Future<ChartData> hourglass({
+    required String ancestorsUrl,
+    required String descendantsUrl,
+    required PersonRef subject,
+  }) async {
+    final up = await chart(ChartKind.ancestors, ancestorsUrl, subject: subject);
+    final down = await chart(
+      ChartKind.descendants,
+      descendantsUrl,
+      subject: subject,
+    );
+
+    return ChartData(
+      kind: ChartKind.hourglass,
+      subject: subject,
+      ancestors: up.ancestors,
+      descendants: down.descendants,
+    );
+  }
+
   /// Reads one chart for [subject], at the URL the site gave for it.
   Future<ChartData> chart(
     ChartKind kind,
     String url, {
     required PersonRef subject,
   }) async {
-    if (!ChartKind.drawable.contains(kind)) {
+    // The hourglass is stitched from the other two rather than fetched.
+    if (kind != ChartKind.ancestors && kind != ChartKind.descendants) {
       throw ParseFailure(
         parser: 'chart',
         expected: 'a chart this app can draw',

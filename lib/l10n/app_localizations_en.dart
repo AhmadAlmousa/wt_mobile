@@ -244,6 +244,21 @@ class AppTextEn extends AppText {
   String get chartDescendants => 'Descendants';
 
   @override
+  String get chartHourglass => 'Hourglass';
+
+  @override
+  String get chartView => 'How to draw it';
+
+  @override
+  String get chartViewTree => 'Tree';
+
+  @override
+  String get chartViewCircle => 'Circle';
+
+  @override
+  String get chartViewCompact => 'Compact';
+
+  @override
   String get openThisPerson => 'Open this person';
 
   @override

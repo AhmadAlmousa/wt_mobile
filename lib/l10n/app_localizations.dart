@@ -529,6 +529,36 @@ abstract class AppText {
   /// **'Descendants'**
   String get chartDescendants;
 
+  /// No description provided for @chartHourglass.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourglass'**
+  String get chartHourglass;
+
+  /// No description provided for @chartView.
+  ///
+  /// In en, this message translates to:
+  /// **'How to draw it'**
+  String get chartView;
+
+  /// No description provided for @chartViewTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tree'**
+  String get chartViewTree;
+
+  /// No description provided for @chartViewCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circle'**
+  String get chartViewCircle;
+
+  /// No description provided for @chartViewCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get chartViewCompact;
+
   /// No description provided for @openThisPerson.
   ///
   /// In en, this message translates to:

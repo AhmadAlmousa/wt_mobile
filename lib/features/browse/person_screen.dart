@@ -645,12 +645,7 @@ class _Charts extends StatelessWidget {
         children: [
           for (final kind in kinds)
             ActionChip(
-              avatar: Icon(
-                kind == ChartKind.ancestors
-                    ? Icons.account_tree_outlined
-                    : Icons.family_restroom_outlined,
-                size: 18,
-              ),
+              avatar: Icon(_iconFor(kind), size: 18),
               label: Text(chartTitle(kind, text)),
               onPressed: () => onOpen(kind),
             ),
@@ -659,6 +654,13 @@ class _Charts extends StatelessWidget {
     );
   }
 }
+
+/// The icon that stands for a chart.
+IconData _iconFor(ChartKind kind) => switch (kind) {
+  ChartKind.ancestors => Icons.account_tree_outlined,
+  ChartKind.hourglass => Icons.hourglass_empty,
+  _ => Icons.family_restroom_outlined,
+};
 
 /// Stands in for a photograph that is loading, missing or unreadable.
 class _PhotoPlaceholder extends StatelessWidget {

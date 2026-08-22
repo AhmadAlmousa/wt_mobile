@@ -46,7 +46,26 @@ enum ChartKind {
   static const Set<ChartKind> drawable = {
     ChartKind.ancestors,
     ChartKind.descendants,
+    ChartKind.hourglass,
   };
+
+  /// The charts the app can actually draw for a person, given what the site
+  /// offered for them.
+  ///
+  /// An hourglass is not fetched: it is the two charts either side of a
+  /// person, stacked. So a site that runs the hourglass module but not both
+  /// of those cannot have one drawn here, and is not offered it.
+  static List<ChartKind> drawnFrom(Map<ChartKind, String> offered) {
+    final halves =
+        offered.containsKey(ChartKind.ancestors) &&
+        offered.containsKey(ChartKind.descendants);
+
+    return [
+      for (final kind in drawable)
+        if (offered.containsKey(kind))
+          if (kind != ChartKind.hourglass || halves) kind,
+    ];
+  }
 
   /// The chart [cssClass] names, or null when it names none of them.
   static ChartKind? fromMenuClass(String cssClass) {
@@ -99,6 +118,16 @@ final class AncestorNode {
       yield* parent.everyone;
     }
   }
+
+  /// Everyone in the chart, by their Sosa number.
+  ///
+  /// Safe as a key where a person is not: the numbering is derived from where
+  /// somebody sits, so a tree that folds back on itself — cousins marrying,
+  /// which is ordinary in this family — holds one person under two numbers,
+  /// exactly as a pedigree should.
+  Map<int, AncestorNode> get bySosa => {
+    for (final node in everyone) node.sosa: node,
+  };
 
   /// How many generations this chart actually holds, the subject counting as
   /// one — which is rarely the number that was asked for, because a tree runs

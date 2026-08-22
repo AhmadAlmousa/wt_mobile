@@ -345,6 +345,13 @@ is the **shape** — who descends from whom — and draws it again.
   own tree is a family where that is ordinary — so anything that looked a box
   up by person rather than remembering where it placed it would find the wrong
   one of them.
+- **Not every chart is a fetch.** A fan chart is an ancestors chart bent round
+  a circle, a compact chart is the same one with smaller boxes, and an
+  hourglass is the two charts either side of a person stitched at the middle.
+  webtrees renders all three itself; asking for them would mean three more
+  parsers describing families the app has already read. What is fetched and
+  what is drawn are therefore different sets — a distinction the live check
+  learned the hard way (§7, bug 22).
 
 ### Languages
 
@@ -500,7 +507,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **4a** | Getting out of the way — resume, one-tree, back stack, calendar choice | ✅ |
 | **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
 | **6a** | Charts: discovery, ancestors and descendants, drawn natively | ✅ |
-| **6b** | Charts: fan/circle, hourglass, compact — the same data, redrawn | ⬜ |
+| **6b** | Charts: fan/circle, compact, hourglass — the same data, redrawn | ✅ |
 | **6c** | Tools: relationships, timeline, lifespans, statistics | ⬜ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
@@ -515,8 +522,9 @@ from a box to the person.
 | Ancestry, Pedigree | the ancestors chart, read from its nesting | ✅ 6a |
 | Descendancy | the descendants chart, read from its nesting | ✅ 6a |
 | Interactive | not a fetch: pan, zoom, and tap to redraw around anyone | ✅ 6a |
-| Circle (fan), Compact | the same ancestors data, laid out differently | 6b |
-| Hourglass, Family book | ancestors *and* descendants of one person, together | 6b |
+| Circle (fan), Compact | the same ancestors data, laid out differently | ✅ 6b |
+| Hourglass | ancestors *and* descendants of one person, stitched at the subject | ✅ 6b |
+| Family book | the hourglass with every spouse's family drawn too | 6c |
 | Relationships | the server's own path between two people; its grid layout has to be walked | 6c |
 | Timeline | positioned event boxes, with the years in a `<script>` beside them | 6c |
 | Lifespan | years per person, which means reading numerals the server localized | 6c |
@@ -688,6 +696,43 @@ thirteen charts that instance offers and reads two of them: seven people over
 four generations of ancestors, nine people over three of descendants. The
 previews walk into both charts, in both languages and both themes.
 
+### 2026-08-22 (later still) — Phase 6b: the same family, three more ways
+
+Three more of the charts on webtrees' list, and not one of them cost a
+request: a fan is the ancestors chart bent round a circle, a compact chart is
+the same one with the photographs traded for smaller boxes, and an hourglass
+is the two charts either side of a person stitched where they meet.
+
+**A fan is geometry, and geometry is testable.** `fan_layout.dart` answers
+which slice of which ring a person occupies, and `FanLayout.at` answers the
+opposite question — who is under this finger — from a radius and an angle.
+Both are arithmetic, so both are tested without pumping a frame: that the
+father's line takes the right-hand half, that each generation's slice is
+exactly half its child's, that a tap outside the outermost ring finds nobody,
+and that an ancestor the tree does not record leaves their slice **empty**
+rather than letting the chart close the gap. A fan that rearranged itself
+around a missing great-grandmother would be saying something the tree does
+not.
+
+**Ring width is a legibility decision, not a spacing one.** The first fan
+gave each ring 58 pixels, which fits `محمد ال…` and tells the reader nothing
+they did not already know. Names run along the radius, so the ring has to be
+as wide as a family name is long.
+
+**The hourglass had one thing to get right.** Both halves contain the person
+in the middle, and stitching two charts is exactly where a second copy of
+somebody comes from. The subject is drawn once, from the half that decided
+where the middle is, and the other half is translated to meet it.
+
+**What the app fetches and what it draws are different sets.** The live check
+learned this by asking `tree.almou.sa` for an hourglass — a chart the app
+never requests — and being refused by its own repository (§7, bug 22).
+
+Released as **0.5.0**. **350 tests** green (331 → 350), analyzer clean, and
+the live check reads both charts and the hourglass stitched from them against
+`tree.almou.sa`. The previews now walk into four charts in each language and
+theme.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -716,6 +761,7 @@ previews walk into both charts, in both languages and both themes.
 | 19 | A lifespan rendered `1940–1875` in Arabic — bidi reordering a run of digits | **Rendered preview** |
 | 20 | The calendar escape was read from a decoded URL, whose `#` swallowed the query | **Parser test** |
 | 21 | Submitting a search left its debounce pending, so every search ran twice | **Widget test** |
+| 22 | The live check asked the server for a chart the app never fetches | **Live run only** |
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -734,6 +780,13 @@ the wrong version's template and agreed with a parser that never looked.
 Bugs 18 and 19 are the two the tests could not have been expected to catch
 from copy alone: one needed the system back button simulated, the other needed
 somebody to look at a picture.
+
+Bug 22 is small and the lesson is not: "charts the app can draw" and "charts
+the app fetches" became different sets the moment an hourglass was stitched
+from two others, and a loop written when they were the same set went on
+asking a real server for a page nothing would ever parse. The unit tests were
+green — they know what the app draws — and only a live run put the question
+to a site.
 
 Bug 21 had been there since search was written and cost only a duplicate
 request, which is why nothing noticed. Paging gave it teeth: the second,
@@ -1017,14 +1070,14 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 331 tests
+flutter test          # 350 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
-# ancestors and descendants charts.
+# ancestors, descendants, fan and hourglass charts.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 

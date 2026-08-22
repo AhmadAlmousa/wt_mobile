@@ -302,7 +302,9 @@ Future<void> main(List<String> args) async {
           client,
           version: instance.version,
         );
-        for (final kind in ChartKind.drawable) {
+        // Only the two charts that are actually fetched: an hourglass is
+        // stitched from them, and is checked on its own below.
+        for (final kind in const [ChartKind.ancestors, ChartKind.descendants]) {
           if (person.charts[kind] == null) {
             stdout.writeln(
               '  SKIP  this site does not run the ${kind.name} chart',
@@ -336,6 +338,33 @@ Future<void> main(List<String> args) async {
             '${drawn.xref}: ${chart.size} people, '
                 '${_generationsIn(chart)} generations',
             ok: chart.size > 1,
+          );
+        }
+
+        // An hourglass is not a fetch of its own: it is the two charts either
+        // side of a person, stitched. Worth checking live all the same,
+        // because it is the one chart whose halves have to agree about who
+        // is in the middle.
+        final up = person.charts[ChartKind.ancestors];
+        final down = person.charts[ChartKind.descendants];
+        if (up == null || down == null) {
+          stdout.writeln(
+            '  SKIP  this site does not run both halves of an '
+            'hourglass',
+          );
+        } else {
+          final hourglass = await chartRepository.hourglass(
+            ancestorsUrl: up,
+            descendantsUrl: down,
+            subject: PersonRef(xref: person.xref, name: person.name),
+          );
+          report(
+            'hourglass',
+            '${hourglass.ancestors?.everyone.length ?? 0} above, '
+                '${hourglass.descendants?.everyone.length ?? 0} below',
+            ok:
+                hourglass.ancestors?.person.xref == person.xref &&
+                hourglass.descendants?.person.xref == person.xref,
           );
         }
 
