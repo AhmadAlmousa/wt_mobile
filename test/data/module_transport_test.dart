@@ -379,6 +379,37 @@ void main() {
       expect(stock.calls, ['search']);
     });
 
+    test(
+      'statistics stay on the page even where the module offers them',
+      () async {
+        // Coverage, not correctness. Both transports agree on every figure they
+        // both state — checked live on 2.2.6 and 2.3 — but a statistics page
+        // publishes seventeen sections where the module answers four, so
+        // preferring it would cost a reader thirteen sections of their own
+        // tree. `treeCharts` decides which transport reads them, because a
+        // chart handle only means something to whoever minted it.
+        final stock = _RecordingTransport('stock');
+        final module = _RecordingTransport('module');
+
+        final composed = CapabilityRecordsTransport(
+          stock: stock,
+          module: module,
+          capabilities: ModuleCapabilities(
+            apiVersion: 1,
+            moduleVersion: '1.1.0',
+            webtreesVersion: '2.2.6',
+            features: const {Capability.statistics, Capability.individual},
+            languages: const {},
+          ),
+        );
+
+        await composed.treeCharts('main');
+
+        expect(stock.calls, ['treeCharts']);
+        expect(module.calls, isEmpty);
+      },
+    );
+
     test('with no module at all, everything is HTML', () async {
       final stock = _RecordingTransport('stock');
 

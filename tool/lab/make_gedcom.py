@@ -68,6 +68,7 @@ def individual(
     shared_note: str | None = None,
     source: tuple[str, str] | None = None,
     media: str | None = None,
+    fact_media: str | None = None,
 ) -> None:
     out(0, f"@{xref}@", "INDI")
     out(1, "NAME", f"{given} /{surname}/")
@@ -104,6 +105,11 @@ def individual(
         # row the notes tab collapses and marks differently from the rest.
         if note is not None:
             out(2, "NOTE", note)
+        # Media hanging off the fact rather than off the person: the
+        # `tr.wt-level-two-media` row, whose `th.rela` carries *that fact's*
+        # label and no `.wt-fact-label` at all (PROJECT.md §3).
+        if fact_media is not None:
+            out(2, "OBJE", f"@{fact_media}@")
 
     if death is not None:
         out(1, "DEAT")
@@ -188,6 +194,7 @@ def build() -> None:
         shared_note="N1",
         source=("S1", "الصفحة ٤٢"),
         media="M1",
+        fact_media="M2",
         note="سُجّل الميلاد بعد سنة من وقوعه.",
     )
     # His sister, who marries into the other branch — which is what makes a
@@ -257,11 +264,26 @@ def build() -> None:
     out(1, "NAME", "الأرشيف الوطني")
     out(1, "ADDR", RIYADH)
 
+    # Two media objects, and the difference between them is deliberate.
+    #
+    # A photograph is a JPEG, which is what a family album holds and what both
+    # webtrees versions serve. A scanned certificate is a PNG, which webtrees
+    # 2.3 cannot make a thumbnail of at all: `ImageFactory::autoRotateImage()`
+    # calls `exif_read_data()` on every image, PHP warns "File not supported"
+    # for anything that is not a JPEG or a TIFF, and webtrees' own error
+    # handler turns a warning into a 500. So the PNG is here to keep that
+    # visible rather than to be avoided (PROJECT.md §7, bug 44).
     out(0, "@M1@", "OBJE")
-    out(1, "FILE", "lab-portrait.png")
-    out(2, "FORM", "png")
+    out(1, "FILE", "lab-portrait.jpg")
+    out(2, "FORM", "jpeg")
     out(2, "TYPE", "photo")
     out(2, "TITL", "صورة عبد الله")
+
+    out(0, "@M2@", "OBJE")
+    out(1, "FILE", "lab-record.png")
+    out(2, "FORM", "png")
+    out(2, "TYPE", "document")
+    out(2, "TITL", "شهادة الميلاد")
 
     out(0, "@SUB1@", "SUBM")
     out(1, "NAME", "lab")

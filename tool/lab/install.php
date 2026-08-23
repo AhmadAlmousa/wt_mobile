@@ -187,6 +187,26 @@ if (!$tree->imported()) {
     exit(1);
 }
 
+// The photograph the GEDCOM's OBJE points at. A media *record* without a
+// file on disk is a media tab with nothing in it: webtrees renders the record
+// and `MediaFileThumbnail` answers 404 for the bytes, so the whole
+// authenticated-image path — the signed URL, `canShow()` before the
+// signature, the watermark decision — is never reached. Writing one file is
+// the difference between "this site runs the media module" and "this site has
+// a photograph in it", and until now no lab had the second.
+//
+// Drawn rather than shipped, so nothing binary lives in the repository and
+// nothing depicts a real person. Written through the tree's own filesystem,
+// because the media folder is a `media_folder` column since schema 45 and
+// `mediaFilesystem()` is what reads it correctly in both versions.
+//
+// Two files, and the second format is the point: a JPEG photograph, which
+// both versions serve, and a PNG scan, which 2.3 answers `500` for — see
+// `labDocument()` below.
+$tree->mediaFilesystem()->write('lab-portrait.jpg', labPortrait());
+$tree->mediaFilesystem()->write('lab-record.png', labDocument());
+say('media files', $tree->mediaFolder() . '{lab-portrait.jpg, lab-record.png}');
+
 say('counts', sprintf(
     '%d individuals, %d families, %d sources, %d media',
     DB::table('individuals')->where('i_file', '=', $tree->id())->count(),
@@ -198,4 +218,83 @@ say('counts', sprintf(
 function say(string $label, string $value): void
 {
     printf("  %-10s %s\n", $label, $value);
+}
+
+/**
+ * A portrait-shaped photograph of nobody: a head and shoulders in flat colour.
+ *
+ * Big enough (480×640) that a thumbnail request is a real downscale rather
+ * than an upscale, and lit from one side so a resized copy is visibly the
+ * same picture rather than a flat rectangle that would look identical at any
+ * size. **JPEG**, because that is what a family album holds — and because it
+ * is the only format webtrees 2.3 can make a thumbnail of; see below.
+ */
+function labPortrait(): string
+{
+    $width  = 480;
+    $height = 640;
+    $image  = imagecreatetruecolor($width, $height);
+
+    $backdrop = imagecolorallocate($image, 214, 203, 180);
+    $shadow   = imagecolorallocate($image, 188, 174, 148);
+    $figure   = imagecolorallocate($image, 92, 78, 62);
+    $lit      = imagecolorallocate($image, 122, 104, 82);
+
+    imagefilledrectangle($image, 0, 0, $width, $height, $backdrop);
+    imagefilledellipse($image, (int) ($width * 0.75), (int) ($height * 0.25), 360, 360, $shadow);
+
+    // Shoulders, then the head over them, then a lit edge down the left of
+    // each — the whole point of the picture is that it survives being resized.
+    imagefilledellipse($image, (int) ($width / 2), (int) ($height * 1.05), 460, 620, $figure);
+    imagefilledellipse($image, (int) ($width / 2) - 6, (int) ($height * 1.05), 430, 600, $lit);
+    imagefilledellipse($image, (int) ($width / 2), (int) ($height * 0.38), 250, 300, $figure);
+    imagefilledellipse($image, (int) ($width / 2) - 8, (int) ($height * 0.38), 230, 280, $lit);
+
+    ob_start();
+    imagejpeg($image, null, 88);
+    $jpeg = (string) ob_get_clean();
+    imagedestroy($image);
+
+    return $jpeg;
+}
+
+/**
+ * A scanned certificate: ruled lines on paper, as a PNG.
+ *
+ * The format is the reason it exists. webtrees 2.3 added
+ * `ImageFactory::autoRotateImage()`, which calls `exif_read_data()` on every
+ * image it resizes; PHP raises `E_WARNING: File not supported` for anything
+ * that is not a JPEG or a TIFF, and `Http\Middleware\ErrorHandler` turns any
+ * un-silenced warning into an exception. So **every non-JPEG thumbnail on 2.3
+ * is a 500** — on the website as much as here. 2.2.6 has no such call and
+ * serves the same file.
+ *
+ * A lab that held only JPEGs would have shown a media tab working perfectly
+ * on both versions and hidden that from everyone.
+ */
+function labDocument(): string
+{
+    $width  = 600;
+    $height = 420;
+    $image  = imagecreatetruecolor($width, $height);
+
+    $paper = imagecolorallocate($image, 238, 233, 220);
+    $ink   = imagecolorallocate($image, 96, 88, 74);
+    $rule  = imagecolorallocate($image, 202, 194, 176);
+
+    imagefilledrectangle($image, 0, 0, $width, $height, $paper);
+    imagerectangle($image, 18, 18, $width - 19, $height - 19, $ink);
+
+    for ($y = 90; $y < $height - 60; $y += 46) {
+        imagefilledrectangle($image, 56, $y, $width - 57, $y + 3, $rule);
+    }
+
+    imagefilledrectangle($image, 56, 48, 300, 58, $ink);
+
+    ob_start();
+    imagepng($image, null, 6);
+    $png = (string) ob_get_clean();
+    imagedestroy($image);
+
+    return $png;
 }

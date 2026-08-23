@@ -270,6 +270,18 @@ anonymous `/my-account`.
   validating the signature, and picks watermarking per user. Images must
   therefore be fetched through the authenticated session, and any cache
   partitioned by site and account and cleared on sign-out.
+- **webtrees 2.3 cannot make a thumbnail of anything that is not a JPEG.**
+  2.3 added `ImageFactory::autoRotateImage()`, which calls `exif_read_data()`
+  on every image it resizes (`app/Factories/ImageFactory.php:388`). PHP raises
+  `E_WARNING: File not supported` for a PNG, a GIF or a WebP, and
+  `Http\Middleware\ErrorHandler` turns any un-silenced warning into an
+  exception — so the request answers **`500`**, on the website as much as in
+  this app. 2.2.6 has no such call and serves the same file. Confirmed by
+  requesting one URL twice with the same bytes stored first as a PNG and then
+  as a JPEG: `500`, then `200`. **Worth reporting upstream**, and the reason
+  the lab now holds one of each (§7, bug 44). The app already degrades
+  correctly — `AuthenticatedImage` draws the placeholder for a photo it cannot
+  fetch — which is why nothing had ever noticed.
 - **A record URL redirects when the slug is absent.** The route is
   `/individual/{xref}{/slug}`, and the handler compares the given slug against
   one derived from the record's current name, answering `301` to the canonical
@@ -860,6 +872,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **8a** | The server module — a read-only JSON API, and the transports to use it | ✅ |
 | **8b** | The lab: 2.2.6 and 2.3 installs, the module running, both transports diffed | ✅ — then against the real tree, see §9 #18 |
 | **8c** | What a reader saw: family facts, the mourning ribbon, the whole chart, a PDF drawn as shapes | ✅ |
+| **8d** | The capability ledger: every remaining capability diffed transport against transport, and a lab with a photograph in it | ✅ — nine cleared, `statistics` deliberately not |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -892,20 +905,42 @@ against an untouched instance. "Cleared" means the capability composer may
 prefer the module where one is installed, which it already does automatically;
 the parser behind it stays, fixtures and all, and stays tested.
 
-| Capability | Both transports agree | Cleared |
-|---|---|---|
-| `access` | 2.2.6 · 2.3 — account, admin, tree count, role | ✅ |
-| `individual` | 2.2.6 · 2.3 — name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, **family events**, dates in both calendars | ✅ |
-| `individuals` | 2.2.6 · 2.3 — same result count for the same query | ✅ |
-| `family`, `ancestors`, `descendants`, `relationship`, `timeline`, `statistics`, `media`, `notes`, `sources` | answer identically on both, but are not yet diffed against the stock path field by field | ⬜ |
+| Capability | What both transports were asked | Evidence | Cleared |
+|---|---|---|---|
+| `access` | account, admin, tree count, role, own record | the real tree | ✅ |
+| `individual` | name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, family events, dates in both calendars | the real tree | ✅ |
+| `individuals` | same result count for the same query; enumeration | the real tree | ✅ |
+| `notes`, `sources` | how many of each a record carries, and which hang off a fact | both labs | ✅ |
+| `media` | how many items, which are on a fact, and the bytes of every thumbnail | both labs | ✅ |
+| `family` | each family's membership by xref — kind, spouses, children | both labs | ✅ |
+| `ancestors`, `descendants` | how many people, how many generations, and **the shape**: who sits at which Sosa or d'Aboville number | both labs | ✅ |
+| `relationship` | how many paths, the site's own phrase for the whole relationship, and each step's word and person | both labs | ✅ |
+| `timeline` | which events, in what order | both labs | ✅ |
+| `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | both labs | ❌ **read from the page** |
 
-Cleared against **`tree.almou.sa` itself** — the real 1,463-person tree, with
-the module installed there — as well as against both labs. The two records that
-disagreed there are bugs 36 and 37, both fixed, and nothing else differed.
+Three of those were cleared against **`tree.almou.sa` itself** — the real
+1,463-person tree with the module installed — and the two records that
+disagreed there are bugs 36 and 37, both fixed. The rest are cleared against
+**both labs on both webtrees versions**, fourteen records each, which is the
+strongest evidence available for them today: the target site runs neither
+notes, sources nor media, so no real server has ever published one of those to
+either transport, and the diffs for a family's membership, a chart's shape, a
+path and a timeline were written this session and have never been run against
+1,463 people. Running them there is the next thing worth doing.
 
-Still not exercised on real data, and so still uncleared: the notes, sources
-and media capabilities (this site runs none of those three tab modules), a
-manager's or editor's view, and pending edits. §9 #18 carries the rest.
+Clearing them cost three fixes, all found the first time the two were asked
+the same question (§7, bugs 45–47): the module's relationship description was
+the bare kinship word where the page writes the site's own *"Relationship: X"*;
+its timeline had dropped both the calendar conversion and the couple a
+marriage belongs to, so a man's two marriages were two identical rows; and the
+app was preferring the module for statistics, which shows less.
+
+**`statistics` is the one capability the app reads from the page on purpose.**
+Not a disagreement — every figure both state matches — but the module sends a
+chosen set where the page publishes everything the site computes. The rule
+lives in `Capability.readFromThePage`, and the diagnostics screen reads the
+same rule, so it reports where a figure actually came from. It moves when the
+endpoint covers the page.
 
 **Exit criteria**
 
@@ -1804,6 +1839,67 @@ half. Goldens catch regressions in what has been looked at; nothing here makes
 anybody look at something new. A device (§9 #13) and the habit of opening the
 app after changing it are still the only things that do.
 
+### 2026-08-23 (later still) — the capabilities nobody had compared
+
+Phase 8b cleared three capabilities of twelve and left the ledger in §5 saying
+so. Nine sat at ⬜ — not because anything was wrong with them, but because
+nothing had ever asked both transports the same question about them. This
+closes that, and it cost four bugs, one of them webtrees' own.
+
+**It started with a file that did not exist.** The lab's GEDCOM had declared a
+media object since the lab was written — `@M1@ OBJE`, pointing at
+`lab-portrait.png` — and `wt_media_file` held the row, and the media tab
+rendered it. There was no image on disk. So `MediaFileThumbnail` had never run
+in this project's whole history: not the signed URL, not `canShow()` before
+the signature, not the watermark decision, and not `AuthenticatedImage` or
+`MediaCache` on the app's side. §9 #1 had blamed the *data* — the target site
+runs none of the three optional tabs — and it was half right. The labs run all
+three, and one generated PNG was the difference between "this site runs the
+media module" and "this site has a photograph in it".
+
+**Then the PNG turned out to be a 500 on 2.3.** Not the app's: webtrees 2.3
+added `ImageFactory::autoRotateImage()`, which calls `exif_read_data()` on
+every image it resizes, and PHP warns `File not supported` for anything that
+is not a JPEG or a TIFF — which webtrees' own `ErrorHandler` turns into an
+exception. Proved by storing the same picture twice at the same URL: as a PNG,
+`500`; as a JPEG, `200`. It breaks the website's own media tab, and it is
+worth reporting upstream (§7, bug 44). The lab now holds one of each on
+purpose, and the check reports the failure rather than tolerating it silently.
+The app was already right: a photo it cannot fetch draws the placeholder.
+
+**With a real photograph and real notes, the diffs could be written.**
+`comparePerson` now compares the notes, the citations, the media items, which
+of them hang off a fact rather than off the person, and each family's
+membership by xref. A new section compares what nothing had compared: the
+ancestors and descendants charts by size, depth and **shape** — who sits at
+which Sosa or d'Aboville number, which is also a check on the app's own
+derivation of those numbers against the server's — the relationship by path
+count and by the words on each step, the timeline by which events and in what
+order, and the statistics by the figures both state.
+
+**Three of the four faults were the module's, and each was a reader's
+problem rather than a value's.** Its relationship path was headlined `أب`
+where the page writes the site's own `Relationship: أب`. Its timeline had
+dropped the calendar conversion — `١٩٧٤` where every other module payload says
+`١٩٧٤ (١٣٩٤)` — and the couple a marriage belongs to, so a man's two marriages
+were two identical rows on a chart that exists to tell them apart.
+
+**And one changed a rule.** The module's statistics endpoint answers four
+sections and eight datasets; a statistics page publishes seventeen and
+fifteen. Both agree on every figure they state — the module is not wrong, it
+says less — and the app had been preferring it, so installing the module cost
+a reader thirteen sections of their own tree. Preferring the module is now
+conditional on it knowing *more*, in one place (`Capability.readFromThePage`),
+which the diagnostics screen reads too: a screen whose whole job is to say
+which transport answered must not say "Module" for something the module no
+longer answers.
+
+Released as **0.16.0**. **543 tests** green (541 → 543), analyzer clean, and
+`tool/live_check.dart --sample 14` passes against **both** labs on both
+webtrees versions: fourteen records walked, no differences, every capability
+diff green. Nine capabilities move to ✅ in §5 and `statistics` moves to a
+deliberate ❌.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -1854,6 +1950,24 @@ app after changing it are still the only things that do.
 | 41 | The mourning ribbon was a parallelogram that stopped short of both borders, so at 40 pixels it read as a black smudge floating over a corner rather than as a ribbon | **Reading the screen** |
 | 42 | Sharing a chart captured the **viewport**: the `RepaintBoundary` was around `ChartCanvas`, whose build returns the `InteractiveViewer`, so what reached the file was the part of the family on screen at whatever the reader had pinched to | **Reading the screen** |
 | 43 | A chart shape the app draws with its own painter — the fan — had no capture boundary at all, so sharing one could only ever have failed | Found while fixing 42 |
+| 44 | webtrees **2.3** answers `500` for the thumbnail of any non-JPEG. `ImageFactory::autoRotateImage()` calls `exif_read_data()` on every image, PHP warns for a PNG, and webtrees' own error handler turns a warning into an exception — so a scanned certificate breaks on the website too | **Putting a file on disk in the lab** |
+| 45 | The module's relationship `description` was the bare kinship word — `أب` — where the page writes the site's own `Relationship: %s`, so the two transports headlined the same path differently | **The capability diff, on its first run** |
+| 46 | The module's timeline had dropped the calendar conversion *and* the couple: `١٩٧٤` where the page says `١٩٧٤ (١٣٩٤)`, and two marriages with nothing to tell them apart | **The capability diff, on its first run** |
+| 47 | The app preferred the module for statistics, which answers four sections where the page publishes seventeen — and the diagnostics screen, whose job is to say which transport answered, said "Module" for a capability the module was about to be taken off | **The capability diff, on its first run** |
+
+Bugs 44–47 are what happens when the two transports are asked the same
+question about the capabilities nobody had compared yet. Three are the
+module's and one is webtrees' own — and 44 could only ever have been found by
+a lab with a *file* in it: the GEDCOM had declared a media object since the
+lab was written, the media tab had rendered it, and nothing had ever asked for
+the bytes, because there were none.
+
+47 is the one that changes a rule rather than a value. Every figure the two
+transports both state agrees; the module simply sends **less**. So "the module
+is faster and more truthful" is not enough on its own to prefer it — the test
+is whether it knows *more*, and where it knows less the page answers. That now
+lives in one place, `Capability.readFromThePage`, because the diagnostics
+screen has to state the same answer the transports act on.
 
 Bugs 40–43 were all found the same way: **somebody looked at the screen.** Not
 one of them was visible to 509 green tests, to `live_check`, to the module's
@@ -2272,15 +2386,22 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # Diffs name, sex, death, every relative count, the primary facts, the GEDCOM
 # tags, the family events and a date in both calendars. Family events are
 # there because they were once the only thing that differed (§7, bug 40).
+# Then the capabilities the ledger in §5 had never compared: the notes, the
+# citations, the media items and which of them hang off a fact; each family's
+# membership by xref; the ancestors and descendants charts by size, depth and
+# *shape*; the relationship by its wording and its steps; the timeline by
+# which events and in what order; and the statistics by the figures both
+# state — with coverage reported beside them, because a transport can be
+# right and still say less (§9 #23).
 
-flutter test          # 541 tests
+flutter test          # 543 tests
 flutter analyze       # must stay clean
 dart format lib test tool   # CI fails if this changes anything
 
 # Pictures of the parts a person judges rather than asserts on: avatars with
 # and without the mourning ribbon, a person in a list, a parted couple, the
 # message panels — each in both directions and both themes. Tagged, so the
-# other 527 can run without them and a red golden is never confused for a
+# other 529 can run without them and a red golden is never confused for a
 # wrong value.
 flutter test --tags golden
 flutter test --exclude-tags golden
@@ -2294,7 +2415,10 @@ python3 tool/check_module.py [../webtrees]
 find server -name '*.php' -print0 | xargs -0 -n1 php -l
 
 # Then actually run it. Two throwaway installs on SQLite, the module symlinked
-# into each, and a synthetic Arabic tree in which every person is invented.
+# into each, and a synthetic Arabic tree in which every person is invented —
+# notes, a citation, and two media files drawn by the installer: a JPEG
+# photograph, and a PNG scan that webtrees 2.3 refuses to thumbnail at all
+# (§7, bug 44). Both are why the media path has ever run.
 # Requires: php8.4-cli php8.4-{sqlite3,mbstring,intl,gd,xml,curl,zip} composer
 tool/lab/setup.sh 2.2.6 8622
 tool/lab/setup.sh main  8623
@@ -2343,19 +2467,19 @@ Both tools read the password from the terminal with echo disabled, or from
 
 ## 9. Open questions and risks
 
-1. **Notes, sources and photographs have never been seen from a real site.**
-   `tree.almou.sa` runs none of those three tab modules — it offers
-   `personal_facts`, `relatives`, `tree`, `places` and `_vytux_cousins_` — and
-   although its own statistics report **86 media objects, 83 of them
-   photographs**, not one is visible to this account: no highlighted thumbnail
-   appears on any of 50 people searched, and `/tree/main/media-list` renders
-   none either. So
-   `parseNotes`, `parseSources`, `parseMedia`, `AuthenticatedImage`,
-   `MediaCache` and the `canShow()`-before-signature rule that motivated them
-   stand on fixtures transcribed from the upstream templates and nothing else.
-   Needs an instance that runs those modules and holds media. This is a gap in
-   the *data* available, not in the code — but it is the largest untested
-   surface the app now has.
+1. **Notes, sources and photographs have been read, but only from a lab.**
+   *(Narrowed 2026-08-23.)* Both labs run all three optional tabs and now hold
+   two media files — a JPEG photograph and a PNG scan — so `parseNotes`,
+   `parseSources`, `parseMedia`, `AuthenticatedImage`, `MediaCache` and the
+   `canShow()`-before-signature rule have all run against a real webtrees for
+   the first time, on both versions, and agree with the module field for
+   field. What is still true is that no *real* server has ever published one:
+   `tree.almou.sa` runs none of the three tab modules, and although its own
+   statistics report **86 media objects, 83 of them photographs**, this
+   account can see none of them. So the parsers stand on a synthetic tree and
+   the upstream templates, and a site that keeps its media differently — an
+   external URL, a folder per person, a watermark — has never been met.
+
 2. **A divorce has never been seen from a real server.** Sex, death and the
    tag dictionary were all confirmed against `tree.almou.sa` on 2026-08-23
    (§3), but that tree records no divorce on any record the live check
@@ -2528,6 +2652,12 @@ Both tools read the password from the terminal with echo disabled, or from
    version (34). All three are fixed, and none was visible to 508 tests or to
    the 2.2.6 instance the project was built against. Assume there are more, and
    that the only thing that finds them is running against both.
+   **A fourth is not the app's at all** (bug 44): 2.3 answers `500` for the
+   thumbnail of any non-JPEG, because `autoRotateImage()` reads EXIF from
+   everything and webtrees turns PHP's warning into an exception. Nothing here
+   can fix that — the app already draws the placeholder — but it means a 2.3
+   site with PNG or GIF media shows a gallery of placeholders, and it is worth
+   reporting upstream.
 21. **The module's surname index and enumeration have never met a large tree.**
    `searchIndividualNames()` walks a PHP cursor rather than a SQL `LIMIT`, so
    a deep offset is `O(offset)`; `searchIndividualsAdvanced()` fetches a whole
@@ -2551,6 +2681,22 @@ Both tools read the password from the terminal with echo disabled, or from
    would have frozen bug 41's smudge as correct. So the other half stands, and
    the only things that close it are a device (see 13) and the habit of
    opening the app after changing it.
+23. **A transport can be *right* and still say less.** The module's statistics
+   endpoint agrees with the page on every figure it states and sends a quarter
+   of the sections; the app had been preferring it, and nothing noticed until
+   the two were asked the same question (§7, bug 47). Correctness diffs cannot
+   see this — both answers are true — so the rule is now explicit
+   (`Capability.readFromThePage`) and `live_check` reports coverage beside
+   every capability it compares. Assume the same shape exists elsewhere: a
+   payload that is accurate, narrower than the page, and preferred anyway.
+   The timeline was the other half of it and was fixed rather than demoted
+   (bug 46).
+24. **The module fixtures are still written from the design.**
+   `test/fixtures/module/` was transcribed from `api_eval.md` §7 rather than
+   captured from a server, which is why bug 40 survived everything — and the
+   labs can now produce the real thing for a family whose every member is
+   invented, so there is nothing left to sanitize. Capturing them is the
+   cheapest remaining way to move a live-only check into the offline suite.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

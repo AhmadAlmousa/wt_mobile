@@ -161,8 +161,17 @@ final class Relationship implements RequestHandlerInterface
 
         return [
             // The whole relationship as one phrase, which no client should
-            // try to compose from the steps.
-            'description' => Text::of($this->relationship_service->nameFromPath($nodes, $language)),
+            // try to compose from the steps — and phrased the way webtrees
+            // phrases it above its own chart:
+            // `RelationshipsChartModule` writes
+            // `I18N::translate('Relationship: %s', $relationship)`, which is
+            // the string the HTML transport reads out of that `<h3>`. Sending
+            // the bare name instead made the two transports disagree about a
+            // heading a reader sees (PROJECT.md §7, bug 45).
+            'description' => I18N::translate(
+                'Relationship: %s',
+                Text::of($this->relationship_service->nameFromPath($nodes, $language)),
+            ),
             'steps'       => $steps,
         ];
     }

@@ -29,6 +29,32 @@ abstract final class Capability {
   static const String relationship = 'relationship';
   static const String timeline = 'timeline';
   static const String statistics = 'statistics';
+
+  /// What the app reads from the page even where the module offers it.
+  ///
+  /// Coverage, not correctness. A statistics *page* publishes everything the
+  /// site computes — seventeen sections and fifteen charts on both lab
+  /// installs — while the module answers a chosen four and eight. Both agree
+  /// on every figure they state, checked live on 2.2.6 and 2.3, so this is
+  /// not a disagreement: the module simply says less, and preferring it would
+  /// cost a reader thirteen sections of their own tree.
+  ///
+  /// The composer working as designed rather than an exception to it: the
+  /// module is preferred where it knows *more* — a fact's GEDCOM tag, a role,
+  /// a date's calendar — and the floor answers where it knows less. Revisit
+  /// when the endpoint covers the page; `PROJECT.md` §5 is the ledger.
+  static const Set<String> readFromThePage = {statistics};
+
+  /// Whether the module answers this capability for this site.
+  ///
+  /// The one place the rule lives, because the diagnostics screen has to
+  /// state the same answer the transports act on — "the module is installed"
+  /// and "this screen used the module" are different questions, and the
+  /// second one is what a reader wondering about a figure actually needs.
+  static bool prefersModule(
+    String capability,
+    ModuleCapabilities capabilities,
+  ) => capabilities.has(capability) && !readFromThePage.contains(capability);
 }
 
 /// Reads people from the module where it can, and from HTML where it cannot.
@@ -47,7 +73,9 @@ final class CapabilityRecordsTransport implements RecordsTransport {
   final ModuleCapabilities capabilities;
 
   RecordsTransport _for(String capability) =>
-      capabilities.has(capability) ? module ?? stock : stock;
+      Capability.prefersModule(capability, capabilities)
+      ? module ?? stock
+      : stock;
 
   @override
   Future<SearchPage> search(String tree, String query, {int page = 1}) =>
@@ -62,6 +90,9 @@ final class CapabilityRecordsTransport implements RecordsTransport {
   /// Answered by whichever transport will be *reading* those charts, because
   /// a handle is only meaningful to the transport that minted it. Mixing them
   /// would hand a module endpoint to the HTML parser.
+  ///
+  /// Which is the page, today: statistics is the only tree-level chart, and
+  /// [Capability.readFromThePage] says why the module does not answer it.
   @override
   Future<Map<ChartKind, String>> treeCharts(String tree) =>
       _for(Capability.statistics).treeCharts(tree);
@@ -154,6 +185,8 @@ final class CapabilityAccessTransport implements AccessTransport {
 
   @override
   Future<AccessSummary> describe() =>
-      (capabilities.has(Capability.access) ? module ?? stock : stock)
+      (Capability.prefersModule(Capability.access, capabilities)
+              ? module ?? stock
+              : stock)
           .describe();
 }

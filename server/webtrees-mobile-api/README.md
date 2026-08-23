@@ -129,6 +129,22 @@ Two consequences worth knowing:
   as `spouses` and `children`, and a client that drew both drew each member
   twice. No field changed, so no version scheme could have announced it — which
   is why a client should drop those three tags itself whatever the module says.
+  **1.1.0** changed two more values without changing a field. A relationship's
+  `description` is now `Relationship: X` — the phrase `RelationshipsChartModule`
+  writes above its own chart — rather than the bare kinship word; and a
+  timeline event's `summary` carries the calendar conversion (`1974 (1394)`,
+  not `1974`) and, for a marriage or a divorce, the couple it belongs to,
+  without which a person's two marriages are two identical rows.
+
+## Known upstream defects a client will meet
+
+- **webtrees 2.3 answers `500` for the thumbnail of any non-JPEG.**
+  `ImageFactory::autoRotateImage()` calls `exif_read_data()` on every image it
+  resizes, PHP raises `E_WARNING: File not supported` for a PNG, a GIF or a
+  WebP, and `ErrorHandler` turns an un-silenced warning into an exception. This
+  module mints the URL and does not fetch the bytes, so nothing here can fix
+  it: a client must draw its placeholder for a picture it cannot fetch, exactly
+  as it would for one it is not allowed to see. 2.2.6 is unaffected.
 
 ## Layout
 

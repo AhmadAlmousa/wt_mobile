@@ -53,7 +53,8 @@ were written for, where a real one holds whatever it happens to hold:
 | Cousins marrying | the same person reached twice in one chart |
 | A living person and a dead one | `isDead`, and the `…–` lifespan |
 | A person with a name and no facts | "absent, not empty" |
-| A shared note, an inline note, a citation with a page, a media object | the three optional tabs |
+| A shared note, an inline note, a citation with a page | two of the three optional tabs |
+| **A JPEG photograph on the person and a PNG scan on their birth** | the media tab, the signed thumbnail, `AuthenticatedImage` — and, in the PNG, webtrees 2.3 answering `500` for anything that is not a JPEG (PROJECT.md §7, bug 44) |
 | A relative's death | the one fact the chart-box tag dictionary provably cannot learn |
 
 The tree is also **private**, converts dates to **Hijri**, and searches **blood

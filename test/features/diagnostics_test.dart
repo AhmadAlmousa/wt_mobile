@@ -28,7 +28,7 @@ WebtreesInstance _site({
 ModuleCapabilities _module({Set<String> features = const {}}) =>
     ModuleCapabilities(
       apiVersion: kModuleApiVersion,
-      moduleVersion: '1.0.1',
+      moduleVersion: '1.1.0',
       webtreesVersion: '2.3.0-dev',
       features: features,
       languages: const {'ar', 'en-GB'},
@@ -124,6 +124,30 @@ void main() {
       // Two answered by the module, six by the site's own pages.
       expect(find.text('Module'), findsNWidgets(2));
       expect(find.text('Site pages'), findsNWidgets(6));
+    });
+
+    testWidgets('a capability read from the page says so, module or not', (
+      tester,
+    ) async {
+      // The screen exists to answer "which transport answered this", and
+      // statistics is the one capability a module can offer and still not
+      // answer: it sends four sections where the page publishes seventeen.
+      // Reporting the module here would send a reader looking in the wrong
+      // place for a figure they disagreed with.
+      await open(
+        tester,
+        Diagnostics(
+          stage: ConnectionStage.signedIn,
+          instance: _site(),
+          username: 'mobile',
+          capabilities: _module(
+            features: const {Capability.statistics, Capability.individual},
+          ),
+        ),
+      );
+
+      expect(find.text('Module'), findsOneWidget);
+      expect(find.text('Site pages'), findsNWidgets(7));
     });
 
     testWidgets('a site with no module does not pretend otherwise', (

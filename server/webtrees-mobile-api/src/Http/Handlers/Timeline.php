@@ -6,6 +6,7 @@ namespace WebtreesMobileApi\Http\Handlers;
 
 use Fisharebest\Webtrees\Date\GregorianDate;
 use Fisharebest\Webtrees\Fact;
+use Fisharebest\Webtrees\Family;
 use Fisharebest\Webtrees\Individual;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Validator;
@@ -66,7 +67,8 @@ final class Timeline implements RequestHandlerInterface
         $tree    = Request::tree($request);
         $subject = Request::individual($request);
         $people  = new PersonPresenter(Request::thumbnail($request));
-        $facts   = new FactPresenter($people, new DatePresenter($tree));
+        $dates   = new DatePresenter($tree);
+        $facts   = new FactPresenter($people, $dates);
 
         $individuals = [$subject];
 
@@ -108,7 +110,7 @@ final class Timeline implements RequestHandlerInterface
                 // value, place, joined with webtrees' own separator. A client
                 // draws one box per event and needs one string for it; the
                 // structured fields above it are there for everything else.
-                'summary'   => $this->summary($fact),
+                'summary'   => $this->summary($fact, $dates),
                 'julianDay' => $day,
                 // The Gregorian year, for a scale. Never the year to *show*:
                 // the fact's own date carries that, written by the server in
@@ -131,14 +133,31 @@ final class Timeline implements RequestHandlerInterface
     }
 
     /**
-     * `Label — 12 March 1901 — Kuwait`, in the site's words and punctuation.
+     * `Label — 12 March 1901 (21 Dhū al-Qiʿdah 1318) — Kuwait — A + B`.
+     *
+     * The order is `timeline-chart/chart.phtml`'s own: label, date, value,
+     * place, and — for an event that belongs to a couple rather than to a
+     * person — the family's name after it. Two of those parts were missing,
+     * and both were missing information a reader can see:
+     *
+     * - The **conversion**. `Date::display()` renders the native calendar and
+     *   nothing else, so an Arabic tree's `1974 (1394)` arrived as `1974`
+     *   while the same fact on the same record carried both. The date
+     *   presenter composes what the rest of the module sends, and is not
+     *   subject to 2.3 dropping a single date's conversion (PROJECT.md §9
+     *   #15).
+     * - The **couple**. Without it a man's two marriages are two identical
+     *   rows on the same scale, which is exactly the shape a timeline exists
+     *   to tell apart (PROJECT.md §7, bug 46).
      */
-    private function summary(Fact $fact): string
+    private function summary(Fact $fact, DatePresenter $dates): string
     {
         $parts = [Text::of($fact->label())];
 
-        if ($fact->date()->isOK()) {
-            $parts[] = Text::of($fact->date()->display());
+        $date = $dates->present($fact->date());
+
+        if ($date !== null) {
+            $parts[] = $date['text'];
         }
 
         $value = Text::orNull($fact->value());
@@ -149,6 +168,12 @@ final class Timeline implements RequestHandlerInterface
 
         if ($fact->place()->gedcomName() !== '') {
             $parts[] = Text::of($fact->place()->shortName());
+        }
+
+        $record = $fact->record();
+
+        if ($record instanceof Family) {
+            $parts[] = Text::of($record->fullName());
         }
 
         return implode(' — ', $parts);

@@ -23,6 +23,7 @@ import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
 import 'package:webtrees_mobile/data/module/module_access.dart';
 import 'package:webtrees_mobile/data/module/module_api.dart';
+import 'package:webtrees_mobile/data/module/module_charts.dart';
 import 'package:webtrees_mobile/data/module/module_records.dart';
 import 'package:webtrees_mobile/data/session.dart';
 import 'package:webtrees_mobile/data/stock/charts_repository.dart';
@@ -31,6 +32,7 @@ import 'package:webtrees_mobile/data/transport.dart';
 import 'package:webtrees_mobile/domain/charts.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
 import 'package:webtrees_mobile/domain/records.dart';
+import 'package:webtrees_mobile/domain/statistics.dart';
 
 Future<void> main(List<String> args) async {
   final options = <String, String>{};
@@ -613,6 +615,46 @@ Future<void> main(List<String> args) async {
             ok: bytes.isNotEmpty,
           );
         }
+
+        // Every picture on the record, not just the highlighted one. A media
+        // tab holds whatever the tree keeps — a photograph, a scanned
+        // certificate — and until a lab held a file on disk none of this had
+        // ever been fetched from any server at all.
+        for (final item in person.media) {
+          final url = item.thumbnailUrl;
+          if (url == null) {
+            stdout.writeln('  SKIP  "${item.title}" carries no thumbnail');
+            continue;
+          }
+
+          try {
+            final bytes = await records.image(url);
+            report(
+              'media "${item.title}"',
+              '${bytes.length} bytes',
+              ok: bytes.isNotEmpty,
+            );
+          } on UnexpectedResponse catch (error) {
+            // The one failure that is the *server's* and is already
+            // understood: 2.3 calls `exif_read_data()` on every image it
+            // resizes, PHP warns for anything that is not a JPEG or a TIFF,
+            // and webtrees turns an un-silenced warning into an exception. So
+            // a PNG or a GIF is a 500 there, on the website too. Reported
+            // rather than tolerated silently, and still a failure on 2.2.6,
+            // which has no such call (PROJECT.md §7, bug 44).
+            final version = instance.versionParts;
+            final atLeast23 =
+                version != null &&
+                (version.$1 > 2 || (version.$1 == 2 && version.$2 >= 3));
+            if (error.status != 500 || !atLeast23) rethrow;
+
+            stdout.writeln(
+              '  WARN  media "${item.title}": HTTP 500 — webtrees 2.3 cannot '
+              'thumbnail a non-JPEG (exif_read_data in '
+              'ImageFactory::autoRotateImage). The app draws the placeholder.',
+            );
+          }
+        }
       }
     }
 
@@ -685,6 +727,152 @@ Future<void> main(List<String> args) async {
           report,
           strictDates: namesCalendars,
         );
+      }
+
+      // The capabilities the ledger in PROJECT.md §5 had never checked: a
+      // chart, a path, a scale and a page of counts, read through both
+      // transports and compared. Each transport uses *its own* handles — a
+      // chart address is only meaningful to whoever minted it, which is the
+      // rule `CapabilityChartsTransport` exists to keep.
+      if (xref != null) {
+        stdout.writeln('\n=== Module vs stock, charts ===');
+
+        final byHtml = await stock.individual(tree.name, xref);
+        final byJson = await module.individual(tree.name, xref);
+        final subject = PersonRef(xref: byHtml.xref, name: byHtml.name);
+        final stockCharts = ChartsRepository(client, version: instance.version);
+        final moduleCharts = ModuleChartsTransport(client);
+
+        for (final kind in const [ChartKind.ancestors, ChartKind.descendants]) {
+          final here = byHtml.charts[kind];
+          final there = byJson.charts[kind];
+          if (here == null || there == null) {
+            stdout.writeln(
+              '  SKIP  ${kind.name}: '
+              '${here == null ? 'the site' : 'the module'} does not offer it',
+            );
+            continue;
+          }
+
+          final drawnHere = await stockCharts.chart(
+            kind,
+            here,
+            subject: subject,
+          );
+          final drawnThere = await moduleCharts.chart(
+            kind,
+            there,
+            subject: subject,
+          );
+
+          compare('${kind.name}: people', drawnHere.size, drawnThere.size);
+          compare(
+            '${kind.name}: generations',
+            _generationsIn(drawnHere),
+            _generationsIn(drawnThere),
+          );
+          // The shape itself, not just its size: who sits in which position.
+          // The stock path *computes* the Sosa numbers from the nesting and
+          // the module gets them from webtrees, so this is also the check
+          // that the app's own derivation matches the server's.
+          compare(
+            '${kind.name}: shape',
+            _shapeOf(drawnHere),
+            _shapeOf(drawnThere),
+          );
+        }
+
+        // A relationship is the one capability where the module reimplements
+        // core logic rather than calling it — `calculateRelationships()` is
+        // private — so this is the only check that can catch the drift
+        // PROJECT.md §9 #19 is about.
+        final relative = [
+          ...byHtml.parents,
+          ...byHtml.children,
+          ...byHtml.siblings,
+        ].firstOrNull;
+        final pathHere = byHtml.charts[ChartKind.relationship];
+        final pathThere = byJson.charts[ChartKind.relationship];
+
+        if (relative == null || pathHere == null || pathThere == null) {
+          stdout.writeln('  SKIP  relationship: nothing to ask about');
+        } else {
+          final walkedHere = await stockCharts.relationship(
+            pathHere,
+            from: xref,
+            to: relative.xref,
+          );
+          final walkedThere = await moduleCharts.relationship(
+            pathThere,
+            from: xref,
+            to: relative.xref,
+          );
+
+          compare('relationship: paths', walkedHere.length, walkedThere.length);
+          compare(
+            'relationship: wording',
+            _pathOf(walkedHere.firstOrNull),
+            _pathOf(walkedThere.firstOrNull),
+          );
+        }
+
+        // A timeline's *positions* are each transport's own arithmetic — the
+        // page states pixels, the module states years — so what has to agree
+        // is the events and their order, which is what the chart draws.
+        final timeHere = byHtml.charts[ChartKind.timeline];
+        final timeThere = byJson.charts[ChartKind.timeline];
+        if (timeHere == null || timeThere == null) {
+          stdout.writeln('  SKIP  timeline: this site does not offer one');
+        } else {
+          final lineHere = await stockCharts.timeline(timeHere);
+          final lineThere = await moduleCharts.timeline(timeThere);
+
+          compare(
+            'timeline: events',
+            lineHere.events.length,
+            lineThere.events.length,
+          );
+          compare('timeline: order', _orderOf(lineHere), _orderOf(lineThere));
+          // Not asserted, because the page decorates an event with ages it
+          // computes for the occasion. Printed, because the module must not
+          // say *less*: the calendar conversion and the couple a marriage
+          // belongs to had both gone missing here, and only reading this
+          // found it.
+          report(
+            'timeline: first event',
+            '\n      stock=${lineHere.events.firstOrNull?.label}'
+                '\n      module=${lineThere.events.firstOrNull?.label}',
+          );
+        }
+
+        // Statistics are the one capability where the two are *not* the same
+        // question. The page publishes everything a site computes; the module
+        // sends a curated set of counts and datasets. So the count that both
+        // state is compared, and the coverage is reported rather than
+        // asserted — a difference here is a decision, not a defect.
+        final treeHandlesHere = await stock.treeCharts(tree.name);
+        final treeHandlesThere = await module.treeCharts(tree.name);
+        final statsHere = treeHandlesHere[ChartKind.statistics];
+        final statsThere = treeHandlesThere[ChartKind.statistics];
+
+        if (statsHere == null || statsThere == null) {
+          stdout.writeln('  SKIP  statistics: not offered by both');
+        } else {
+          final pageStats = await stockCharts.statistics(statsHere);
+          final jsonStats = await moduleCharts.statistics(statsThere);
+
+          compare(
+            'statistics: total individuals',
+            _totalOf(pageStats),
+            _totalOf(jsonStats),
+          );
+          report(
+            'statistics: coverage',
+            'stock=${_coverageOf(pageStats)}  '
+                'module=${_coverageOf(jsonStats)} '
+                '(the module sends a chosen set, not the whole page)',
+          );
+        }
       }
 
       // One record proves very little of a tree with thousands in it, and the
@@ -831,6 +1019,31 @@ Future<void> comparePerson(
   note('children', byHtml.children.length, byJson.children.length);
   note('primary facts', byHtml.primaryFacts.length, byJson.primaryFacts.length);
 
+  // The three optional tabs, which until a lab held a note, a citation and a
+  // file on disk had never been read from any server by either transport.
+  // Counts rather than text: a citation is `label: value` prose webtrees has
+  // already worded, and the module sends the same fields apart, so the two
+  // are allowed to render differently and not allowed to disagree about how
+  // many there are.
+  note('notes', byHtml.notes.length, byJson.notes.length);
+  note('citations', byHtml.sources.length, byJson.sources.length);
+  note('media items', byHtml.media.length, byJson.media.length);
+
+  // Which of those hang off a fact rather than off the person. The markup
+  // says it with `tr.wt-level-two-*` and the module says it with a flag, and
+  // a transport that lost the distinction would put a birth certificate
+  // under the person instead of under their birth.
+  note(
+    'media on a fact',
+    byHtml.media.where((item) => item.isSecondary).length,
+    byJson.media.where((item) => item.isSecondary).length,
+  );
+
+  // Who is in each family, which is the half of a family a page states
+  // structurally and the module states as a list. Sorted, because neither
+  // transport promises an order and only the membership is the claim.
+  note('family membership', _families(byHtml), _families(byJson));
+
   // What happened to each couple, and nothing else. A family's `HUSB`, `WIFE`
   // and `CHIL` lines are facts like any other to webtrees, so a module that
   // asks for a family's facts unfiltered answers a marriage *and* one pointer
@@ -894,6 +1107,22 @@ Future<void> comparePerson(
   }
 }
 
+/// Who each of a record's families holds, in an order neither transport chose.
+///
+/// The xrefs rather than the names: a name is rendered — and a person with two
+/// `NAME` lines is rendered differently in a chart box and in an accordion,
+/// which is what bug 37 was — while an xref is what the tree calls them.
+String _families(IndividualRecord record) {
+  final families = [
+    for (final family in record.families)
+      '${family.kind.name}:'
+          '${(family.spouses.map((person) => person.xref).toList()..sort()).join(',')}'
+          '>'
+          '${(family.children.map((person) => person.xref).toList()..sort()).join(',')}',
+  ]..sort();
+  return families.join(' · ');
+}
+
 /// Every family event a record carries, in an order neither transport chose.
 ///
 /// Labels rather than values: the page renders a marriage as one string of
@@ -907,6 +1136,74 @@ String _familyFacts(IndividualRecord record) {
           .toList()
         ..sort();
   return labels.join(' · ');
+}
+
+/// A chart's shape as one string: who sits in which position.
+///
+/// Sosa numbers for an ancestor chart, d'Aboville numbers for a descendant
+/// one — the two numbering schemes webtrees itself uses, and the two the app
+/// derives rather than reads (PROJECT.md §3). Sorted by position, so the
+/// order neither transport promises cannot make them differ.
+String _shapeOf(ChartData chart) {
+  final ancestors = chart.ancestors;
+  if (ancestors != null) {
+    final entries =
+        ancestors.everyone
+            .map((node) => '${node.sosa}=${node.person.xref}')
+            .toList()
+          ..sort();
+    return entries.join(' ');
+  }
+
+  final entries =
+      chart.descendants!.everyone
+          .map((node) => '${node.number}=${node.person.xref}')
+          .toList()
+        ..sort();
+  return entries.join(' ');
+}
+
+/// One relationship path as the words on it and the people between them.
+String _pathOf(RelationshipPath? path) {
+  if (path == null) return '(no path)';
+
+  return [
+    path.description,
+    for (final step in path.steps) '${step.relationship}→${step.person.xref}',
+  ].join(' · ');
+}
+
+/// A timeline's events in the order it draws them, by what each one *is*.
+///
+/// Two things are deliberately excluded. **Positions**, because the page
+/// states pixels off its own stylesheet and the module states years — two
+/// scales describing one order. And everything the page *decorates* a label
+/// with: it prints the ages of everybody an event touched, which is its own
+/// composition rather than a fact about the tree. What has to agree is which
+/// events there are and in what order, so this keeps each label up to its
+/// first separator — the fact's own name, in the site's own words.
+String _orderOf(TimelineChart timeline) {
+  final events = [...timeline.events]
+    ..sort((a, b) => a.position.compareTo(b.position));
+  return events.map((event) => event.label.split(' — ').first).join(' · ');
+}
+
+/// The one figure a statistics page and the module both state.
+String _totalOf(TreeStatistics statistics) {
+  for (final part in statistics.parts) {
+    for (final section in part.sections) {
+      final total = section.total;
+      if (total != null) return total;
+    }
+  }
+  return '(none stated)';
+}
+
+/// How much of a site's statistics a transport answered.
+String _coverageOf(TreeStatistics statistics) {
+  final sections = statistics.parts.expand((part) => part.sections).toList();
+  final datasets = sections.expand((section) => section.datasets).length;
+  return '${sections.length} section(s), $datasets chart(s)';
 }
 
 /// How many generations a chart turned out to hold.

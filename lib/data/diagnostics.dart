@@ -89,7 +89,12 @@ final class Diagnostics {
       Capability.timeline,
       Capability.statistics,
     ])
-      CapabilitySource(capability, fromModule: capabilities.has(capability)),
+      CapabilitySource(
+        capability,
+        // What the composer actually does, not what the module offers: a
+        // capability can be advertised and still answered from the page.
+        fromModule: Capability.prefersModule(capability, capabilities),
+      ),
   ];
 
   /// A plain-text report, for pasting into a bug report.

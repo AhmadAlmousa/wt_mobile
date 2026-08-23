@@ -61,7 +61,15 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
      */
     public const int API_VERSION = 1;
 
-    public const string MODULE_VERSION = '1.0.1';
+    /**
+     * Bumped for a change a client can *see*, not only for a new endpoint:
+     * 1.1.0 restates a relationship the way webtrees' own chart heads it and
+     * puts the calendar conversion and the couple back into a timeline event
+     * (`PROJECT.md` §7, bugs 45–46). `API_VERSION` is unchanged because the
+     * shape did not change — which is exactly why a client must not assume
+     * the module it is talking to is the module it was written against.
+     */
+    public const string MODULE_VERSION = '1.1.0';
 
     public const string AUTHOR = 'webtrees_mobile';
 

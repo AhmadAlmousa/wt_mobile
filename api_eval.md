@@ -1179,3 +1179,90 @@ module at all: **nothing in this project looks at the result.** Every check it
 owns answers "is this value right", and the four faults above were all "is
 this what a person would want to see". A device, and the habit of opening the
 app after changing it, is the only thing that closes that.
+
+---
+
+## 17. What a lab with a photograph in it found
+
+**Added 2026-08-23, after every remaining capability was diffed.** §16 ended
+with a list of what had never been exercised: notes, sources and media, and a
+manager's view. Two of those are now closed, and closing them found four more
+faults — three in the module, one in webtrees.
+
+### The media capability had never run, and the reason was one missing file
+
+The lab's GEDCOM had declared `@M1@ OBJE` since it was written, the `media`
+row existed, and the media tab rendered it. **No image was ever written to
+disk.** So `MediaFileThumbnail` — the handler §4 cites for `canShow()` before
+signature, and §10 for "sizes are requested, not harvested" — had never
+executed in this project at all, on either transport.
+
+A media *record* is not a photograph. §7's `GET …/media/{xref}?w=&h=&fit=` and
+§9's privacy reasoning are both about bytes, and neither is tested by a record
+that points at nothing. The lab now draws two files at install time.
+
+### webtrees 2.3 cannot thumbnail anything but a JPEG
+
+The second file is a PNG, and it answers `500` on 2.3.
+`ImageFactory::autoRotateImage()` — new in 2.3 — calls `exif_read_data()` on
+every image it resizes; PHP raises `E_WARNING: File not supported` for a PNG,
+a GIF or a WebP; and `Http\Middleware\ErrorHandler` throws on any un-silenced
+warning. Proved by storing one picture twice at one URL: PNG `500`, JPEG
+`200`. 2.2.6 has no such call.
+
+This is the third upstream defect this project has found by reading or running
+2.3, after the single-date conversion loss in §4 and the `400` from
+`GET /login` in §15 — and the first that breaks the *website* for ordinary
+data. It belongs in the same upstream report.
+
+### Three module faults, all of them about what a reader sees
+
+None was a wrong value; each was a payload that said less than the page.
+
+| Where | The page | The module | Fix |
+|---|---|---|---|
+| Relationship | `Relationship: أب`, from `RelationshipsChartModule`'s own `<h3>` | `أب` | Send what webtrees writes |
+| Timeline | `١٩٧٤ (١٣٩٤)`, and the couple after a marriage | `١٩٧٤`, no couple | Compose from `DatePresenter`, append `Family::fullName()` |
+| Statistics | 17 sections, 15 charts | 4 sections, 8 charts | Read from the page |
+
+The first two restate §16's lesson exactly — *what does webtrees **show** of
+this, and where* — for two payloads §7 designed without asking. The third does
+not, and is the more interesting one.
+
+### A transport can be right and still say less
+
+Every figure the statistics endpoint states matches the page. It simply sends
+a chosen quarter of what the page publishes, and the client had been
+preferring it — so installing the module *cost* a reader thirteen sections of
+their own tree.
+
+Nothing in this document catches that. §11's rules are about compatibility
+(additive-only, version the URL) and §13's migration order is about
+correctness (retire nothing until its endpoint passes live). Both are
+satisfied by a payload that is accurate and narrower. The missing rule:
+
+> **Prefer the module only where it knows *more*.** Faster and more structured
+> is not sufficient; a capability the module answers with less than the page
+> stays on the page until the endpoint covers it.
+
+Which is §13's "compose at the level of capabilities" carried one step
+further: the composer's condition is not *does the module offer this* but
+*does the module offer this better*. The client keeps that rule in one place,
+and its diagnostics screen reads the same rule — because "the module is
+installed" and "this screen used the module" were already different questions,
+and this makes them differ for a third reason.
+
+### The ledger
+
+Nine capabilities move to cleared: `notes`, `sources`, `media`, `family`,
+`ancestors`, `descendants`, `relationship`, `timeline` — on both labs, both
+versions, fourteen records each, no differences — beside the three the real
+tree cleared. `statistics` moves to a deliberate *not cleared*.
+
+### What is still untested
+
+A manager's or an editor's view, and a tree with pending edits: unchanged from
+§15 and §16. And now, sharpened: the diffs written for this section have run
+against fourteen invented people and never against 1,463 real ones, which is
+exactly the gap that produced §16's two disagreements. The real tree is where
+they go next.
