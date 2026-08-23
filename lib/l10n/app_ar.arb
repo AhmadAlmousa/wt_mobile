@@ -1,8 +1,6 @@
 {
   "@@locale": "ar",
-
   "appTitle": "webtrees",
-
   "connectTitle": "اتّصل بشجرة عائلتك",
   "connectSubtitle": "أدخل عنوان موقع webtrees الخاص بك.",
   "siteAddress": "عنوان الموقع",
@@ -11,7 +9,6 @@
   "connect": "اتّصال",
   "connecting": "جارٍ الاتصال…",
   "recentSites": "المواقع الأخيرة",
-
   "signIn": "تسجيل دخول",
   "signingIn": "جارٍ تسجيل دخولك…",
   "usernameOrEmail": "إسم المستخدم أو عنوان البريد الإلكتروني",
@@ -29,10 +26,24 @@
   "degradedServerWarning": "يبلّغ هذا الموقع عن مشكلة بسيطة في إعداد الخادم. من المفترض أن يعمل تسجيل الدخول رغم ذلك.",
   "webtrees": "webtrees",
   "webtreesVersion": "webtrees {version}",
-  "@webtreesVersion": {"placeholders": {"version": {"type": "String"}}},
+  "@webtreesVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "hostAndVersion": "{host} · webtrees {version}",
-  "@hostAndVersion": {"placeholders": {"host": {"type": "String"}, "version": {"type": "String"}}},
-
+  "@hostAndVersion": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "yourAccess": "صلاحياتك",
   "checkAgain": "تحقّق مرة أخرى",
   "signOut": "تسجيل خروج",
@@ -42,33 +53,34 @@
   "tryAgain": "أعد المحاولة",
   "familyTrees": "شجرات العائلة",
   "siteAdministrator": "مدير الموقع",
-
   "roleAdministrator": "مدير",
   "roleManager": "مشرف",
   "roleModerator": "مراقب",
   "roleEditor": "محرر",
   "roleMember": "عضو",
   "roleReadOnly": "قراءة فقط",
-
   "describeAdministrator": "أنت مدير هذا الموقع، لذا تدير كل شجرة فيه.",
   "describeManager": "يمكنك تغيير هذه الشجرة وإعداداتها.",
   "describeModerator": "يمكنك تحرير السجلات والموافقة على تعديلات الآخرين.",
   "describeEditor": "يمكنك تحرير السجلات. تنتظر تعديلاتك موافقة مراقب.",
   "describeMember": "يمكنك عرض هذه الشجرة، بما فيها الأقارب الأحياء.",
   "describeMemberOrVisitor": "يمكنك عرض هذه الشجرة. وهي شجرة عامة، لذا لا يستطيع التطبيق تمييز ما إذا كنت داخلاً كعضو أم تراها كما يراها أي زائر.",
-
   "canEdit": "إمكانية التحرير",
   "canApproveChanges": "إمكانية اعتماد التعديلات",
   "canManage": "إمكانية الإدارة",
   "linkedTo": "مرتبط بـ {xref}",
-  "@linkedTo": {"placeholders": {"xref": {"type": "String"}}},
-
+  "@linkedTo": {
+    "placeholders": {
+      "xref": {
+        "type": "String"
+      }
+    }
+  },
   "searchForAPerson": "ابحث عن شخص",
   "searchHint": "اسم، أو رقم سجل مثل I42",
   "searchPrompt": "اكتب اسماً للبحث في شجرة العائلة هذه.",
   "searching": "جارٍ البحث…",
   "noMatches": "لم يطابق هذا الاسم أحد. جرّب تهجئة أخرى، أو جزءاً من الاسم.",
-
   "yourAccount": "حسابك",
   "person": "فرد",
   "reload": "إعادة التحميل",
@@ -105,7 +117,9 @@
   "chartEmpty": "لا أحد آخر مسجّل هنا بعد.",
   "showMoreResults": "عرض المزيد",
   "eventsOfCloseRelatives": "أحداث الأقارب",
-
+  "deceased": "متوفّى",
+  "childCount": "{count, plural, =0{لا أولاد} =1{ولد واحد} =2{ولدان} few{{count} أولاد} many{{count} ولدًا} other{{count} ولد}}",
+  "recordId": "السجل",
   "settings": "الإعدادات",
   "appearance": "المظهر",
   "themeSystem": "حسب الجهاز",
@@ -122,31 +136,80 @@
   "calendarHijri": "هجري",
   "calendarOnlyWhenOffered": "لا يظهر التاريخ بالتقويم الذي تختاره إلا إذا حوّله الموقع. وإلا فسيظهر كما كتبه الموقع.",
   "done": "تم",
-
   "errorUnreachableHost": "تعذّر الوصول إلى {address}.{detail} تحقّق من العنوان ومن اتصالك.",
-  "@errorUnreachableHost": {"placeholders": {"address": {"type": "String"}, "detail": {"type": "String"}}},
+  "@errorUnreachableHost": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
   "errorNotWebtrees": "استجاب {address}، لكنه لا يبدو موقع webtrees. تحقّق من العنوان — ينبغي أن يشير إلى الصفحة التي تسجّل الدخول منها عادة.",
-  "@errorNotWebtrees": {"placeholders": {"address": {"type": "String"}}},
+  "@errorNotWebtrees": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
   "errorMaintenanceMode": "الموقع متوقف للصيانة. أعد المحاولة لاحقاً.",
   "errorServerUnhealthy": "يبلّغ موقع webtrees عن مشكلة في إعداد الخادم ولا يمكنه العمل. على مديره مراجعة لوحة التحكم.",
   "errorBlockedAsBot": "حجب الموقع هذا التطبيق باعتباره حركة آلية ({reason}).",
-  "@errorBlockedAsBot": {"placeholders": {"reason": {"type": "String"}}},
+  "@errorBlockedAsBot": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "errorSignInRejected": "لم يُقبل اسم المستخدم أو كلمة المرور.",
   "errorStaleSignIn": "انتهت صلاحية محاولة تسجيل الدخول. أعد المحاولة.",
   "errorSessionExpired": "انتهت جلستك. سجّل الدخول مرة أخرى.",
   "errorNotPermitted": "لا يملك حسابك صلاحية الوصول إلى هذا.",
   "errorNotFound": "هذا العنصر غير موجود، أو غير ظاهر لك.",
   "errorUnexpectedResponse": "استجاب الموقع بشكل غير متوقع (HTTP {status}).",
-  "@errorUnexpectedResponse": {"placeholders": {"status": {"type": "int"}}},
+  "@errorUnexpectedResponse": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "errorCannotRead": "تعذّرت قراءة {what} من إصدار webtrees هذا. قد يستخدم سمة أو إصداراً لم يره التطبيق من قبل.",
-  "@errorCannotRead": {"placeholders": {"what": {"type": "String"}}},
+  "@errorCannotRead": {
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
   "errorParseFailure": "تعذّرت قراءة {parser} في هذا الموقع. قد يستخدم سمة أو إصدار webtrees لم يره التطبيق من قبل.",
-  "@errorParseFailure": {"placeholders": {"parser": {"type": "String"}}},
-
+  "@errorParseFailure": {
+    "placeholders": {
+      "parser": {
+        "type": "String"
+      }
+    }
+  },
   "noticeSiteRenamedItself": "يسمّي هذا الموقع نفسه {canonical}. سيستخدم التطبيق ذلك العنوان، لأن ملف ارتباط تسجيل الدخول صادر لذلك المضيف.",
-  "@noticeSiteRenamedItself": {"placeholders": {"canonical": {"type": "String"}}},
+  "@noticeSiteRenamedItself": {
+    "placeholders": {
+      "canonical": {
+        "type": "String"
+      }
+    }
+  },
   "noticeBlocklistUnchecked": "تعذّر التحقّق من قائمة الحجب في الموقع: {reason}",
-  "@noticeBlocklistUnchecked": {"placeholders": {"reason": {"type": "String"}}},
+  "@noticeBlocklistUnchecked": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "noticeVersionUnreadable": "تعذّرت قراءة إصدار الموقع.",
   "noticeSiteUnidentified": "لم يعرّف هذا الموقع نفسه بأنه webtrees. سيتابع التطبيق، لكن بعض الميزات قد لا تعمل.",
   "noticeNoTreesVisible": "لا يرى هذا الحساب أي شجرة عائلة. قد يحتاج مدير الموقع إلى منحه صلاحية الوصول.",
@@ -157,5 +220,11 @@
   "noticeSourcesUnavailable": "تعذّر تحميل المصادر لهذا الشخص.",
   "noticeMediaUnavailable": "تعذّر تحميل الصور لهذا الشخص.",
   "noticeSectionUnavailable": "تعذّر تحميل قسم {module}.",
-  "@noticeSectionUnavailable": {"placeholders": {"module": {"type": "String"}}}
+  "@noticeSectionUnavailable": {
+    "placeholders": {
+      "module": {
+        "type": "String"
+      }
+    }
+  }
 }

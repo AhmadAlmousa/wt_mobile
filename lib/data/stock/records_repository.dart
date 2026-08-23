@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 
+import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html;
 
 import '../../core/errors.dart';
@@ -11,6 +12,7 @@ import '../../domain/charts.dart';
 import '../../domain/notice.dart';
 import '../../domain/records.dart';
 import 'dom.dart';
+import 'fact_tags.dart';
 import 'media_cache.dart';
 import 'record_parser.dart';
 
@@ -106,6 +108,10 @@ final class RecordsRepository {
   /// Each row's `text` is **rendered HTML**, not a name: webtrees builds it
   /// from a view that emits a thumbnail, the full name and a lifespan. The
   /// thumbnail is present only for someone with a highlighted media file.
+  ///
+  /// It states no sex, so search results are the one place in the app where
+  /// a person is drawn without one. Fetching each row's record to find out
+  /// would cost a request per result; opening the person answers it.
   List<PersonRef> _peopleFrom(List<Object?> rows) {
     final people = <PersonRef>[];
     for (final row in rows) {
@@ -120,7 +126,8 @@ final class RecordsRepository {
       if (xref.isEmpty) continue;
 
       final fragment = html.parseFragment(text);
-      final name = textOf(fragment.querySelector('span.NAME'));
+      final nameSpan = fragment.querySelector('span.NAME');
+      final name = textOf(nameSpan);
 
       people.add(
         PersonRef(
@@ -128,12 +135,39 @@ final class RecordsRepository {
           // Without the name span the whole rendered row is still better than
           // showing the user a bare identifier.
           name: name ?? cleanText(fragment.text) ?? xref,
+          lifespan: _lifespanAfter(fragment, nameSpan),
           thumbnailUrl: fragment.querySelector('img')?.attributes['src'],
         ),
       );
     }
     return people;
   }
+
+  /// The years a search row prints after the name.
+  ///
+  /// `selects/individual.phtml` writes `{name}, {lifespan}` with nothing
+  /// marking the second part, so it is recovered by removing the first: what
+  /// follows the name is the lifespan, and the comma webtrees joined them
+  /// with.
+  static String? _lifespanAfter(DocumentFragment row, Element? name) {
+    final whole = cleanText(row.text);
+    final just = cleanText(name?.text);
+    if (whole == null || just == null) return null;
+
+    final at = whole.indexOf(just);
+    if (at < 0) return null;
+
+    final rest = whole.substring(at + just.length);
+    final years = cleanText(rest.replaceFirst(_leadingSeparator, ''));
+    // A person with neither birth nor death still renders the dash between
+    // two empty years, which says nothing worth showing.
+    return years != null && _hasDigits.hasMatch(years) ? years : null;
+  }
+
+  /// The comma webtrees joins a name to its lifespan with, Arabic's included.
+  static final RegExp _leadingSeparator = RegExp(r'^[,\u060C\s]+');
+
+  static final RegExp _hasDigits = RegExp(r'[\p{L}\p{N}]', unicode: true);
 
   /// The charts a site offers for a whole tree rather than for one person.
   ///
@@ -193,15 +227,36 @@ final class RecordsRepository {
       offered: false,
     );
 
+    // What this site calls a death, a marriage, a divorce. Learned from the
+    // chart boxes on the relatives tab, because those state the GEDCOM tag in
+    // a class while every label on the page is already translated. One index
+    // serves the whole record: the facts table and the family blocks are the
+    // same page, rendered by the same server, in the same language.
+    final tags = relativesHtml == null
+        ? FactTagIndex.empty
+        : FactTagIndex.from(html.parseFragment(relativesHtml));
+
+    final families = relativesHtml == null
+        ? const <FamilyGroup>[]
+        : _parser.parseRelatives(relativesHtml, xref: xref, tags: tags);
+
+    // The person's own sex, lifespan and death, taken from their own chart
+    // box: they appear in their own family tables like anybody else, and the
+    // box is the one place a stock site states these structurally.
+    final self = _selfIn(families, xref);
+
     return IndividualRecord(
       xref: xref,
       name: page.name,
       alternateName: page.alternateName,
       thumbnailUrl: page.thumbnailUrl,
-      facts: factsHtml == null ? const [] : _parser.parseFacts(factsHtml),
-      families: relativesHtml == null
+      sex: self?.sex ?? page.sex,
+      lifespan: self?.lifespan,
+      isDeceased: self?.isDeceased ?? false,
+      facts: factsHtml == null
           ? const []
-          : _parser.parseRelatives(relativesHtml, xref: xref),
+          : _parser.parseFacts(factsHtml, tags: tags),
+      families: families,
       notes: notesHtml == null ? const [] : _parser.parseNotes(notesHtml),
       sources: sourcesHtml == null
           ? const []
@@ -299,6 +354,22 @@ final class RecordsRepository {
       warnings.add(SectionUnavailable(module));
       return null;
     }
+  }
+
+  /// This person as their own family tables describe them.
+  ///
+  /// Everyone in a family table is rendered as a chart box, the viewer
+  /// included, and that box carries their sex, their lifespan and their death
+  /// — none of which the individual page states in a way that survives
+  /// translation. Answers null on a site with the relatives tab switched off,
+  /// where none of it can be known.
+  static PersonRef? _selfIn(List<FamilyGroup> families, String xref) {
+    for (final family in families) {
+      for (final person in [...family.spouses, ...family.children]) {
+        if (person.xref == xref) return person;
+      }
+    }
+    return null;
   }
 
   /// The query parameters of a server-supplied URL.

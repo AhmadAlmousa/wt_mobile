@@ -31,6 +31,7 @@ final class PersonRef {
     this.alternateName,
     this.lifespan,
     this.sex = Sex.unknown,
+    this.isDeceased = false,
     this.thumbnailUrl,
   });
 
@@ -50,6 +51,14 @@ final class PersonRef {
   final String? lifespan;
 
   final Sex sex;
+
+  /// Whether the tree records this person as no longer living.
+  ///
+  /// Read from the death event webtrees prints inside every chart box, not
+  /// inferred from an age: a tree may record a death with no date at all, and
+  /// it may record a birth two centuries ago for somebody it still lists as
+  /// living. False therefore means "nothing said so", not "alive".
+  final bool isDeceased;
 
   /// An HMAC-signed thumbnail URL, absent when the person has no photo.
   ///
@@ -79,11 +88,21 @@ final class FactEntry {
     this.place,
     this.type,
     this.about,
+    this.tag,
     this.isSecondary = false,
   });
 
   /// What webtrees calls this fact, already translated by the server.
   final String label;
+
+  /// The GEDCOM tag behind [label] — `INDI:DEAT`, `FAM:DIV` — where the page
+  /// said enough to know it.
+  ///
+  /// The label itself is translated, so an interface that switched on it
+  /// would work in English and quietly do nothing in Arabic. The tag comes
+  /// from a dictionary built out of the same page: see [FactTagIndex]. Null
+  /// where the page named no tag, which every reader must survive.
+  final String? tag;
 
   /// The fact's own value, where it has one beyond a date and a place.
   final String? value;
@@ -144,6 +163,7 @@ final class FamilyGroup {
     required List<PersonRef> spouses,
     required List<PersonRef> children,
     List<FactEntry> facts = const [],
+    this.endedInDivorce = false,
   }) : spouses = List.unmodifiable(spouses),
        children = List.unmodifiable(children),
        facts = List.unmodifiable(facts);
@@ -167,6 +187,13 @@ final class FamilyGroup {
   /// why they have to be read here: a marriage date shown against one spouse
   /// and not the other would be an odd thing to claim.
   final List<FactEntry> facts;
+
+  /// Whether this couple separated — a divorce, an annulment.
+  ///
+  /// Worth its own field rather than left for each screen to look for: a
+  /// chart draws the line between two people differently, and a chart has no
+  /// fact rows to search.
+  final bool endedInDivorce;
 }
 
 /// A note recorded against a person, or against one of their facts.
@@ -275,6 +302,8 @@ final class IndividualRecord {
     this.alternateName,
     this.thumbnailUrl,
     this.sex = Sex.unknown,
+    this.lifespan,
+    this.isDeceased = false,
     List<NoteEntry> notes = const [],
     List<SourceCitation> sources = const [],
     List<MediaItem> media = const [],
@@ -295,6 +324,13 @@ final class IndividualRecord {
   final String? alternateName;
   final String? thumbnailUrl;
   final Sex sex;
+
+  /// Birth and death years as webtrees formats them, e.g. `1901–1974`.
+  final String? lifespan;
+
+  /// Whether the tree records this person as no longer living. See
+  /// [PersonRef.isDeceased].
+  final bool isDeceased;
 
   final List<FactEntry> facts;
   final List<FamilyGroup> families;
@@ -328,6 +364,21 @@ final class IndividualRecord {
   /// between themes and versions. Losing the relatives tab should cost the
   /// relatives section and say so — not the whole page.
   final List<Notice> warnings;
+
+  /// This person as they would appear in a list.
+  ///
+  /// A record already holds everything a reference does, and every screen
+  /// that shows a person beside their relatives needs them in the same shape
+  /// the relatives arrive in.
+  PersonRef get asReference => PersonRef(
+    xref: xref,
+    name: name,
+    alternateName: alternateName,
+    lifespan: lifespan,
+    sex: sex,
+    isDeceased: isDeceased,
+    thumbnailUrl: thumbnailUrl,
+  );
 
   /// The facts worth showing without the user asking for more.
   Iterable<FactEntry> get primaryFacts =>

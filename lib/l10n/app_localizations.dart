@@ -655,6 +655,24 @@ abstract class AppText {
   /// **'Events of close relatives'**
   String get eventsOfCloseRelatives;
 
+  /// No description provided for @deceased.
+  ///
+  /// In en, this message translates to:
+  /// **'Deceased'**
+  String get deceased;
+
+  /// No description provided for @childCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No children} =1{1 child} other{{count} children}}'**
+  String childCount(int count);
+
+  /// No description provided for @recordId.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get recordId;
+
   /// No description provided for @settings.
   ///
   /// In en, this message translates to:

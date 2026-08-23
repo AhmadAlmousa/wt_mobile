@@ -194,7 +194,7 @@ void main() {
       test('ignores the tab’s own controls', () {
         // The date-differences toggle is a table too, but has no family
         // caption.
-        expect(families.map((f) => f.xref), ['F1', 'F2']);
+        expect(families.map((f) => f.xref), ['F1', 'F2', 'F3']);
       });
 
       test('tells a birth family from the person’s own', () {
@@ -219,8 +219,9 @@ void main() {
 
         expect(record.parents.map((p) => p.xref), ['X7', 'X8']);
         expect(record.siblings.map((p) => p.xref), ['X43']);
-        expect(record.spouses.map((p) => p.xref), ['X50']);
-        expect(record.children.map((p) => p.xref), ['X60', 'X61']);
+        // Two marriages, and both of them the person's own.
+        expect(record.spouses.map((p) => p.xref), ['X50', 'X51']);
+        expect(record.children.map((p) => p.xref), ['X60', 'X61', 'X62']);
       });
 
       test('does not count the person as their own sibling', () {
@@ -264,9 +265,39 @@ void main() {
         // The marriage belongs to the family, not to either person, and this
         // row is the only place the relatives tab states it. Dropping it left
         // a couple on screen with nothing said about them.
-        final marriage = families.last.facts.single;
+        final marriage = families[1].facts.single;
         expect(marriage.label, 'الزواج');
         expect(marriage.value, '1925 — مكة');
+      });
+
+      test('names each fact by its tag, not by its translated label', () {
+        // The dictionary comes from the chart boxes on this very page, so it
+        // is this site's own Arabic that maps onto GEDCOM — nothing here
+        // knows the English word for a marriage.
+        expect(families[1].facts.single.tag, 'FAM:MARR');
+        expect(
+          families.last.facts.map((fact) => fact.tag),
+          ['FAM:MARR', 'FAM:DIV'],
+        );
+      });
+
+      test('tells which marriage ended in divorce', () {
+        // Per family, not per person: this man married twice and the second
+        // family is the one that ended.
+        expect(families[1].endedInDivorce, isFalse);
+        expect(families.last.endedInDivorce, isTrue);
+      });
+
+      test('reads who has died from the chart box, not from an age', () {
+        final father = families.first.spouses.first;
+        expect(father.xref, 'X7');
+        expect(father.isDeceased, isTrue);
+
+        // A daughter born in 1929 with no death recorded: the box prints a
+        // birth and no death, which is a statement rather than a silence.
+        final living = families[1].children.last;
+        expect(living.xref, 'X61');
+        expect(living.isDeceased, isFalse);
       });
     });
 

@@ -7,6 +7,7 @@ import '../../data/stock/records_repository.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/chart_header_title.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import 'chart_canvas.dart';
@@ -61,6 +62,12 @@ enum ChartView { tree, circle, compact }
 class _ChartScreenState extends State<ChartScreen> {
   late Future<ChartData> _chart;
 
+  /// Whose chart this is, once the record it was read from has arrived.
+  ///
+  /// Held rather than taken from the future's result so the bar keeps naming
+  /// the person while a redraw is in flight.
+  PersonRef? _subject;
+
   ChartView _view = ChartView.tree;
 
   @override
@@ -88,12 +95,8 @@ class _ChartScreenState extends State<ChartScreen> {
   /// the only reason there is a chart to draw.
   Future<ChartData> _fetch() async {
     final person = await widget.records.individual(widget.tree, widget.xref);
-    final subject = PersonRef(
-      xref: person.xref,
-      name: person.name,
-      thumbnailUrl: person.thumbnailUrl,
-      sex: person.sex,
-    );
+    final subject = person.asReference;
+    if (mounted) setState(() => _subject = subject);
 
     if (widget.kind == ChartKind.hourglass) {
       final up = person.charts[ChartKind.ancestors];
@@ -119,7 +122,11 @@ class _ChartScreenState extends State<ChartScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(chartTitle(widget.kind, text)),
+        title: ChartHeaderTitle(
+          title: chartTitle(widget.kind, text),
+          person: _subject,
+          records: widget.records,
+        ),
         actions: [
           // Only an ancestor chart has other shapes to take: a fan is a
           // pedigree bent round a circle, and there is no such thing as a

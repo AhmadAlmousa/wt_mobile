@@ -8,10 +8,9 @@ import '../../data/stock/records_repository.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/bidi.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
-import 'authenticated_image.dart';
+import '../shared/person_tile.dart';
 
 /// Finds people in one tree by name.
 ///
@@ -306,24 +305,14 @@ class _SearchScreenState extends State<SearchScreen> {
         if (index == _results.length) return _moreFooter(context);
 
         final person = _results[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            leading: AuthenticatedImage(
-              url: person.thumbnailUrl,
-              records: widget.records,
-              name: person.name,
-              size: 48,
-            ),
-            title: Text(person.name),
-            // Isolated, or the Arabic layout around it reads 1875–1940 back
-            // to front and the person dies before they are born.
-            subtitle: person.lifespan == null
-                ? null
-                : Text(ltrRun(person.lifespan)),
-            onTap: () => widget.onOpenPerson(person.xref),
-          ),
+        // A search row is the one place the app draws somebody without
+        // knowing their sex: webtrees' autocomplete sends a name, a lifespan
+        // and sometimes a photograph, and nothing else. Opening them answers
+        // it; asking the server per row would be a request each.
+        return PersonTile(
+          person: person,
+          records: widget.records,
+          onOpen: () => widget.onOpenPerson(person.xref),
         );
       },
     );

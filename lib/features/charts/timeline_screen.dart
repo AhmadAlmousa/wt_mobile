@@ -5,8 +5,10 @@ import '../../data/session_manager.dart';
 import '../../data/stock/charts_repository.dart';
 import '../../data/stock/records_repository.dart';
 import '../../domain/charts.dart';
+import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/bidi.dart';
+import '../shared/chart_header_title.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import 'timeline_layout.dart';
@@ -39,6 +41,11 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   late Future<TimelineChart> _timeline;
 
+  /// Whose life this is. The record has to be fetched anyway — it is what
+  /// carries the timeline's address — so naming the person in the bar costs
+  /// nothing more than remembering them.
+  PersonRef? _subject;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +60,8 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   Future<TimelineChart> _fetch() async {
     final person = await widget.records.individual(widget.tree, widget.xref);
+    if (mounted) setState(() => _subject = person.asReference);
+
     final url = person.charts[ChartKind.timeline];
     if (url == null) throw const NotFound();
 
@@ -65,7 +74,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(text.chartTimeline),
+        title: ChartHeaderTitle(
+          title: text.chartTimeline,
+          person: _subject,
+          records: widget.records,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

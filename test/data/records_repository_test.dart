@@ -9,6 +9,7 @@ import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
 import 'package:webtrees_mobile/domain/notice.dart';
+import 'package:webtrees_mobile/domain/records.dart';
 
 import '../support/fake_webtrees.dart';
 
@@ -189,8 +190,37 @@ void main() {
         expect(person.thumbnailUrl, contains('media-thumbnail/M11/1'));
         expect(person.primaryFacts.map((f) => f.label), contains('الميلاد'));
         expect(person.parents.map((p) => p.xref), ['X7', 'X8']);
-        expect(person.children.map((p) => p.xref), ['X60', 'X61']);
+        expect(person.children.map((p) => p.xref), ['X60', 'X61', 'X62']);
         expect(person.warnings, isEmpty);
+      });
+
+      test('reads the subject’s own sex, years and death', () async {
+        serve(site(version: version));
+
+        final person = await records.individual('main', 'X42');
+
+        // None of this is on the individual page in a form that survives
+        // translation — the page states the sex as the *word* for it. It is
+        // lifted from the person's own chart box on the relatives tab, where
+        // they appear like anybody else.
+        expect(person.sex, Sex.male);
+        expect(person.lifespan, '1901–1974');
+        expect(person.isDeceased, isTrue);
+      });
+
+      test('a record with no relatives tab claims nothing about the person',
+          () async {
+        final withoutRelatives = site(version: version)
+          ..remove(tabRoute('relatives'));
+        serve(withoutRelatives);
+
+        final person = await records.individual('main', 'X42');
+
+        // The one place those facts are stated is gone, so the honest answer
+        // is silence — not a guess from the page title's years.
+        expect(person.sex, Sex.unknown);
+        expect(person.isDeceased, isFalse);
+        expect(person.warnings, isNotEmpty);
       });
 
       test('asks for each tab at the URL the page gave it', () async {

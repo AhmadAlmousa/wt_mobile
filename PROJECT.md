@@ -295,6 +295,30 @@ anonymous `/my-account`.
   `ALLOW_CHANGE_GEDCOM=1` and more than one tree.
 - The user's own XREF is **not** on the account page (disabled control, empty
   value). Read `a.menu-myrecord[href]` from any page of that tree.
+- **Every fact webtrees renders inside a chart box names its own GEDCOM tag.**
+  `Fact::summary()` emits
+  `<div class="fact_INDI:DEAT"><span class="label">…</span>: …</div>`, and
+  `chart-box.phtml` prints a run of those into `.wt-chart-box-facts` (the
+  person's birth and death) and into the hidden `.wt-chart-box-zoom-dropdown`
+  beside it (*everything*, their spouse families' facts included).
+
+  This is the only structural statement a stock site makes about what kind of
+  event a row is. Every label on a record page — the facts table, the family
+  blocks, a chart's captions — is already translated, and `INDI:SEX` is
+  rendered as the *word* for the sex rather than as a class. So the app reads
+  a page's chart boxes into a label → tag dictionary
+  (`data/stock/fact_tags.dart`) and uses it to name every other fact on that
+  same page. That is what makes "is this person dead", "did this marriage end
+  in divorce" and "which icon does this row get" answerable in Arabic.
+
+  **Read from the upstream templates, not yet from a captured page** — see §9.
+- **A person's own sex, lifespan and death come from the relatives tab, not
+  from their page.** They appear in their own family tables as a chart box
+  like anybody else, and that box carries `wt-chart-box-{m,f,u}`, the
+  lifespan, and the death fact. The individual page states the sex only as
+  the translated word for it, and the silhouette class
+  (`wt-individual-silhouette-m`) exists only for someone with no media on a
+  tree with silhouettes on — kept as a fallback, relied on for nothing.
 
 ### Charts
 
@@ -560,6 +584,9 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **6d** | Statistics — the counts, and the datasets behind its charts | ✅ |
 | **6e** | Timeline — a life against a scale of years | ✅ |
 | **6f** | Lifespans — several lives compared against one scale | ⬜ |
+| **7a** | Identity — who a person is, seen before it is read | ✅ |
+| **7b** | Charts — grouping, marital status, controls, export | 🚧 |
+| **7c** | Relationships — the path drawn, and the ways through it | ⬜ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -892,6 +919,67 @@ it was written, which is how the ordering looked deliberate and was not
 
 Released as **0.8.0**. **400 tests** green (384 → 400), analyzer clean, and the
 live check reads a real timeline against `tree.almou.sa`.
+
+---
+
+### 2026-08-23 — Phase 7a: who a person is, seen before it is read
+
+Everyone in the app looked the same. The same neutral tile whether the record
+said man, woman or nothing; no sign anywhere of who had died; a profile page
+that was one long run of grey rounded rectangles with no edge between a first
+marriage and a second. All of it was information the tree had been stating and
+the app had been throwing away.
+
+**The parser could not see any of it, and the reason was language.** Every
+label webtrees prints — `Death`, `الوفاة`, `Divorce` — is translated by the
+server before it arrives, and `INDI:SEX` is rendered as the *word* for the
+sex. A parser keyed on those words works in English and quietly does nothing
+in the language this app was built for.
+
+**`chart-box` gives it away.** `Fact::summary()` writes the GEDCOM tag into
+the class and the site's own translation into the label beside it, and
+webtrees prints a run of those into every chart box — the person's own events
+in `.wt-chart-box-facts`, and everything including their families' events in
+the hidden zoom dropdown. So a page teaches the app what *this* site calls a
+death and what it calls a divorce, and that dictionary then names every other
+fact on the same page. `FactTagIndex` (§3) is the whole mechanism, and it is
+what makes three separate features possible at once: the mourning ribbon, the
+per-fact icons, and knowing which of two marriages ended.
+
+**A person's own sex was never populated at all** — `IndividualRecord.sex`
+existed and nothing ever set it. It comes from the relatives tab now: the
+viewer appears in their own family tables as a chart box like anybody else,
+and that box carries the sex class, the lifespan and the death.
+
+**Blue and pink, derived rather than fixed.** `PersonColors` is a
+`ThemeExtension` beside `SemanticColors`, with separate light and dark pairs;
+text on them clears 8.7:1 in both. A pastel that reads correctly on paper
+turns to mud on a dark surface, and the generated expressive scheme offers
+nothing dependably blue or dependably pink to borrow. The avatar placeholder
+used to pick its colour by hashing the name — variety with no meaning, while
+the answer sat unread in a CSS class.
+
+**The header is built from the flexible space's own height, not from
+`FlexibleSpaceBar`'s title.** That widget lays a title out at `width / scale`
+and then magnifies it, so an Arabic name wraps to two lines and its romanized
+form truncates at exactly the moment there is most room for both — and, tall
+enough, the title grows up into the back button. Interpolating the portrait
+size and the text style against the measured height instead means every state
+is laid out at the width it is really drawn at.
+
+**Four copies of the same row became one.** Search results, relatives, a
+relationship step and its picker each wrote out their own card-avatar-name
+tile. `PersonTile` replaced all four, which is why a gender colour and a
+ribbon arrived everywhere in one change rather than four.
+
+Search results are the one place a person is still drawn without a sex:
+webtrees' autocomplete sends a name, a lifespan and sometimes a photograph,
+and nothing else. Their lifespan is recovered now, which it was not before.
+
+The fixtures gained a second marriage, ending in divorce, because the feature
+this phase is about is exactly the one a single family cannot exercise.
+
+Released as **0.9.0**. **419 tests** green (400 → 419), analyzer clean.
 
 ---
 
@@ -1249,7 +1337,7 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 400 tests
+flutter test          # 419 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
@@ -1294,29 +1382,41 @@ Both tools read the password from the terminal with echo disabled, or from
    Needs an instance that runs those modules and holds media. This is a gap in
    the *data* available, not in the code — but it is the largest untested
    surface the app now has.
-2. **A photograph can only be shown at thumbnail size.** The media tab signs
+2. **The chart-box fact blocks have not been seen from a real server either.**
+   `FactTagIndex` (§3) — and with it the death ribbon, the fact icons and the
+   per-family divorce mark — reads `.wt-chart-box-facts` and
+   `.wt-chart-box-zoom-dropdown`, both transcribed from `chart-box.phtml`
+   rather than captured. `tool/live_check.dart` against `tree.almou.sa` is
+   what would settle it, and needs a password.
+
+   Every reader of the index degrades on its own: an empty index means "this
+   page said nothing", so a site that renders no fact blocks loses the icons
+   and the divorce mark, and death falls back to whether the rendered lifespan
+   has a year after its dash. Nothing fails, and nothing is claimed that was
+   not read — but the difference between the two paths is currently unmeasured.
+3. **A photograph can only be shown at thumbnail size.** The media tab signs
    its URLs at 100 pixels, and the signature covers those dimensions, so the
    app cannot ask for a bigger copy — the full image lives behind the media
    *record* page, which v1 has no screen for. The gallery therefore shows
    thumbnails that do not open. Worth revisiting with a media record screen.
-3. **A chart is only as small as the tree it draws.** The app places one
+4. **A chart is only as small as the tree it draws.** The app places one
    widget per person, which a chart of a few dozen handles without noticing.
    A large family at three generations of descendants is already ninety-odd
    boxes on this instance, and a site whose administrator allows nine
    generations could ask for thousands. Nothing bounds that yet: no limit on
    what is fetched, no culling of what is off screen. Worth measuring on a
    real device before it is worth solving.
-4. **A relationship is read out of a layout, not a structure.** The path is
+5. **A relationship is read out of a layout, not a structure.** The path is
    recovered by walking a grid of table cells: robust against the lines and
    images webtrees draws between them, but not against a theme that changed
    the grid itself. The parser answers an empty path rather than a wrong one
    when the walk finds nothing, and the screen says the site found no link —
    which would be indistinguishable from a theme it could not read.
-5. **The charts have been read on 2.2.6 only.** Both parsers run against
+6. **The charts have been read on 2.2.6 only.** Both parsers run against
    fixtures for 2.2.6 and 2.3, and the two versions' chart templates differ by
    one attribute — but 2.3 has never answered a real request here, so that is
    an argument from source, not evidence.
-6. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
+7. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    tab fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
@@ -1326,21 +1426,21 @@ Both tools read the password from the terminal with echo disabled, or from
    parsers, which read them correctly, including a chart box carrying a whole
    facts dropdown no fixture has. Sanitized real captures in `test/fixtures/`
    are still the right next step.
-7. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
+8. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
-8. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
+9. **Tree list unavailable** when `ALLOW_CHANGE_GEDCOM != 1`. Falls back to the
    default tree; consider letting the user enter a tree name manually.
-9. **`local_auth` has no Linux support** — the biometric gate must degrade
+10. **`local_auth` has no Linux support** — the biometric gate must degrade
    gracefully on the development machine.
-10. **Upstream module API churn.** webtrees does not guarantee stability for
+11. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
    is built (v2), isolate volatile core APIs behind one adapter and run CI
    against both 2.2.x and 2.3.
-11. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
+12. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
-12. **Nothing has run on a real device.** This is now the largest gap by some
+13. **Nothing has run on a real device.** This is now the largest gap by some
    way: three of the six things Phase 4a changed — resuming through the
    biometric gate at launch, the Android back gesture, and the keystore that
    makes resuming possible at all — are *device* behaviours that a widget test
@@ -1350,7 +1450,7 @@ Both tools read the password from the terminal with echo disabled, or from
    networking still cannot be validated without hardware. Sideloadable builds
    exist (`flutter build apk --release --split-per-abi`, ~20MB for arm64), so
    this is now waiting on a device rather than on the toolchain.
-13. **"Works against any webtrees instance" is a goal, not a tested claim.**
+14. **"Works against any webtrees instance" is a goal, not a tested claim.**
    What is actually verified: 2.2.6 **live end to end** — connect, sign in,
    roles, search and its second page, opening a person, facts, relatives and
    family facts across 40 real records, the language switch and the calendar
@@ -1363,7 +1463,7 @@ Both tools read the password from the terminal with echo disabled, or from
    sections an instance offers (`sections offered` in `tool/live_check.dart`),
    which is the raw material for the compatibility matrix this still needs
    before release.
-14. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
+15. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
    on the `cal` parameter of the calendar links webtrees wraps each date in;
    2.3's rewritten `Date::display` emits no links, so nothing states which
    calendar a rendered date is in and the app shows both. Two further 2.3
@@ -1372,13 +1472,13 @@ Both tools read the password from the terminal with echo disabled, or from
    which would drop it from ordinary single dates; and it is bracketed rather
    than parenthesised. Worth reproducing on a 2.3 install and reporting
    upstream before building around it.
-15. **The app writes the account's language preference.** Aligning the server's
+16. **The app writes the account's language preference.** Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
    account with. Disclosed in the settings sheet; an optional module could
    avoid it, nothing stock can.
-16. **The Android compile-SDK override** rewrites every plugin subproject
+17. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.

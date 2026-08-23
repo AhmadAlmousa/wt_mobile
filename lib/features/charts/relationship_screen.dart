@@ -9,10 +9,11 @@ import '../../data/stock/records_repository.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
-import '../browse/authenticated_image.dart';
 import '../shared/bidi.dart';
+import '../shared/chart_header_title.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
+import '../shared/person_tile.dart';
 
 /// How two people in a tree are related.
 ///
@@ -46,6 +47,9 @@ class RelationshipScreen extends StatefulWidget {
 class _RelationshipScreenState extends State<RelationshipScreen> {
   late Future<IndividualRecord> _person;
 
+  /// The person the comparison starts from, once their record has arrived.
+  PersonRef? _subject;
+
   /// The person to compare with, once the reader has chosen one.
   PersonRef? _other;
   Future<List<RelationshipPath>>? _paths;
@@ -56,6 +60,10 @@ class _RelationshipScreenState extends State<RelationshipScreen> {
     _person = widget.session.withSession(
       () => widget.records.individual(widget.tree, widget.xref),
     );
+    // Remembered so the bar can name them while a path is being fetched.
+    _person.then((person) {
+      if (mounted) setState(() => _subject = person.asReference);
+    }).ignore();
   }
 
   void _compareWith(PersonRef other, IndividualRecord person) {
@@ -76,7 +84,13 @@ class _RelationshipScreenState extends State<RelationshipScreen> {
     final text = AppText.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(text.chartRelationship)),
+      appBar: AppBar(
+        title: ChartHeaderTitle(
+          title: text.chartRelationship,
+          person: _subject,
+          records: widget.records,
+        ),
+      ),
       body: SafeArea(
         child: FutureBuilder<IndividualRecord>(
           future: _person,
@@ -111,7 +125,7 @@ class _RelationshipScreenState extends State<RelationshipScreen> {
 
             return _Path(
               paths: _paths!,
-              from: PersonRef(xref: person.xref, name: person.name),
+              from: person.asReference,
               to: other,
               records: widget.records,
               bloodLinesOnly: ChartsRepository.bloodLinesOnly(
@@ -210,17 +224,17 @@ class _Path extends StatelessWidget {
               ],
               const SizedBox(height: 16),
               for (final path in found) ...[
-                _PersonRow(
+                PersonTile(
                   person: path.from,
                   records: records,
-                  onTap: () => onOpenPerson(path.from.xref),
+                  onOpen: () => onOpenPerson(path.from.xref),
                 ),
                 for (final step in path.steps) ...[
                   _Link(step.relationship),
-                  _PersonRow(
+                  PersonTile(
                     person: step.person,
                     records: records,
-                    onTap: () => onOpenPerson(step.person.xref),
+                    onOpen: () => onOpenPerson(step.person.xref),
                   ),
                 ],
                 const SizedBox(height: 24),
@@ -274,35 +288,6 @@ class _Link extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PersonRow extends StatelessWidget {
-  const _PersonRow({
-    required this.person,
-    required this.records,
-    required this.onTap,
-  });
-
-  final PersonRef person;
-  final RecordsRepository records;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      leading: AuthenticatedImage(
-        url: person.thumbnailUrl,
-        records: records,
-        name: person.name,
-        size: 44,
-      ),
-      title: Text(person.name),
-      subtitle: person.lifespan == null ? null : Text(ltrRun(person.lifespan)),
-      onTap: onTap,
-    ),
-  );
 }
 
 /// Finds the other person.
@@ -414,22 +399,10 @@ class _PersonPickerState extends State<_PersonPicker> {
             itemCount: _results.length,
             itemBuilder: (context, index) {
               final person = _results[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: AuthenticatedImage(
-                    url: person.thumbnailUrl,
-                    records: widget.records,
-                    name: person.name,
-                    size: 44,
-                  ),
-                  title: Text(person.name),
-                  subtitle: person.lifespan == null
-                      ? null
-                      : Text(ltrRun(person.lifespan)),
-                  onTap: () => widget.onPicked(person),
-                ),
+              return PersonTile(
+                person: person,
+                records: widget.records,
+                onOpen: () => widget.onPicked(person),
               );
             },
           ),

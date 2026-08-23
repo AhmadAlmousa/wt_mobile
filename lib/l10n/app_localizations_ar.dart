@@ -313,6 +313,27 @@ class AppTextAr extends AppText {
   String get eventsOfCloseRelatives => 'أحداث الأقارب';
 
   @override
+  String get deceased => 'متوفّى';
+
+  @override
+  String childCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ولد',
+      many: '$count ولدًا',
+      few: '$count أولاد',
+      two: 'ولدان',
+      one: 'ولد واحد',
+      zero: 'لا أولاد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordId => 'السجل';
+
+  @override
   String get settings => 'الإعدادات';
 
   @override

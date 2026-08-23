@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
+import 'package:webtrees_mobile/app/theme.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
+import 'package:webtrees_mobile/features/browse/authenticated_image.dart';
+import 'package:webtrees_mobile/features/charts/chart_canvas.dart';
 import 'package:webtrees_mobile/features/charts/fan_canvas.dart';
 
 import '../support/fake_webtrees.dart';
@@ -199,6 +202,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Facts and events'), findsOne);
+
+    await tester.scrollUntilVisible(
+      find.text('Parents'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Parents'), findsOne);
   });
 
@@ -230,6 +240,12 @@ void main() {
 
     // A marriage belongs to the family rather than to either person, and the
     // relatives tab is the only place a stock site states it.
+    await tester.scrollUntilVisible(
+      find.textContaining('1898 — الرياض'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.textContaining('1898 — الرياض'), findsOne);
 
     await tester.scrollUntilVisible(
@@ -241,8 +257,9 @@ void main() {
     expect(find.text('عائلته مع سارة'), findsOne);
     expect(find.textContaining('1925 — مكة'), findsOne);
     // Children are listed under the marriage they belong to, not merged into
-    // one list for everyone the person ever had.
-    expect(find.text('Children'), findsOne);
+    // one list for everyone the person ever had — and counted, so a reader
+    // can see at a glance how big each family was.
+    expect(find.text('2 children'), findsOne);
   });
 
   testWidgets('names a family even when its caption is empty', (tester) async {
@@ -339,10 +356,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // A grandfather above and a granddaughter below, on one canvas, with the
-    // person they have in common drawn once between them.
-    expect(find.text('سالم الموسى'), findsOne);
-    expect(find.text('ريم الموسى'), findsOne);
-    expect(find.text('عبد الله الموسى'), findsOne);
+    // person they have in common drawn once between them. Scoped to the
+    // canvas: the bar names the subject too, and that is not a second box.
+    Finder onTheChart(String name) => find.descendant(
+      of: find.byType(ChartCanvas),
+      matching: find.text(name),
+    );
+    expect(onTheChart('سالم الموسى'), findsOne);
+    expect(onTheChart('ريم الموسى'), findsOne);
+    expect(onTheChart('عبد الله الموسى'), findsOne);
 
     expect(server.routes, contains('/tree/main/ancestors-tree-4/X42'));
     expect(server.routes, contains('/tree/main/descendants-tree-3/X42'));
@@ -643,6 +665,60 @@ void main() {
     // what the reader sees most: a wall of identical silhouettes tells them
     // nothing about who is who.
     expect(find.text('ع'), findsOne);
+  });
+
+  testWidgets('colours a relative by the sex their record states', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('فاطمة السالم'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final colours = PersonColors.of(
+      tester.element(find.byType(Scaffold).first),
+    );
+    Color fillBehind(String name) {
+      final box = tester.widget<DecoratedBox>(
+        find
+            .ancestor(
+              of: find.text(name),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      return (box.decoration as BoxDecoration).color!;
+    }
+
+    // The father's initial sits on the blue container and the mother's on the
+    // pink one — read from `wt-chart-box-m`/`-f`, not from the name.
+    expect(fillBehind('م'), colours.male);
+    expect(fillBehind('ف'), colours.female);
+  });
+
+  testWidgets('marks someone the tree records as dead', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+
+    // Read from the death event in the person's own chart box, not from the
+    // years: a tree can record a death with no date at all.
+    expect(find.text('Deceased'), findsOne);
+
+    // Every portrait of them carries the ribbon, the one in the bar included.
+    final portraits = tester
+        .widgetList<AuthenticatedImage>(find.byType(AuthenticatedImage))
+        .where((image) => image.name == 'عبد الله الموسى');
+    expect(portraits, isNotEmpty);
+    expect(portraits.every((image) => image.deceased), isTrue);
   });
 
   testWidgets('offers a site’s statistics from the tree screen', (

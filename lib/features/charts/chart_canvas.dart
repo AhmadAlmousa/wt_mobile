@@ -201,6 +201,11 @@ class _PersonBox extends StatelessWidget {
                   url: placement.person.thumbnailUrl,
                   records: records,
                   name: placement.person.name,
+                  // The same face, in the same colours, with the same
+                  // ribbon as everywhere else: a chart is where a reader
+                  // most needs to tell a son from a daughter at a glance.
+                  sex: placement.person.sex,
+                  deceased: placement.person.isDeceased,
                   size: 40,
                 ),
                 const SizedBox(width: 8),

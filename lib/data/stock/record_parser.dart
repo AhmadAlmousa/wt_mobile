@@ -8,6 +8,7 @@ import '../../domain/dates.dart';
 import '../../domain/records.dart';
 import 'chart_box.dart';
 import 'dom.dart';
+import 'fact_tags.dart';
 
 /// Reads individuals out of the HTML a stock webtrees site renders.
 ///
@@ -57,10 +58,30 @@ final class RecordParser {
       thumbnailUrl: document
           .querySelector('img.img-thumbnail')
           ?.attributes['src'],
+      sex: _sexFromSilhouette(document),
       tabs: _tabs(document),
       inlineTabs: _inlineTabs(document),
       charts: parseChartMenu(document, xref: xref),
     );
+  }
+
+  /// The sex webtrees encoded in the silhouette it drew for this person.
+  ///
+  /// A weak signal and only a fallback: webtrees renders the silhouette in
+  /// place of a photograph, so it exists only for someone with no media on a
+  /// tree that has silhouettes switched on. It is here because the page's own
+  /// statement of sex — inside the names accordion — is the *translated* word
+  /// for it, and reading that would work in English alone. The reliable
+  /// answer comes from the chart boxes on the relatives tab.
+  static Sex _sexFromSilhouette(Document document) {
+    final silhouette = document.querySelector('.wt-individual-silhouette');
+    for (final name in silhouette?.classes ?? const <String>{}) {
+      if (name.startsWith('wt-individual-silhouette-') &&
+          name.length == 'wt-individual-silhouette-x'.length) {
+        return Sex.fromCssSuffix(name.substring(name.length - 1));
+      }
+    }
+    return Sex.unknown;
   }
 
   /// Every name recorded for this person, primary first.
@@ -159,8 +180,9 @@ final class RecordParser {
   ///
   /// Missing rows are not an error: a tree can restrict facts per record, and
   /// a person with nothing recorded legitimately renders an empty table.
-  List<FactEntry> parseFacts(String fragment) {
+  List<FactEntry> parseFacts(String fragment, {FactTagIndex? tags}) {
     final document = html.parseFragment(fragment);
+    final index = tags ?? FactTagIndex.empty;
     final facts = <FactEntry>[];
 
     for (final row in document.querySelectorAll('tr')) {
@@ -187,6 +209,10 @@ final class RecordParser {
           // Whose event this is, when webtrees folded someone else's into
           // this list: a sibling's birth, a family's marriage.
           about: _aboutOf(row),
+          // What kind of event it is, in GEDCOM's terms rather than in the
+          // reader's language — so an icon can be chosen for a death without
+          // the app knowing the word for one.
+          tag: index.tagFor(label),
           // webtrees collapses relatives' events, historical events and
           // associates by default; they are context, not this person's facts.
           isSecondary: classes.contains('collapse'),
@@ -545,8 +571,13 @@ final class RecordParser {
   /// Each family is its own table: a caption linking to the family record,
   /// then the couple, then any marriage facts, then the children — the order
   /// the upstream template emits in both supported versions.
-  List<FamilyGroup> parseRelatives(String fragment, {required String xref}) {
+  List<FamilyGroup> parseRelatives(
+    String fragment, {
+    required String xref,
+    FactTagIndex? tags,
+  }) {
     final document = html.parseFragment(fragment);
+    final index = tags ?? FactTagIndex.from(document);
     final families = <FamilyGroup>[];
 
     for (final table in document.querySelectorAll('table')) {
@@ -556,7 +587,7 @@ final class RecordParser {
       // the "date differences" toggle.
       if (familyXref == null) continue;
 
-      final (spouses, children, facts) = _splitFamily(table);
+      final (spouses, children, facts) = _splitFamily(table, index);
       families.add(
         FamilyGroup(
           xref: familyXref,
@@ -565,6 +596,9 @@ final class RecordParser {
           spouses: spouses,
           children: children,
           facts: facts,
+          // Read from this family's own rows, so a person married twice is
+          // divorced from one of them and not from the other.
+          endedInDivorce: facts.any((fact) => index.isDivorce(fact.label)),
         ),
       );
     }
@@ -579,6 +613,7 @@ final class RecordParser {
   /// pair of people are the couple.
   (List<PersonRef>, List<PersonRef>, List<FactEntry>) _splitFamily(
     Element table,
+    FactTagIndex index,
   ) {
     final spouses = <PersonRef>[];
     final children = <PersonRef>[];
@@ -592,7 +627,7 @@ final class RecordParser {
         // child" links an editor sees — carry no chart box either, but they
         // only ever appear after the children, so treating them as a divider
         // costs nothing.
-        final fact = _familyFact(row);
+        final fact = _familyFact(row, index);
         if (fact != null) facts.add(fact);
         if (row.querySelector('.field') != null) seenDivider = true;
         continue;
@@ -617,12 +652,16 @@ final class RecordParser {
   /// date carries no calendar links here — `Date::display()` is called without
   /// them — so this text is all there is. An empty field is normal: webtrees
   /// still prints the row for a marriage it has no date or place for.
-  FactEntry? _familyFact(Element row) {
+  FactEntry? _familyFact(Element row, FactTagIndex index) {
     final label = textOf(row.querySelector('td span.label'));
     if (label == null) return null;
 
     final value = cleanText(textOf(row.querySelector('td span.field')));
-    return FactEntry(label: label, value: _hasContent(value) ? value : null);
+    return FactEntry(
+      label: label,
+      value: _hasContent(value) ? value : null,
+      tag: index.tagFor(label),
+    );
   }
 
   /// Whether a rendered value says anything at all.
@@ -663,6 +702,7 @@ final class IndividualPage {
     Map<ChartKind, String> charts = const {},
     this.alternateName,
     this.thumbnailUrl,
+    this.sex = Sex.unknown,
   }) : tabs = Map.unmodifiable(tabs),
        inlineTabs = Map.unmodifiable(inlineTabs),
        charts = Map.unmodifiable(charts);
@@ -671,6 +711,10 @@ final class IndividualPage {
   final String name;
   final String? alternateName;
   final String? thumbnailUrl;
+
+  /// What the page itself gave away about this person's sex, which on a stock
+  /// site is usually nothing. See [RecordParser._sexFromSilhouette].
+  final Sex sex;
 
   /// Module name to fragment URL, exactly as the server wrote it.
   final Map<String, String> tabs;

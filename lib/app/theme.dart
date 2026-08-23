@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../domain/records.dart';
+
 /// The application's visual identity, in the Material 3 Expressive idiom.
 ///
 /// Expressive is not a switch Flutter exposes as one flag, so it is assembled
@@ -49,6 +51,9 @@ abstract final class AppTheme {
         brightness == Brightness.light
             ? SemanticColors.light
             : SemanticColors.dark,
+        brightness == Brightness.light
+            ? PersonColors.light
+            : PersonColors.dark,
       ],
       scaffoldBackgroundColor: colors.surface,
       splashFactory: InkSparkle.splashFactory,
@@ -284,6 +289,102 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
           Color.lerp(warningContainer, other.warningContainer, t)!,
       onWarningContainer:
           Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
+    );
+  }
+}
+
+/// The colours a person is drawn in, by the sex their record states.
+///
+/// A family tree is read by scanning it, and the first thing anybody scans
+/// for is which of two people is which. webtrees says so with a class on
+/// every chart box; before this the app threw that away and picked an avatar
+/// colour by hashing the name, which was variety without meaning.
+///
+/// Blue and pink, because that is what a reader of a family tree expects and
+/// what webtrees' own themes use — but derived per brightness rather than
+/// fixed, because a pastel that reads correctly on paper turns to mud on a
+/// dark surface. Each pair clears 4.5:1 between its container and the text
+/// drawn on it, in both themes.
+///
+/// Not taken from the generated scheme: `DynamicSchemeVariant.expressive`
+/// rotates hues far from the seed and offers nothing dependably blue or
+/// dependably pink, and a role that happens to land near one today would move
+/// the next time the seed changed. Same reasoning as [SemanticColors].
+@immutable
+class PersonColors extends ThemeExtension<PersonColors> {
+  const PersonColors({
+    required this.male,
+    required this.onMale,
+    required this.female,
+    required this.onFemale,
+    required this.unknown,
+    required this.onUnknown,
+  });
+
+  static const PersonColors light = PersonColors(
+    male: Color(0xFFCFE4F7),
+    onMale: Color(0xFF0E3350),
+    female: Color(0xFFF8D3E2),
+    onFemale: Color(0xFF4A1030),
+    unknown: Color(0xFFE2E2E4),
+    onUnknown: Color(0xFF3A3A3E),
+  );
+
+  static const PersonColors dark = PersonColors(
+    male: Color(0xFF14384F),
+    onMale: Color(0xFFBFDDF5),
+    female: Color(0xFF4A2136),
+    onFemale: Color(0xFFF6C9DC),
+    unknown: Color(0xFF37373B),
+    onUnknown: Color(0xFFDCDCE0),
+  );
+
+  final Color male;
+  final Color onMale;
+  final Color female;
+  final Color onFemale;
+  final Color unknown;
+  final Color onUnknown;
+
+  /// The container colour and the colour to draw on it, for [sex].
+  (Color, Color) forSex(Sex sex) => switch (sex) {
+    Sex.male => (male, onMale),
+    Sex.female => (female, onFemale),
+    Sex.unknown => (unknown, onUnknown),
+  };
+
+  /// The set in force, falling back to light rather than throwing if the
+  /// extension was somehow not registered.
+  static PersonColors of(BuildContext context) =>
+      Theme.of(context).extension<PersonColors>() ?? light;
+
+  @override
+  PersonColors copyWith({
+    Color? male,
+    Color? onMale,
+    Color? female,
+    Color? onFemale,
+    Color? unknown,
+    Color? onUnknown,
+  }) => PersonColors(
+    male: male ?? this.male,
+    onMale: onMale ?? this.onMale,
+    female: female ?? this.female,
+    onFemale: onFemale ?? this.onFemale,
+    unknown: unknown ?? this.unknown,
+    onUnknown: onUnknown ?? this.onUnknown,
+  );
+
+  @override
+  PersonColors lerp(ThemeExtension<PersonColors>? other, double t) {
+    if (other is! PersonColors) return this;
+    return PersonColors(
+      male: Color.lerp(male, other.male, t)!,
+      onMale: Color.lerp(onMale, other.onMale, t)!,
+      female: Color.lerp(female, other.female, t)!,
+      onFemale: Color.lerp(onFemale, other.onFemale, t)!,
+      unknown: Color.lerp(unknown, other.unknown, t)!,
+      onUnknown: Color.lerp(onUnknown, other.onUnknown, t)!,
     );
   }
 }

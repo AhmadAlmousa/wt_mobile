@@ -1,9 +1,9 @@
 {
   "@@locale": "en",
-
   "appTitle": "webtrees",
-  "@appTitle": {"description": "The application name, shown as the task title."},
-
+  "@appTitle": {
+    "description": "The application name, shown as the task title."
+  },
   "connectTitle": "Connect to your family tree",
   "connectSubtitle": "Enter the address of your webtrees site.",
   "siteAddress": "Site address",
@@ -12,7 +12,6 @@
   "connect": "Connect",
   "connecting": "Connecting…",
   "recentSites": "Recent",
-
   "signIn": "Sign in",
   "signingIn": "Signing you in…",
   "usernameOrEmail": "Username or email",
@@ -30,10 +29,24 @@
   "degradedServerWarning": "This site reports a minor server configuration problem. Signing in should still work.",
   "webtrees": "webtrees",
   "webtreesVersion": "webtrees {version}",
-  "@webtreesVersion": {"placeholders": {"version": {"type": "String"}}},
+  "@webtreesVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "hostAndVersion": "{host} · webtrees {version}",
-  "@hostAndVersion": {"placeholders": {"host": {"type": "String"}, "version": {"type": "String"}}},
-
+  "@hostAndVersion": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "yourAccess": "Your access",
   "checkAgain": "Check again",
   "signOut": "Sign out",
@@ -43,33 +56,34 @@
   "tryAgain": "Try again",
   "familyTrees": "Family trees",
   "siteAdministrator": "Site administrator",
-
   "roleAdministrator": "Administrator",
   "roleManager": "Manager",
   "roleModerator": "Moderator",
   "roleEditor": "Editor",
   "roleMember": "Member",
   "roleReadOnly": "Read-only",
-
   "describeAdministrator": "You administer this site, so you manage every tree in it.",
   "describeManager": "You can change this tree and its settings.",
   "describeModerator": "You can edit records and approve changes other people submit.",
   "describeEditor": "You can edit records. Your changes wait for a moderator to approve them.",
   "describeMember": "You can view this tree, including living relatives.",
   "describeMemberOrVisitor": "You can view this tree. It is public, so the app cannot tell whether you are signed in as a member or seeing it as any visitor would.",
-
   "canEdit": "Can edit",
   "canApproveChanges": "Can approve changes",
   "canManage": "Can manage",
   "linkedTo": "Linked to {xref}",
-  "@linkedTo": {"placeholders": {"xref": {"type": "String"}}},
-
+  "@linkedTo": {
+    "placeholders": {
+      "xref": {
+        "type": "String"
+      }
+    }
+  },
   "searchForAPerson": "Search for a person",
   "searchHint": "A name, or a record id such as I42",
   "searchPrompt": "Type a name to search this family tree.",
   "searching": "Searching…",
   "noMatches": "Nobody matched that name. Try a different spelling, or part of the name.",
-
   "yourAccount": "Your account",
   "person": "Person",
   "reload": "Reload",
@@ -113,7 +127,16 @@
   "chartEmpty": "Nobody else is recorded here yet.",
   "showMoreResults": "Show more",
   "eventsOfCloseRelatives": "Events of close relatives",
-
+  "deceased": "Deceased",
+  "childCount": "{count, plural, =0{No children} =1{1 child} other{{count} children}}",
+  "@childCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recordId": "Record",
   "settings": "Settings",
   "appearance": "Appearance",
   "themeSystem": "Follow the device",
@@ -130,31 +153,80 @@
   "calendarHijri": "Hijri",
   "calendarOnlyWhenOffered": "A date is only shown in the calendar you choose when the site converts it. Otherwise it appears as the site wrote it.",
   "done": "Done",
-
   "errorUnreachableHost": "Could not reach {address}.{detail} Check the address and your connection.",
-  "@errorUnreachableHost": {"placeholders": {"address": {"type": "String"}, "detail": {"type": "String"}}},
+  "@errorUnreachableHost": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
   "errorNotWebtrees": "{address} answered, but it does not look like a webtrees site. Check the address — it should point at the page where you normally sign in.",
-  "@errorNotWebtrees": {"placeholders": {"address": {"type": "String"}}},
+  "@errorNotWebtrees": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
   "errorMaintenanceMode": "The site is offline for maintenance. Try again later.",
   "errorServerUnhealthy": "The webtrees site reports a server configuration problem and cannot run. Its administrator needs to look at the control panel.",
   "errorBlockedAsBot": "The site blocked this app as automated traffic ({reason}).",
-  "@errorBlockedAsBot": {"placeholders": {"reason": {"type": "String"}}},
+  "@errorBlockedAsBot": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "errorSignInRejected": "That username or password was not accepted.",
   "errorStaleSignIn": "The sign-in attempt expired. Try again.",
   "errorSessionExpired": "Your session ended. Sign in again.",
   "errorNotPermitted": "Your account does not have access to this.",
   "errorNotFound": "That item does not exist, or is not visible to you.",
   "errorUnexpectedResponse": "The site responded unexpectedly (HTTP {status}).",
-  "@errorUnexpectedResponse": {"placeholders": {"status": {"type": "int"}}},
+  "@errorUnexpectedResponse": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "errorCannotRead": "Could not read {what} from this webtrees version. It may use a theme or version this app has not seen yet.",
-  "@errorCannotRead": {"placeholders": {"what": {"type": "String"}}},
+  "@errorCannotRead": {
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
   "errorParseFailure": "Could not read the {parser} on this site. It may use a theme or a webtrees version this app has not seen yet.",
-  "@errorParseFailure": {"placeholders": {"parser": {"type": "String"}}},
-
+  "@errorParseFailure": {
+    "placeholders": {
+      "parser": {
+        "type": "String"
+      }
+    }
+  },
   "noticeSiteRenamedItself": "This site calls itself {canonical}. The app will use that address, because its sign-in cookie is issued for that host.",
-  "@noticeSiteRenamedItself": {"placeholders": {"canonical": {"type": "String"}}},
+  "@noticeSiteRenamedItself": {
+    "placeholders": {
+      "canonical": {
+        "type": "String"
+      }
+    }
+  },
   "noticeBlocklistUnchecked": "Could not check the site blocklist: {reason}",
-  "@noticeBlocklistUnchecked": {"placeholders": {"reason": {"type": "String"}}},
+  "@noticeBlocklistUnchecked": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "noticeVersionUnreadable": "Could not read the site version.",
   "noticeSiteUnidentified": "This site did not identify itself as webtrees. The app will continue, but some features may not work.",
   "noticeNoTreesVisible": "This account cannot see any family tree. Its administrator may still need to grant access.",
@@ -165,5 +237,11 @@
   "noticeSourcesUnavailable": "Sources could not be loaded for this person.",
   "noticeMediaUnavailable": "Photos could not be loaded for this person.",
   "noticeSectionUnavailable": "The {module} section could not be loaded.",
-  "@noticeSectionUnavailable": {"placeholders": {"module": {"type": "String"}}}
+  "@noticeSectionUnavailable": {
+    "placeholders": {
+      "module": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -313,6 +313,24 @@ class AppTextEn extends AppText {
   String get eventsOfCloseRelatives => 'Events of close relatives';
 
   @override
+  String get deceased => 'Deceased';
+
+  @override
+  String childCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count children',
+      one: '1 child',
+      zero: 'No children',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get recordId => 'Record';
+
+  @override
   String get settings => 'Settings';
 
   @override
