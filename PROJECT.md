@@ -211,8 +211,22 @@ the per-tree ladder is skipped entirely.
 
 **Member vs Visitor:** distinguishable only for *private* trees. `TreeService::all()`
 lists a private tree only for users whose role is not Visitor, so an anonymous
-`404` on `/tree/{t}` while signed-in access works **proves membership**. Public
-trees stay ambiguous, and the UI must say so rather than guess.
+refusal on `/tree/{t}` while signed-in access works **proves membership**.
+Public trees stay ambiguous, and the UI must say so rather than guess.
+
+> **The status differs by version, and reading only `404` broke this on 2.3.**
+> 2.2.x hands the unmatched route to the not-found handler (`404`); 2.3 lets it
+> match with a null tree and `Validator::tree()` throws
+> `HttpBadRequestException` (`400`). Both mean "this tree did not bind", and
+> the app composed the URL so a `400` cannot be its own malformed request —
+> `TreeVisibility.of` accepts both. Confirmed against a private tree on each.
+> A `403` still proves nothing.
+
+**`GET /login` answers `400` on 2.3** — and renders the whole page anyway, meta
+tags included. So anything reading that page must key on *what the body
+contains*, not on the status: the version probe required `200` and lost the
+version on every 2.3 site, while sign-in kept working only because it read the
+CSRF token out of the body without checking. Both now read the body.
 
 **Only these statuses carry meaning.** A probe answers a question about the
 *account*; a `302` or a `5xx` answers a question about the *session* or the
@@ -500,6 +514,13 @@ confirmed by reading both versions while writing `api_eval.md`.
   available; the graph construction and the exclusion loop are not. It would be
   the module's **only** duplicated core logic, and therefore its only silent
   drift risk.
+- **Tree privacy is a column, not a preference.** Schema 45 moved
+  `REQUIRE_AUTHENTICATION` out of `gedcom_setting` and into a `private` column
+  on `gedcom`. 2.2.6 kept a deprecated shim that redirects the write (with no
+  `WHERE` clause, so it makes *every* tree private); 2.3 removed it, and the
+  write lands in a table nothing reads. Anything setting it must write the
+  column. `Tree::private()` reads it correctly in both, which is what the
+  module uses.
 - **A module may set CORS headers.** `SecurityHeaders` sets five headers, none
   of them CORS, and only fills in what a response has not already set — so a
   module route can add `Access-Control-Allow-Origin`. Flutter Web is ruled out
@@ -618,10 +639,19 @@ is the **shape** — who descends from whom — and draws it again.
   exactly as a record's tabs do — including one that holds a *form* for
   building a chart rather than a chart. It is read and found to contain no
   figures, rather than skipped by its name.
-- **The data is JSON; the options beside it are not.** webtrees writes some
-  option objects by hand, with comments and unquoted keys, so a parser that
-  decoded both would drop every chart whose options were hand-written — which
-  is most of the pie charts (§7, bug 23).
+- **The data is JSON; the options beside it are not** — *on 2.2.x*. webtrees
+  writes some option objects by hand, with comments and unquoted keys, so a
+  parser that decoded both would drop every chart whose options were
+  hand-written, which is most of the pie charts (§7, bug 23).
+- **2.3 replaced Google Charts with Chart.js, and moved the data out of the
+  script entirely.** It is now on the canvas: `data-wt-chart-type`,
+  `data-wt-chart-data` and `data-wt-chart-options`. The data is Chart.js's own
+  shape — `labels` down the side, one `datasets` entry per series holding a
+  `data` array parallel to them — which is the *transpose* of what Google
+  Charts took, so rows are rebuilt rather than copied. A break and an
+  improvement at once: the options are now **strict JSON**, which retires bug
+  23 on 2.3. Read from a fixture captured off a running 2.3, because the
+  hand-written one that preceded it was the reason nobody noticed (§7, bug 30).
 - A map chart names each place twice, `{"v": "KW", "f": "الكويت"}`: the code it
   plots by and the name a reader wants.
 - **A timeline states its own scale.** Every year label is a `div` whose id
@@ -827,7 +857,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **7a** | Identity — who a person is, seen before it is read | ✅ |
 | **7b** | Charts — grouping, marital status, controls, export | ✅ |
 | **7c** | Relationships — the path drawn, and the ways through it | ✅ |
-| **8a** | The server module — a read-only JSON API, and the transports to use it | ✅ — written, not yet executed (no PHP on this machine) |
+| **8a** | The server module — a read-only JSON API, and the transports to use it | ✅ |
+| **8b** | The lab: 2.2.6 and 2.3 installs, the module running, both transports diffed | ✅ — synthetic data only, see §9 #18 |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -849,6 +880,27 @@ from a box to the person.
 | Lifespan | bars positioned against a scale of decades, the same way | 6f |
 | Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | ✅ 6d |
 | Pedigree map | a map. Out of scope for v1 — no map dependency is worth the weight yet | — |
+
+### Which capabilities are cleared for the module
+
+`api_eval.md` §13 rule 6: a capability moves to the module only once its
+endpoint has passed live against real data. This is that ledger — and it is
+**not** a list of parsers to delete. §11's rule is permanent: every capability
+keeps its HTML path, because the first constraint in §1 is that the app works
+against an untouched instance. "Cleared" means the capability composer may
+prefer the module where one is installed, which it already does automatically;
+the parser behind it stays, fixtures and all, and stays tested.
+
+| Capability | Both transports agree | Cleared |
+|---|---|---|
+| `access` | 2.2.6 · 2.3 — account, admin, tree count, role | ✅ |
+| `individual` | 2.2.6 · 2.3 — name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, dates in both calendars | ✅ |
+| `individuals` | 2.2.6 · 2.3 — same result count for the same query | ✅ |
+| `family`, `ancestors`, `descendants`, `relationship`, `timeline`, `statistics`, `media`, `notes`, `sources` | answer identically on both, but are not yet diffed against the stock path field by field | ⬜ |
+
+Cleared on **synthetic** data. §9 #18 is the standing caveat: fourteen invented
+people is not 1,463 real ones, and nothing here has met the tree it was built
+for.
 
 **Exit criteria**
 
@@ -1509,6 +1561,77 @@ only after its endpoint has passed live against real data, and no endpoint has
 run at all yet. The stock path is the floor, permanently, and today it is also
 the only path any real instance uses.
 
+### 2026-08-23 (later still) — Phase 8b: running it, and what that cost
+
+PHP was installed, so the module was executed for the first time. `tool/lab/`
+stands up throwaway webtrees installs on SQLite — 2.2.6 on `:8622`, 2.3 on
+`:8623` — with the module symlinked into each and a synthetic Arabic tree in
+which every person is invented. `tool/live_check.dart` then reads the same
+person through both transports and diffs them field by field.
+
+**The verdict is good, and it is the first evidence of any kind.** On both
+versions the module and the HTML parsers agree on name, alternate name, sex,
+deceased, lifespan, every relative count, primary facts, tags named, and the
+same date in both calendars. All thirteen endpoints answer on both, and the
+payloads are identical between versions. d'Aboville numbers continue across a
+second marriage — bug 26's exact case, now positively confirmed rather than
+merely fixed. Cousins yield two distinct paths. The relationship wording is the
+site's own, including `شقيق أكبر`, the older-brother distinction Arabic makes
+and English cannot.
+
+**Six bugs in an afternoon (§7, 30–35), after a document argued from source,
+508 green tests and a live 2.2.6 run had all passed the same code.** That ratio
+is the point of this entry. Reading found five errors in `api_eval.md`; running
+found six more, and none of them was subtle once seen:
+
+- `capabilities.languages` was a JSON *object*, because `findByInterface()`
+  keys its collection by module name. The client decoded it as empty.
+- `I18N::init()` changed the *dates* and not the *labels*. The global stack
+  registers every GEDCOM tag's label between `UseLanguage` and `Router`, and
+  `Gedcom::registerTags()` evaluates them eagerly — so by the time module
+  middleware runs, the element factory is already holding the session's
+  language. The tags have to be registered again. **§9 #16 is now closed and
+  demonstrated**: `?lang=en-GB` answers `Birth | 21 Dhū al-Qiʿdah 1318`, the
+  next request is Arabic again, and the account's stored preference is
+  untouched — which no stock route can do.
+- Only an anonymous `404` proved a tree private. 2.3 answers `400` for the same
+  condition, so every private tree there was silently downgraded to
+  `memberOrVisitor`.
+- The site version was read only from a `200`. 2.3 answers `400` for
+  `GET /login` and renders the whole page regardless, so 2.3 sites lost the
+  version the parsers key on — while sign-in kept working purely because it
+  read the CSRF token out of the body without checking the status.
+- **The statistics parser found zero charts on 2.3, and had done all along.**
+  2.3 replaced Google Charts with Chart.js and moved the data out of the
+  `<script>` onto the canvas as `data-wt-chart-*` attributes. The `v2_3`
+  fixture had been written by hand in 2.2.6's shape, so the tests were green
+  and the app was broken. It now reads both roads, from a fixture *captured*
+  off a running 2.3, and answers 14 charts there where it answered none.
+  The new options are strict JSON, which retires bug 23 on 2.3.
+
+**And one that was not a bug at all, which is the one worth remembering.** For
+about an hour the module appeared to serve a private tree to an anonymous
+caller on 2.3 — which reads exactly like a privacy hole, and would have been
+the worst finding here. It was the *lab* that was wrong: schema 45 moved tree
+privacy from a setting row to a `private` column, 2.2.6 kept a shim that
+redirects the write and 2.3 removed it, so the tree had never been private.
+With the column set, anonymous access is refused `404` on both. A frightening
+finding deserves the same scepticism as a convenient one, and the database was
+one query away.
+
+**Three of the six were stock-path bugs, not module bugs** — the statistics
+charts, the private-tree status and the site version. All three are
+version-specific breaks on 2.3 that had been shipping unnoticed, because until
+today nothing had ever run this app against a 2.3. That is now §9 #20: assume
+there are more, and that only running against both finds them.
+
+**Nothing has been retired, and nothing will be.** `api_eval.md` §11 is
+permanent — every capability keeps its HTML path, because the first constraint
+is that the app works against an untouched instance. What §13 rule 6 actually
+gates is which capabilities the composer may *prefer* the module for, and that
+is now a ledger in §5. Three are cleared: `access`, `individual`, `individuals`.
+All on fourteen invented people, which is why §9 #18 stays open.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -1545,6 +1668,12 @@ the only path any real instance uses.
 | 27 | `fact_INDI:DEAT` was read out of the 2.3 template; the class is bare, `fact_DEAT` | **A captured fixture** |
 | 28 | `api_eval.md` recommended `I18N::language()->formatDate()` as version-neutral; it does not exist in 2.2.6 at all | **Reading both versions while writing the code** |
 | 29 | The contract suite's fixture gave the subject one spouse where the HTML fixture gave him two | **The contract suite, on its first run** |
+| 30 | The `v2_3` statistics fixture was hand-written in **2.2.6's** shape, so the parser was green while every chart on a real 2.3 site came back empty | **A 2.3 lab install** |
+| 31 | `capabilities.languages` was a JSON *object*: `findByInterface()` keys its collection by module name | **A 2.3 lab install** |
+| 32 | `I18N::init()` did not change a label — only a date. Tag labels are registered eagerly *before* `Router`, so they were already Arabic | **A 2.3 lab install** |
+| 33 | Only an anonymous `404` proved a tree private; 2.3 answers `400`, silently downgrading every private tree there to `memberOrVisitor` | **A 2.3 lab install** |
+| 34 | The version was read only from a `200`; 2.3 answers `400` for `GET /login` and renders the page anyway | **A 2.3 lab install** |
+| 35 | The lab set tree privacy through `setPreference('REQUIRE_AUTHENTICATION')`, which schema 45 turned into a column — so the tree was never private, and it looked exactly like the module leaking one | **Checking the database rather than believing the symptom** |
 
 Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
 the fixtures held a second marriage — a fixture that reproduces exactly what
@@ -1554,7 +1683,26 @@ had been warning about since the beginning. 27 was the reverse: the *captured*
 template invented a qualified form that webtrees has never emitted. Read the
 capture before believing the template.
 
-Bugs 28 and 29 are the newest pair, and they are about *documents* rather than
+Bugs 30–35 all arrived in one afternoon, from the same cause: **the module was
+executed for the first time.** Every one had survived a document argued from
+source, 508 green tests and a live run against a real 2.2.6 instance. Five were
+found within an hour of the first lab install, and the sixth (35) was found by
+disbelieving the other five for long enough to check.
+
+30 is the sharpest, because it is bug 27 again with the versions swapped: a
+fixture *transcribed from an assumption* rather than captured, and green tests
+certifying it. It hid a total failure — not a wrong value, but **zero charts on
+every 2.3 site**, for as long as the app has claimed to support 2.3.
+
+35 is the one worth remembering for next time. The symptom was a private tree
+readable by an anonymous caller through the module on 2.3, which reads exactly
+like a privacy hole. It was the *lab* that was wrong: schema 45 moved tree
+privacy from a setting row to a column, 2.2.6 kept a shim and 2.3 dropped it,
+so the tree had never been private at all. The lesson is not "check the
+fixture" — it is that a frightening finding deserves the same scepticism as a
+convenient one, and the database was one query away.
+
+Bugs 28 and 29 are the previous pair, and they are about *documents* rather than
 markup. 28: `api_eval.md` is argued from source and cites a file and a line for
 every claim, and it still got `formatDate()` wrong — because the method exists,
 and the reading checked that rather than checking *which version* it exists in.
@@ -1886,13 +2034,27 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 508 tests
+flutter test          # 505 tests
 flutter analyze       # must stay clean
 
-# The server module, on a machine with no PHP: structure, unused imports, and
-# every webtrees class it names checked against BOTH 2.2.6 and 2.3 — failing
-# if anything outside src/Compat/ exists in only one.
+# The server module. Static first — structure, unused imports, and every
+# webtrees class it names checked against BOTH 2.2.6 and 2.3, failing if
+# anything outside src/Compat/ exists in only one:
 python3 tool/check_module.py [../webtrees]
+find server -name '*.php' -print0 | xargs -0 -n1 php -l
+
+# Then actually run it. Two throwaway installs on SQLite, the module symlinked
+# into each, and a synthetic Arabic tree in which every person is invented.
+# Requires: php8.4-cli php8.4-{sqlite3,mbstring,intl,gd,xml,curl,zip} composer
+tool/lab/setup.sh 2.2.6 8622
+tool/lab/setup.sh main  8623
+php -S localhost:8622 -t ../lab/webtrees-2.2.6 ../lab/webtrees-2.2.6/index.php &
+
+# live_check reads the same person through BOTH transports and diffs them
+# field by field — which is the only check that has ever caught a difference
+# between them. Note the explicit scheme: a bare host defaults to https.
+WEBTREES_PASSWORD=lab-member-password \
+  dart run tool/live_check.dart --url http://localhost:8622 --user mobile
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
@@ -2045,43 +2207,52 @@ Both tools read the password from the terminal with echo disabled, or from
    rather than a design change, and it is worth reproducing on a running 2.3
    install and **reporting upstream**. The bracketing (`[…]` rather than
    `(…)`) is deliberate and needs no report.
-   A module would sidestep both: it reads `convertToCalendar()` directly and
-   emits the calendar as data (§3).
+   **Closed by the module, demonstrated on both labs.** It reads
+   `convertToCalendar()` directly and states each calendar with its GEDCOM
+   escape, so `CalendarView` works on 2.3 where the markup names nothing: on
+   the 2.3 lab the stock path answers `dates naming their calendar: 0 of 1`
+   and the module answers `٢١ ذو القعدة ١٣١٨` for the same fact. Open, and
+   permanently so, on the stock path — 2.3's markup simply does not say.
 16. **The app writes the account's language preference.** *(Closed by a module;
    open on stock.)* Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
    account with. Disclosed in the settings sheet; nothing stock can avoid it.
-   **A module can, and the mechanism is now known**: module route middleware
-   runs inside `Router`, i.e. after `UseLanguage`, so it may call
-   `I18N::init($tag)` from `Accept-Language` for one request and touch neither
-   the session nor the stored preference (§3).
+   **The module does, and it is demonstrated on both labs.** Module route
+   middleware runs inside `Router`, i.e. after `UseLanguage`, so it calls
+   `I18N::init($tag)` from `?lang=` or `Accept-Language` for one request and
+   touches neither the session nor the stored preference: asking in `en-GB`
+   answers `Birth | 21 Dhū al-Qiʿdah 1318`, the next request is Arabic again,
+   and the account's `language` row still reads `ar`.
+   `I18N::init()` **alone was not enough**, which only running it showed: the
+   global stack registers every GEDCOM tag's label between `UseLanguage` and
+   `Router`, and `Gedcom::registerTags()` evaluates them eagerly — so the first
+   attempt answered English dates beside Arabic labels (§7, bug 32). The tags
+   have to be registered again after the language changes.
 17. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.
-18. **The API module is written and has never answered a request.** *(Was
-   "designed and not written"; the risk narrowed rather than closed.)* There is
-   no PHP, no composer and no webtrees install on this machine, so
-   `server/webtrees-mobile-api/` has been verified by reading source and by
-   `tool/check_module.py` — which resolves every `Fisharebest\Webtrees\…`
-   import against **both** versions and fails on anything version-specific
-   outside `src/Compat/` — and by nothing else. Writing it already contradicted
-   the design in five places (§3, `api_eval.md` §14), one of which would have
-   shipped a module that did not boot on 2.2.6, which is a fair estimate of how
-   much more a running server will find.
-   That is the failure mode §7 keeps recording: bugs 14–16 were 185 green tests
-   agreeing with a fake more permissive than the real thing. Two things to
-   expect: the scrapers have been exercised against 40 real records and the
-   module has not been at all, and running two transports doubles the
-   meaningful test surface for as long as both exist — which, because the stock
-   path is permanent, is forever.
-   **Next step, and it is a prerequisite for everything else:** install the
-   module on a lab 2.2.x *and* a lab 2.3, and run
-   `tool/live_check.dart`, which now reads the same person through both
-   transports and diffs them field by field. No parser is retired until its
-   endpoint has passed that.
+18. **The module runs, on synthetic data only.** *(Was "written and has never
+   answered a request"; narrowed twice, still open.)* It is installed on a
+   2.2.6 and a 2.3 lab (§8), every endpoint answers on both, and
+   `tool/live_check.dart` reads the same person through both transports and
+   finds them identical — name, sex, deceased, lifespan, every relative count,
+   primary facts, tags named, and the same date in both calendars. Executing it
+   cost six bugs in an afternoon (§7, 30–35) after a document argued from
+   source, 508 green tests and a live 2.2.6 run had all passed it.
+   **What is still untested is the data.** The lab tree is fourteen invented
+   people built to hold the shapes the parsers care about; the real one is
+   1,463 people with whatever a century of record-keeping put in it. The
+   scrapers have been exercised against 40 real records and the module against
+   none, so the next step is a lab loaded from a **copy** of the real tree —
+   locally, never committed — and after that the module installed on
+   `tree.almou.sa` itself.
+   Two things remain true regardless: running two transports doubles the
+   meaningful test surface for as long as both exist, which is forever; and no
+   capability is cleared until its endpoint has passed live against real data
+   (see the ledger in §5).
 19. **`RelationshipFinder` is the module's only duplicated core logic.**
    `RelationshipsChartModule::calculateRelationships()` and its two helpers are
    `private`, so ~150 lines of Dijkstra over the `link` table are ported rather
@@ -2090,7 +2261,13 @@ Both tools read the password from the terminal with echo disabled, or from
    divergence would be silent on both sides. Mitigate by testing module output
    against the rendered chart for a set of known pairs, which needs a lab
    install (see 18).
-20. **The module's surname index and enumeration have never met a large tree.**
+20. **The stock path is losing ground on 2.3, and only a lab shows it.** Three
+   version-specific breaks turned up the first time the app met a real 2.3:
+   the statistics charts (bug 30), the private-tree status (33) and the site
+   version (34). All three are fixed, and none was visible to 508 tests or to
+   the 2.2.6 instance the project was built against. Assume there are more, and
+   that the only thing that finds them is running against both.
+21. **The module's surname index and enumeration have never met a large tree.**
    `searchIndividualNames()` walks a PHP cursor rather than a SQL `LIMIT`, so
    a deep offset is `O(offset)`; `searchIndividualsAdvanced()` fetches a whole
    surname partition (webtrees caps it at 5,000) and pages it in PHP. Both are

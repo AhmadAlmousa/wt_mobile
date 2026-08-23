@@ -36,10 +36,15 @@ enum StatisticShape {
   /// as a list rather than dropped.
   other;
 
-  /// Reads the name out of a `statistics.drawPieChart` call.
+  /// Reads the shape a site named, however it named it.
+  ///
+  /// 2.2.x writes it into a call — `statistics.drawPieChart(…)` — and 2.3 into
+  /// a `data-wt-chart-type` attribute. The vocabulary is nearly the same, and
+  /// where it differs the answer is the same: a bar, a column, a combo and a
+  /// line are all "a quantity per category" to a reader.
   static StatisticShape fromCall(String name) => switch (name.toLowerCase()) {
-    'pie' => StatisticShape.pie,
-    'column' || 'combo' || 'bar' => StatisticShape.column,
+    'pie' || 'doughnut' => StatisticShape.pie,
+    'column' || 'combo' || 'bar' || 'line' => StatisticShape.column,
     _ => StatisticShape.other,
   };
 }

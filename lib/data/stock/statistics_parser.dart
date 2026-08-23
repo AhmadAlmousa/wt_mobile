@@ -10,10 +10,23 @@ import 'dom.dart';
 ///
 /// Two things are worth taking, and they arrive by different roads. The counts
 /// are in the markup, rendered by the server in the reader's own numerals. The
-/// data behind each chart is in a `<script>` beside it, written as JSON for a
-/// JavaScript charting library — plain numbers, because nobody was meant to
-/// read them. The app draws its own charts from the second and shows the first
-/// as it arrived.
+/// data behind each chart is beside it, as plain numbers written for a
+/// charting library rather than for a reader. The app draws its own charts
+/// from the second and shows the first exactly as it arrived.
+///
+/// **The two supported versions carry that data completely differently**, and
+/// the app has to read both:
+///
+/// * **2.2.x** calls Google Charts from a `<script>`:
+///   `statistics.drawPieChart("id", [["Sex","Total"],["Males",6]], {…})`.
+/// * **2.3** replaced it with Chart.js and moved the data into attributes on
+///   the canvas: `data-wt-chart-type`, `data-wt-chart-data` and
+///   `data-wt-chart-options`.
+///
+/// The change is a break and an improvement at once. It cost the app every
+/// chart on 2.3 — found by running against one, not by reading — but the new
+/// options are **strict JSON**, where the old ones were hand-written
+/// JavaScript with comments and unquoted keys, which is what §7 bug 23 was.
 final class StatisticsParser {
   const StatisticsParser();
 
@@ -40,7 +53,17 @@ final class StatisticsParser {
       total = null;
     }
 
-    for (final element in document.querySelectorAll('h4, h5, script')) {
+    // Document order across all four, so a chart lands in the section whose
+    // heading came before it.
+    for (final element in document.querySelectorAll(
+      'h4, h5, script, [data-wt-chart-type]',
+    )) {
+      if (element.attributes.containsKey('data-wt-chart-type')) {
+        final dataset = _datasetOn(element);
+        if (dataset != null) datasets.add(dataset);
+        continue;
+      }
+
       switch (element.localName) {
         case 'h4':
           // A heading starts a section, and often carries the figure for the
@@ -60,6 +83,74 @@ final class StatisticsParser {
     finish();
 
     return sections;
+  }
+
+  /// One chart, read from the attributes webtrees 2.3 puts on its canvas.
+  ///
+  /// `data-wt-chart-data` is Chart.js's own shape: `labels` down the side and
+  /// one `datasets` entry per series, each holding a `data` array parallel to
+  /// the labels. That is the transpose of what Google Charts took, so the rows
+  /// are rebuilt rather than copied.
+  StatisticDataset? _datasetOn(Element element) {
+    final data = _json(element.attributes['data-wt-chart-data']);
+    if (data is! Map) return null;
+
+    final labels = data['labels'];
+    final series = data['datasets'];
+    if (labels is! List || series is! List || series.isEmpty) return null;
+
+    final options = _json(element.attributes['data-wt-chart-options']);
+
+    final rows = <StatisticRow>[];
+    for (var index = 0; index < labels.length; index++) {
+      rows.add(
+        StatisticRow(
+          label: _cellLabel(labels[index]),
+          values: [
+            for (final one in series)
+              if (one is Map && one['data'] is List)
+                if ((one['data']! as List).elementAtOrNull(index)
+                    case final num value)
+                  value.toDouble(),
+          ],
+        ),
+      );
+    }
+
+    return StatisticDataset(
+      title: _titleOn(options) ?? '',
+      shape: StatisticShape.fromCall(
+        element.attributes['data-wt-chart-type'] ?? '',
+      ),
+      // No category heading in this shape — only the series have names, and a
+      // single-series chart does not even have those. Nothing displays these;
+      // they are kept because the 2.2 road produces them.
+      columns: [
+        for (final one in series)
+          if (one is Map && one['label'] is String) one['label']! as String,
+      ],
+      rows: rows,
+    );
+  }
+
+  /// The chart's own title, from `options.plugins.title.text`.
+  static String? _titleOn(Object? options) {
+    if (options is! Map) return null;
+    final plugins = options['plugins'];
+    if (plugins is! Map) return null;
+    final title = plugins['title'];
+    if (title is! Map) return null;
+    final text = title['text'];
+    return text is String && text.isNotEmpty ? text : null;
+  }
+
+  static Object? _json(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      return jsonDecode(value);
+    } on FormatException {
+      return null;
+    }
   }
 
   /// A heading's words, without the count webtrees pins to the end of it.

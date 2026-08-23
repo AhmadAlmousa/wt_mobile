@@ -134,8 +134,14 @@ Future<void> main(List<String> args) async {
           : 'not installed (the stock transport answers everything)',
     );
     if (capabilities.isPresent) {
-      report('capabilities', (capabilities.features.toList()..sort()).join(', '));
-      report('languages offered', (capabilities.languages.toList()..sort()).join(', '));
+      report(
+        'capabilities',
+        (capabilities.features.toList()..sort()).join(', '),
+      );
+      report(
+        'languages offered',
+        (capabilities.languages.toList()..sort()).join(', '),
+      );
       report(
         'limits',
         'page≤${capabilities.maxPageSize} '
@@ -295,11 +301,20 @@ Future<void> main(List<String> args) async {
               .expand((date) => date.pieces)
               .whereType<DateValue>()
               .where((value) => value.calendar != DateCalendar.unknown);
+          // 2.2.x wraps each rendered date in a calendar link whose `cal`
+          // parameter names the calendar; 2.3 dropped the links and says
+          // nothing. That is a permanent property of 2.3's markup, not a
+          // parser fault — so on 2.3 it is a caveat rather than a failure,
+          // and the module answers the same question correctly (§9 #15).
+          final namesCalendars = !instance.version.startsWith('2.3');
           report(
             'dates naming their calendar',
-            '${named.length} of ${dated.length} dated fact(s) — '
-                '${named.map((v) => v.calendar.name).toSet().join(', ')}',
-            ok: named.isNotEmpty,
+            named.isEmpty && !namesCalendars
+                ? 'none — 2.3 states no calendar in its markup, so only the '
+                      'module can answer this (PROJECT.md §9 #15)'
+                : '${named.length} of ${dated.length} dated fact(s) — '
+                      '${named.map((v) => v.calendar.name).toSet().join(', ')}',
+            ok: named.isNotEmpty || !namesCalendars,
           );
 
           final sample = dated.firstWhere(

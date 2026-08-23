@@ -1015,9 +1015,69 @@ webtrees source, and fails if anything outside `src/Compat/` names a class that
 exists in only one. `.github/workflows/module.yml` runs that plus `php -l` on
 8.3 and 8.4.
 
-Neither runs an endpoint. The module has not been executed: there is no PHP on
-the machine it was written on, and no webtrees install to load it into. Until
-one exists, §13's rule stands unchanged and matters more than ever — **retire a
-parser only after its endpoint has passed live against real data**, and
-`tool/live_check.dart` now reads the same tree through both transports and
-diffs them field by field.
+Neither runs an endpoint. That gap is closed below.
+
+---
+
+## 15. Running it
+
+**Added 2026-08-23, after the module was executed.** `tool/lab/` in the client
+repository stands up throwaway webtrees installs on SQLite — 2.2.6 and 2.3 side
+by side — with the module symlinked in and a synthetic Arabic tree of fourteen
+invented people. `tool/live_check.dart` reads the same person through both
+transports and diffs them field by field.
+
+**It works, on both versions, and the payloads are identical between them.**
+All thirteen endpoints answer. Module and stock agree on name, alternate name,
+sex, deceased, lifespan, every relative count, primary facts, tags named, and
+the same date in both calendars. d'Aboville numbers continue across a second
+marriage; cousins yield two distinct paths; the relationship wording stays the
+site's own.
+
+### Six more things reading did not find
+
+Reading this document's own sources produced five errors (§14). Running the
+code produced six more, in one afternoon:
+
+1. `capabilities.languages` was a JSON **object** — `findByInterface()` keys
+   its collection by module name, and `->map()->all()` keeps the keys.
+2. **`I18N::init()` is not sufficient to change the language.** This is the one
+   §4 got most wrong. Module middleware does run after `UseLanguage`, exactly
+   as claimed — but the global stack also registers every GEDCOM tag's *label*
+   between `UseLanguage` and `Router`, and `Gedcom::registerTags()` evaluates
+   each label eagerly. So the element factory is already holding the session's
+   language by the time a module can act, and the first attempt answered
+   English dates beside Arabic labels. `registerTags()` has to be called again.
+3. Tree privacy is a **column**, not a preference: schema 45 moved
+   `REQUIRE_AUTHENTICATION` into `gedcom.private`, 2.2.6 kept a deprecated shim
+   and 2.3 removed it. §9's "a private tree fails to bind" is still true — but
+   anything *setting* privacy must write the column, and a lab that used the
+   preference produced a tree that was never private and a symptom that looked
+   exactly like the module leaking one.
+4. An unbindable `{tree}` answers **`400` on 2.3**, not `404` — `Validator`
+   throws `HttpBadRequestException`. §9's advice to "answer 404" is what the
+   module does, and it is now the *more* consistent of the two.
+5. `GET /login` answers **`400` on 2.3** while rendering the whole page.
+6. 2.3 replaced Google Charts with **Chart.js**, moving statistics data out of
+   the `<script>` and onto the canvas as `data-wt-chart-*` attributes. §7's
+   claim that this endpoint retires `<script>` scraping holds; what it missed
+   is that the scraping was *already* broken on 2.3, and that the new markup is
+   strict JSON, which retires bug 23 on the stock path too.
+
+### What §13 rule 6 actually means
+
+"Retire a parser only after its endpoint has passed live" cannot mean *delete*,
+because §11 makes the stock path permanent. It means: a capability becomes one
+the composer may **prefer** the module for. The parser behind it stays, stays
+fixtured and stays tested — otherwise the first constraint in `PROJECT.md` §1
+is broken the moment a site declines to install the module.
+
+Three capabilities are cleared on that reading — `access`, `individual`,
+`individuals` — and the ledger lives in `PROJECT.md` §5.
+
+### What is still untested
+
+**The data.** Fourteen invented people is not 1,463 real ones. The scrapers
+have been exercised against 40 real records and the module against none, so the
+remaining steps are a lab loaded from a copy of the real tree, and then the
+module installed on the instance itself.
