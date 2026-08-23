@@ -1723,6 +1723,8 @@ of those three tab modules, so nothing has ever read them from a real server.
 | 35 | The lab set tree privacy through `setPreference('REQUIRE_AUTHENTICATION')`, which schema 45 turned into a column — so the tree was never private, and it looked exactly like the module leaking one | **Checking the database rather than believing the symptom** |
 | 36 | Every undated person carried a lifespan of `…–`. `Individual::lifespan()` always writes something so a chart box keeps its height; the app showed it | **The real tree** |
 | 37 | The module read no second name for a person recorded twice in the *same* script. `GedcomRecord::alternateName()` answers only when the two differ by character set | **The real tree** |
+| 38 | `deceased` was `Individual::isDead()`, which *infers* death from age — so a person born in 1850 with no death recorded was dead to the module and unknown to a chart box | **`live_check --sample`** |
+| 39 | A converted date repeated its qualifier: `about 1875 (about 1292)` where webtrees writes `about 1875 (1292)` | **`live_check --sample`** |
 
 Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
 the fixtures held a second marriage — a fixture that reproduces exactly what
@@ -1732,7 +1734,20 @@ had been warning about since the beginning. 27 was the reverse: the *captured*
 template invented a qualified form that webtrees has never emitted. Read the
 capture before believing the template.
 
-Bugs 36 and 37 are the two the *real* tree found, on the first request the
+Bugs 38 and 39 are what **one record could not find**. 36 and 37 came from
+diffing a single person; `--sample` walks the tree instead, and the first run
+of it turned up two more classes on the fourteen-person lab — an inferred death
+and a doubled date qualifier — which a 60-record sample of the real tree then
+confirmed on four of its own. Both are cases where a hand-picked record is the
+worst possible witness: they need someone born long ago with no death recorded,
+and an `ABT`/`EST` date. Neither is rare, and neither was in the record the
+first diff happened to choose.
+
+That is now the standing check: `--sample` against both labs, which is the only
+thing that reads real markup through both transports across many shapes at
+once.
+
+Bugs 36 and 37 are the two the *real* tree found on the first request the
 module ever served against 1,463 people rather than fourteen invented ones —
 and neither could have come from anywhere else. Both were disagreements between
 the transports on one woman's record: a lifespan of `…–` where she has no
@@ -2096,6 +2111,8 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 #   --person XREF     diff this record specifically, when one disagrees
+#   --sample N        walk N records and diff every one — the check that
+#                     finds what a single hand-picked record cannot
 
 flutter test          # 509 tests
 flutter analyze       # must stay clean
@@ -2361,7 +2378,10 @@ a phase, or a batch of fixes that changes what the app does. Not every edit.
    anything newly confirmed against a real server, §7 for a bug worth the
    lesson, and §9 for a risk that opened or closed.
 3. **Verify.** `flutter analyze`, `flutter test`, and — after any change to the
-   transport or the parsers — `tool/live_check.dart` against a real instance.
+   transport, the parsers or the module — `tool/live_check.dart --sample 14`
+   against **both** labs (§8) and then against a real instance. One record is
+   not a sample: bugs 38 and 39 were invisible to a single-record diff and
+   obvious to the first walk of a whole tree.
    Bug #5 was invisible to unit tests, and bugs 14–16 were invisible to 185 of
    them.
 4. **Build the APKs.** `flutter build apk --release --split-per-abi`. It is the

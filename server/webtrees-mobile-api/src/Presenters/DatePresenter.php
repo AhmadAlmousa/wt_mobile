@@ -74,16 +74,18 @@ final class DatePresenter
 
         $escape   = $this->compat->calendarEscape($date->minimumDate());
         $rendered = [$this->entry($escape, $native)];
+        $bare     = [$native];
 
         foreach ($this->conversions($date, $escape, $native) as $conversion) {
-            $rendered[] = $conversion;
+            $rendered[] = $conversion['entry'];
+            $bare[]     = $conversion['bare'];
         }
 
         return [
             'gedcom'    => $this->gedcom($date),
             // What the site itself would print: the native rendering with its
             // conversions after it, in webtrees' own parentheses.
-            'text'      => $this->compose($rendered),
+            'text'      => $this->compose($bare),
             'qualifier' => $qualifier === '' ? null : $qualifier,
             'julianDay' => [$date->minimumJulianDay(), $date->maximumJulianDay()],
             'rendered'  => $rendered,
@@ -121,7 +123,7 @@ final class DatePresenter
      * it is the point: the module presents what webtrees decided, it does not
      * decide for itself which calendars a site publishes.
      *
-     * @return array<array<string,string>>
+     * @return array<array<string,mixed>>
      */
     private function conversions(Date $date, string $native_escape, string $native_text): array
     {
@@ -140,7 +142,7 @@ final class DatePresenter
                 continue;
             }
 
-            [$escape, $text] = $converted;
+            [$escape, $text, $bare] = $converted;
 
             // webtrees converts regardless of calendar and shows the result
             // only when it differs — which is what stops a year-only date
@@ -149,14 +151,25 @@ final class DatePresenter
                 continue;
             }
 
-            $conversions[$escape] = $this->entry($escape, $text);
+            $conversions[$escape] = [
+                'entry' => $this->entry($escape, $text),
+                // Without the qualifier. `Date::display()` renders a
+                // conversion by formatting the converted *date* and leaving
+                // the surrounding words to the original, so an `ABT 1875`
+                // reads "about 1875 (1292)" and never "about 1875 (about
+                // 1292)". The full form above is what a reader asking for
+                // Hijri *alone* should see, so both are kept.
+                'bare'  => $bare,
+            ];
         }
 
         return array_values($conversions);
     }
 
     /**
-     * @return array{0:string,1:string}|null The escape and the rendering.
+     * @return array{0:string,1:string,2:string}|null Escape, rendering, and
+     *                                                the rendering without
+     *                                                the date's qualifier.
      */
     private function convert(Date $date, string $calendar): array|null
     {
@@ -179,6 +192,7 @@ final class DatePresenter
         return [
             $this->compat->calendarEscape($minimum),
             $this->render(new Date($gedcom)),
+            $this->render(new Date($this->compat->gedcomOf($minimum))),
         ];
     }
 
@@ -197,14 +211,15 @@ final class DatePresenter
     /**
      * One string holding every calendar, the way webtrees prints them.
      *
-     * @param array<array<string,string>> $rendered
+     * @param array<string> $parts The native rendering, then each conversion
+     *                             without its qualifier.
      */
-    private function compose(array $rendered): string
+    private function compose(array $parts): string
     {
-        $text = $rendered[0]['text'];
+        $text = $parts[0];
 
-        foreach (array_slice($rendered, 1) as $conversion) {
-            $text .= ' (' . $conversion['text'] . ')';
+        foreach (array_slice($parts, 1) as $conversion) {
+            $text .= ' (' . $conversion . ')';
         }
 
         return $text;

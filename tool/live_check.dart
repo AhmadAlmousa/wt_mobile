@@ -27,6 +27,7 @@ import 'package:webtrees_mobile/data/module/module_records.dart';
 import 'package:webtrees_mobile/data/session.dart';
 import 'package:webtrees_mobile/data/stock/charts_repository.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
+import 'package:webtrees_mobile/data/transport.dart';
 import 'package:webtrees_mobile/domain/charts.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
 import 'package:webtrees_mobile/domain/records.dart';
@@ -41,7 +42,8 @@ Future<void> main(List<String> args) async {
   if (address == null) {
     stderr.writeln(
       'Usage: dart run tool/live_check.dart --url HOST '
-      '[--user NAME] [--search TERM] [--language TAG] [--person XREF]',
+      '[--user NAME] [--search TERM] [--language TAG] [--person XREF] '
+      '[--sample N]',
     );
     exitCode = 64;
     return;
@@ -123,6 +125,11 @@ Future<void> main(List<String> args) async {
     // The optional module. A site without one answers 404 here and every
     // later check runs against HTML, which is the ordinary case and the floor
     // the app is built on.
+    // 2.2.x wraps every rendered date in a calendar link naming its calendar;
+    // 2.3 dropped the links. That decides what the stock path can possibly
+    // know about calendars, so several checks below turn on it (§9 #15).
+    final namesCalendars = !instance.version.startsWith('2.3');
+
     stdout.writeln('\n=== Module ===');
     final capabilities = await ModuleCapabilities.probe(client);
     report(
@@ -306,7 +313,6 @@ Future<void> main(List<String> args) async {
           // nothing. That is a permanent property of 2.3's markup, not a
           // parser fault — so on 2.3 it is a caveat rather than a failure,
           // and the module answers the same question correctly (§9 #15).
-          final namesCalendars = !instance.version.startsWith('2.3');
           report(
             'dates naming their calendar',
             named.isEmpty && !namesCalendars
@@ -670,59 +676,89 @@ Future<void> main(List<String> args) async {
       if (xref == null) {
         stdout.writeln('  SKIP  nobody to compare');
       } else {
-        final byHtml = await stock.individual(tree.name, xref);
-        final byJson = await module.individual(tree.name, xref);
+        await comparePerson(
+          tree.name,
+          xref,
+          stock,
+          module,
+          compare,
+          report,
+          strictDates: namesCalendars,
+        );
+      }
 
-        compare('name', byHtml.name, byJson.name);
-        compare('alternate name', byHtml.alternateName, byJson.alternateName);
-        compare('sex', byHtml.sex.name, byJson.sex.name);
-        compare('deceased', byHtml.isDeceased, byJson.isDeceased);
-        compare('lifespan', byHtml.lifespan, byJson.lifespan);
-        compare('parents', byHtml.parents.length, byJson.parents.length);
-        compare('siblings', byHtml.siblings.length, byJson.siblings.length);
-        compare('spouses', byHtml.spouses.length, byJson.spouses.length);
-        compare('children', byHtml.children.length, byJson.children.length);
-        compare(
-          'primary facts',
-          byHtml.primaryFacts.length,
-          byJson.primaryFacts.length,
-        );
+      // One record proves very little of a tree with thousands in it, and the
+      // two disagreements the real tree found were both on a person nothing
+      // would have picked out — no dates, and a second name in the same
+      // script. `--sample N` walks the tree instead, which is the only way to
+      // meet the shapes a hand-picked record never has.
+      final sample = int.tryParse(options['sample'] ?? '') ?? 0;
+      if (sample > 0 && capabilities.has('individuals')) {
+        stdout.writeln('\n=== Module vs stock, $sample records ===');
 
-        // The headline claim: every fact typed, including the ones no chart
-        // box ever printed a class for.
-        int typed(IndividualRecord record) =>
-            record.facts.where((fact) => fact.tag != null).length;
-        report(
-          'facts naming their GEDCOM tag',
-          'stock=${typed(byHtml)}/${byHtml.facts.length}  '
-              'module=${typed(byJson)}/${byJson.facts.length}',
-          ok: typed(byJson) >= typed(byHtml),
-        );
-
-        // A date has to survive the crossing intact, calendars included —
-        // this is what makes an Arabic tree readable at all.
-        final left = byHtml.facts.firstWhere(
-          (fact) => fact.date != null,
-          orElse: () => const FactEntry(label: ''),
-        );
-        final right = byJson.facts.firstWhere(
-          (fact) => fact.label == left.label && fact.date != null,
-          orElse: () => const FactEntry(label: ''),
-        );
-        if (left.date == null || right.date == null) {
-          stdout.writeln('  SKIP  no dated fact in common');
-        } else {
-          compare(
-            'date (both calendars)',
-            left.date!.display(CalendarView.both),
-            right.date!.display(CalendarView.both),
-          );
-          compare(
-            'date (hijri only)',
-            left.date!.display(CalendarView.hijri),
-            right.date!.display(CalendarView.hijri),
-          );
+        // An empty query enumerates, which is the whole reason this is
+        // possible: no stock route can hand back a page of a whole tree.
+        final walked = <String>[];
+        for (var page = 1; walked.length < sample; page++) {
+          final found = await module.search(tree.name, '', page: page);
+          if (found.people.isEmpty) break;
+          walked.addAll(found.people.map((person) => person.xref));
+          if (!found.hasMore) break;
         }
+
+        var checked = 0;
+        var differed = 0;
+        final seen = <String>{};
+
+        for (final one in walked.take(sample)) {
+          // Quietly, unless something disagrees: a hundred passing records is
+          // not a report, and the one that differs must not be buried in it.
+          final problems = <String>[];
+          void quiet(String label, Object? left, Object? right) {
+            if (left == right) return;
+
+            // The module knowing something the page could not say is the
+            // point of it, not a difference to report. A record with no
+            // relatives tab has no chart box, and a chart box is the only
+            // place a stock client can read a sex, a lifespan or a death —
+            // so `null` on the left is silence, not disagreement.
+            if (left == null) return;
+
+            problems.add('$label: stock=$left module=$right');
+          }
+
+          try {
+            await comparePerson(
+              tree.name,
+              one,
+              stock,
+              module,
+              quiet,
+              null,
+              strictDates: namesCalendars,
+            );
+          } on WebtreesError catch (error) {
+            problems.add('threw ${error.runtimeType}');
+          }
+
+          checked++;
+          if (problems.isEmpty) continue;
+
+          differed++;
+          for (final problem in problems) {
+            if (seen.add(problem.split(':').first)) {
+              stdout.writeln('  FAIL  $one — $problem');
+            }
+          }
+        }
+
+        report(
+          'records compared',
+          '$checked walked, $differed with a difference'
+              '${seen.isEmpty ? '' : ' across ${seen.length} field(s)'}',
+          ok: differed == 0,
+        );
+        if (differed > 0) failures += differed - 1;
       }
 
       if (capabilities.has('individuals')) {
@@ -765,6 +801,89 @@ Future<void> main(List<String> args) async {
     failures == 0 ? '\nAll checks passed.' : '\n$failures failed.',
   );
   exitCode = failures == 0 ? 0 : 1;
+}
+
+/// Compares one person as read by each transport.
+///
+/// [note] receives every field; [report] is given the headline ones when a
+/// single record is being examined, and omitted when a sample is being walked
+/// quietly.
+Future<void> comparePerson(
+  String tree,
+  String xref,
+  RecordsTransport stock,
+  RecordsTransport module,
+  void Function(String label, Object? left, Object? right) note,
+  void Function(String label, Object? value, {bool ok})? report, {
+  bool strictDates = true,
+}) async {
+  final byHtml = await stock.individual(tree, xref);
+  final byJson = await module.individual(tree, xref);
+
+  note('name', byHtml.name, byJson.name);
+  note('alternate name', byHtml.alternateName, byJson.alternateName);
+  note('sex', byHtml.sex.name, byJson.sex.name);
+  note('deceased', byHtml.isDeceased, byJson.isDeceased);
+  note('lifespan', byHtml.lifespan, byJson.lifespan);
+  note('parents', byHtml.parents.length, byJson.parents.length);
+  note('siblings', byHtml.siblings.length, byJson.siblings.length);
+  note('spouses', byHtml.spouses.length, byJson.spouses.length);
+  note('children', byHtml.children.length, byJson.children.length);
+  note('primary facts', byHtml.primaryFacts.length, byJson.primaryFacts.length);
+
+  // The headline claim: every fact typed, including the ones no chart box
+  // ever printed a class for. The module may name *more*, never fewer.
+  int typed(IndividualRecord record) =>
+      record.facts.where((fact) => fact.tag != null).length;
+
+  if (report != null) {
+    report(
+      'facts naming their GEDCOM tag',
+      'stock=${typed(byHtml)}/${byHtml.facts.length}  '
+          'module=${typed(byJson)}/${byJson.facts.length}',
+      ok: typed(byJson) >= typed(byHtml),
+    );
+  } else if (typed(byJson) < typed(byHtml)) {
+    note('facts typed', typed(byHtml), typed(byJson));
+  }
+
+  // A date has to survive the crossing intact, calendars included — this is
+  // what makes an Arabic tree readable at all.
+  final left = byHtml.facts.firstWhere(
+    (FactEntry fact) => fact.date != null,
+    orElse: () => const FactEntry(label: ''),
+  );
+  final right = byJson.facts.firstWhere(
+    (FactEntry fact) => fact.label == left.label && fact.date != null,
+    orElse: () => const FactEntry(label: ''),
+  );
+
+  if (left.date == null || right.date == null) {
+    if (report != null) stdout.writeln('  SKIP  no dated fact in common');
+    return;
+  }
+
+  final bothStock = left.date!.display(CalendarView.both);
+  final bothModule = right.date!.display(CalendarView.both);
+
+  if (strictDates) {
+    note('date (both calendars)', bothStock, bothModule);
+    note(
+      'date (hijri only)',
+      left.date!.display(CalendarView.hijri),
+      right.date!.display(CalendarView.hijri),
+    );
+    return;
+  }
+
+  // 2.3 states no calendar in its markup, so the stock path cannot offer a
+  // conversion and cannot drop to one either — it answers the bare native
+  // date for every view (§9 #15). The module answering *more* is the point of
+  // it, so what is checked here is only that it did not answer something
+  // *else*: whatever the page rendered must still be in what the module sent.
+  if (!bothModule.contains(bothStock)) {
+    note('date (2.3, module must not lose the page)', bothStock, bothModule);
+  }
 }
 
 /// How many generations a chart turned out to hold.

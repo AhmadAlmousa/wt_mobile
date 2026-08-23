@@ -48,11 +48,26 @@ final class PersonPresenter
             'name'          => Text::of($individual->fullName()),
             'alternateName' => $this->alternateName($individual),
             'sex'           => self::sexName($this->compat->sexCode($individual)),
-            'deceased'      => $individual->isDead(),
+            'deceased'      => $this->isDeceased($individual),
             'lifespan'      => $this->lifespan($individual),
             'thumbnail'     => $this->thumbnailUrl($individual),
             'private'       => !$individual->canShow(),
         ];
+    }
+
+    /**
+     * Whether the tree **records** this person as no longer living.
+     *
+     * Not `Individual::isDead()`, which also *infers* death from age — a
+     * person born in 1850 with no death recorded is dead to webtrees and
+     * unknown to a chart box, so the two transports disagreed about exactly
+     * that. The contract the app documents is "the tree said so", because the
+     * HTML path reads a death fact out of a chart box and can never know
+     * anything else. False therefore means "nothing said so", not "alive".
+     */
+    private function isDeceased(Individual $individual): bool
+    {
+        return $individual->facts(['DEAT'])->isNotEmpty();
     }
 
     /**
