@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -254,44 +256,67 @@ class _RibbonPainter extends CustomPainter {
   /// left-to-right layout.
   final bool fromTheStart;
 
-  /// How far along each edge the band reaches, as a share of the avatar.
-  static const double _reach = 0.40;
-
-  /// How wide the band itself is, as a share of the avatar.
-  static const double _width = 0.115;
+  /// Where the band's outer and inner edges cut each of the two edges either
+  /// side of the corner, as a share of the avatar.
+  ///
+  /// Both edges are drawn well past the avatar and cut back by the clip
+  /// around this painter, so the band meets the border on both sides instead
+  /// of stopping short of it — which is the difference between a ribbon and a
+  /// black smudge floating over a corner.
+  static const double _outer = 0.30;
+  static const double _inner = 0.54;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final reach = size.shortestSide * _reach;
-    final width = size.shortestSide * _width;
+    // The band is worked out for the leading corner and mirrored for the
+    // other, so there is one piece of geometry rather than two that have to
+    // agree.
+    if (!fromTheStart) {
+      canvas
+        ..save()
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+    }
 
-    // Two points on the edges either side of the corner, and the band drawn
-    // between them: the corner it cuts off is the corner the eye lands on.
-    final along = fromTheStart
-        ? [Offset(0, reach), Offset(reach, 0)]
-        : [Offset(size.width - reach, 0), Offset(size.width, reach)];
+    final outer = size.shortestSide * _outer;
+    final inner = size.shortestSide * _inner;
+    // Far enough past every edge that the clip, not the path, decides where
+    // the band ends.
+    final beyond = size.width + size.height;
 
-    final direction = fromTheStart ? 1.0 : -1.0;
+    // Everything between the lines x + y = outer and x + y = inner.
     final band = Path()
-      ..moveTo(along.first.dx, along.first.dy)
-      ..lineTo(along.last.dx, along.last.dy)
-      ..lineTo(along.last.dx + direction * width, along.last.dy + width)
-      ..lineTo(along.first.dx + direction * width, along.first.dy + width)
+      ..moveTo(-beyond, outer + beyond)
+      ..lineTo(outer + beyond, -beyond)
+      ..lineTo(inner + beyond, -beyond)
+      ..lineTo(-beyond, inner + beyond)
       ..close();
 
-    canvas.drawPath(band, Paint()..color = const Color(0xFF16161A));
-    // A hairline of light along the outer edge, so the band still reads as a
-    // ribbon against a dark photograph rather than as a missing corner.
+    // Lit along the outer edge and falling away into the corner, so the band
+    // reads as cloth lying over the picture rather than as a hole cut in it.
     canvas.drawPath(
       band,
       Paint()
-        ..color = const Color(0x33FFFFFF)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.75,
+        ..shader = ui.Gradient.linear(
+          Offset(outer / 2, outer / 2),
+          Offset(inner / 2, inner / 2),
+          const [Color(0xFF2A2A31), Color(0xFF0C0C10)],
+        ),
     );
+
+    // A hairline of light along the outer edge, so the band still reads as a
+    // ribbon against a dark photograph rather than as a missing corner.
+    canvas.drawLine(
+      Offset(-beyond, outer + beyond),
+      Offset(outer + beyond, -beyond),
+      Paint()
+        ..color = const Color(0x40FFFFFF)
+        ..strokeWidth = math.max(size.shortestSide * 0.014, 0.6),
+    );
+
+    if (!fromTheStart) canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_RibbonPainter old) =>
-      old.fromTheStart != fromTheStart;
+  bool shouldRepaint(_RibbonPainter old) => old.fromTheStart != fromTheStart;
 }

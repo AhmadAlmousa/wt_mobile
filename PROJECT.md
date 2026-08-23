@@ -858,7 +858,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **7b** | Charts — grouping, marital status, controls, export | ✅ |
 | **7c** | Relationships — the path drawn, and the ways through it | ✅ |
 | **8a** | The server module — a read-only JSON API, and the transports to use it | ✅ |
-| **8b** | The lab: 2.2.6 and 2.3 installs, the module running, both transports diffed | ✅ — synthetic data only, see §9 #18 |
+| **8b** | The lab: 2.2.6 and 2.3 installs, the module running, both transports diffed | ✅ — then against the real tree, see §9 #18 |
+| **8c** | What a reader saw: family facts, the mourning ribbon, the whole chart, a PDF drawn as shapes | ✅ |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -894,7 +895,7 @@ the parser behind it stays, fixtures and all, and stays tested.
 | Capability | Both transports agree | Cleared |
 |---|---|---|
 | `access` | 2.2.6 · 2.3 — account, admin, tree count, role | ✅ |
-| `individual` | 2.2.6 · 2.3 — name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, dates in both calendars | ✅ |
+| `individual` | 2.2.6 · 2.3 — name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, **family events**, dates in both calendars | ✅ |
 | `individuals` | 2.2.6 · 2.3 — same result count for the same query | ✅ |
 | `family`, `ancestors`, `descendants`, `relationship`, `timeline`, `statistics`, `media`, `notes`, `sources` | answer identically on both, but are not yet diffed against the stock path field by field | ⬜ |
 
@@ -1679,6 +1680,66 @@ Still unexercised, and now the top of §9 #18: a manager's or editor's view,
 pending edits, and the notes/sources/media capabilities — this site runs none
 of those three tab modules, so nothing has ever read them from a real server.
 
+### 2026-08-23 (later still) — Phase 8c: four things a reader saw
+
+The module had passed everything that could be automated — 509 tests, both
+labs, the real tree diffed record by record — and then somebody used the app
+and found four faults in one sitting (§7, 40–43). Two were in the module, two
+in the interface, and none was reachable by any check the project owns.
+
+**A family's members were being sent as facts.** `Family::facts()` returns
+`HUSB`, `WIFE` and `CHIL` beside a marriage, so a presenter that asked for
+"the facts" and sent them all answered a family's *membership* as though it
+were its *history*. The parents card then listed the marriage and then
+"husband · wife · son · son" underneath it, and every family card wore a pill
+per member. webtrees answers this itself, twice and differently: its family
+page filters those three tags out, and its relatives tab prints only
+`MARRIAGE_EVENTS + DIVORCE_EVENTS`. `FamilyPresenter` now has both — `record()`
+for a family in its own right, `summary()` for a family shown inside somebody
+— and the client drops the pointers again on the way in, because which version
+of the module a site runs is the site's choice and not the app's.
+
+The fixture is why it survived: the module fixture was written from the design
+rather than captured from a server, so it never held the pointers a server
+actually sends. `tool/live_check.dart` now diffs **the family events both
+transports report**, which is the check that fails on the old module — and it
+passes on all fourteen lab records on 2.2.6 and 2.3, both versions.
+
+**The mourning ribbon was a smudge.** It was drawn as a parallelogram between
+two points on the avatar's edges, offset along both axes — so it stopped short
+of the border at each end and, at the 40 pixels a chart box gives a face, read
+as a black mark floating over a corner rather than as a ribbon lying across
+one. It is now the region between two forty-five-degree lines, drawn far past
+the avatar and cut back by the clip, so the clip rather than the path decides
+where it meets the border. Lit along its outer edge and falling away into the
+corner, which is what makes it read as cloth over the picture.
+
+**Sharing a chart shared the window.** `_capture` wrapped `ChartCanvas` —
+whose `build` returns the `InteractiveViewer` that looks *at* the chart — so
+the boundary's natural size was the phone's, and the file held whatever was on
+screen at whatever the reader had pinched to. The boundary moved inside the
+viewport, around the content at its own size; the fan, which had never had one
+at all, got the same one. The test asserts the boundary is wider than the
+device it is drawn on, which is the property that was actually wanted.
+
+**A PDF is drawn now, not photographed.** The page used to be the captured
+picture on a sized page: a screenshot with a border, fixed at the resolution
+it was taken at, and a family chart is exactly the kind of document somebody
+prints large. `features/charts/chart_pdf.dart` draws it again from the same
+layout — rounded boxes, borders, elbow joins, the parted-couple mark, ring
+slices and the ribbon, all as vectors — and the only raster left on the page
+is a photograph, which was one to begin with.
+
+Arabic is why that was not obvious. PDF has no shaping engine: a library has
+to join the letters and reorder the runs itself before it writes glyphs, which
+is what the old comment meant by keeping Arabic "out of a library that would
+have to reimplement it". `package:pdf` *has* implemented it — it runs the
+bidirectional algorithm and substitutes presentation forms — and the app's own
+Cairo face carries them, so the same file the interface is set in produces
+`عبد الله الموسى` correctly shaped on the page, right-aligned, in a chart
+mirrored the way the screen mirrors it. Rendered and looked at, both shapes,
+in both directions.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -1725,6 +1786,37 @@ of those three tab modules, so nothing has ever read them from a real server.
 | 37 | The module read no second name for a person recorded twice in the *same* script. `GedcomRecord::alternateName()` answers only when the two differ by character set | **The real tree** |
 | 38 | `deceased` was `Individual::isDead()`, which *infers* death from age — so a person born in 1850 with no death recorded was dead to the module and unknown to a chart box | **`live_check --sample`** |
 | 39 | A converted date repeated its qualifier: `about 1875 (about 1292)` where webtrees writes `about 1875 (1292)` | **`live_check --sample`** |
+| 40 | A family's `HUSB`, `WIFE` and `CHIL` lines came back as *facts*, so the parents card listed "husband · wife · son · son" under the parents and every family card wore a pill per member | **Reading the screen** |
+| 41 | The mourning ribbon was a parallelogram that stopped short of both borders, so at 40 pixels it read as a black smudge floating over a corner rather than as a ribbon | **Reading the screen** |
+| 42 | Sharing a chart captured the **viewport**: the `RepaintBoundary` was around `ChartCanvas`, whose build returns the `InteractiveViewer`, so what reached the file was the part of the family on screen at whatever the reader had pinched to | **Reading the screen** |
+| 43 | A chart shape the app draws with its own painter — the fan — had no capture boundary at all, so sharing one could only ever have failed | Found while fixing 42 |
+
+Bugs 40–43 were all found the same way: **somebody looked at the screen.** Not
+one of them was visible to 509 green tests, to `live_check`, to the module's
+static checker or to a `--sample` walk of the real tree, and between them they
+cover the two most-used screens in the app.
+
+40 is the one worth the lesson. `HUSB`, `WIFE` and `CHIL` are facts like any
+other to webtrees — `Family::facts()` returns them beside a marriage — so a
+presenter that asked a family for its facts and sent them all answered a
+marriage *and* one pointer per member. The client already had those people as
+`spouses` and `children`, so it drew both: the word "son" once per son. webtrees
+itself filters exactly those three on its family page, and prints only marriage
+and divorce events on the relatives tab; the module now does both, one for the
+family endpoint and one for a family shown inside a person. The **fixture is
+why nothing caught it**: `test/fixtures/module/individual_X42.json` was written
+from the design rather than captured from the server, so it never contained the
+pointers the server actually sent. That is bug 27 and bug 30 for the third
+time, and this time the check went in on the wire — `live_check` now diffs the
+family events both transports report, which fails loudly on the old module.
+
+42 is the same kind of error in the interface: the boundary named
+`_capture` really did wrap "the chart", and the chart's `build` returns the
+`InteractiveViewer` that looks at it — so the thing captured at natural size
+was a window, and the export was a screenshot with extra steps. The comment
+above it had said "at its **natural size**, outside the viewport" since it was
+written. A comment describing intent is not a test, and the test that now
+exists asserts the boundary is *wider than the phone it is drawn on*.
 
 Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
 the fixtures held a second marriage — a fixture that reproduces exactly what
@@ -2113,8 +2205,11 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 #   --person XREF     diff this record specifically, when one disagrees
 #   --sample N        walk N records and diff every one — the check that
 #                     finds what a single hand-picked record cannot
+# Diffs name, sex, death, every relative count, the primary facts, the GEDCOM
+# tags, the family events and a date in both calendars. Family events are
+# there because they were once the only thing that differed (§7, bug 40).
 
-flutter test          # 509 tests
+flutter test          # 513 tests
 flutter analyze       # must stay clean
 
 # The server module. Static first — structure, unused imports, and every
@@ -2355,6 +2450,19 @@ Both tools read the password from the terminal with echo disabled, or from
    surname partition (webtrees caps it at 5,000) and pages it in PHP. Both are
    bounded and both are what the website itself does, but the target tree is
    1,463 people and neither has been measured on one ten times that.
+22. **Nothing the project owns can see the screen.** Four faults (§7, 40–43)
+   were found by a person using the app, after 509 tests, a static checker
+   across both webtrees versions, two lab installs, a field-by-field diff of
+   both transports and a 60-record sample walk of the real tree had all
+   passed. Two were module bugs the fixtures could not hold, because the
+   fixtures were written from the design rather than captured from a server;
+   two were interface bugs where a comment described the intent and no
+   assertion checked it. Each fix ships with a check that fails on the old
+   code — `live_check` now diffs family events, and the export test asserts
+   the capture is wider than the device — but the *class* of fault is open:
+   `tool/preview/render_preview.dart` renders every screen and asserts
+   nothing, so it only helps somebody who looks. The real mitigation is a
+   device (see 13) and the habit of opening the app after changing it.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

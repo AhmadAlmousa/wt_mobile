@@ -28,11 +28,21 @@ class ChartViewport extends StatefulWidget {
     required this.child,
     this.focus,
     this.smallestText = 11,
+    this.captureKey,
     super.key,
   });
 
   final Size size;
   final Widget child;
+
+  /// Marks the chart at its **natural size** so it can be exported whole.
+  ///
+  /// Inside the viewport rather than around it. A boundary around the window
+  /// captures a picture of the window — the part of the family that happened
+  /// to be on screen, at whatever the reader had pinched to — because that is
+  /// all the window is. A boundary around the content captures the content,
+  /// however far the view has been panned away from it.
+  final GlobalKey? captureKey;
 
   /// Where to centre when the whole chart cannot be shown legibly. The person
   /// the chart was drawn for; null centres the chart itself.
@@ -68,8 +78,7 @@ class _ChartViewportState extends State<ChartViewport> {
   }
 
   /// The scale below which the smallest text stops being readable.
-  double get _legibleScale =>
-      ChartViewport.legibleText / widget.smallestText;
+  double get _legibleScale => ChartViewport.legibleText / widget.smallestText;
 
   void _settle(Size window) {
     if (_settledFor == window) return;
@@ -129,12 +138,15 @@ class _ChartViewportState extends State<ChartViewport> {
         minScale: math.min(_fitScale, _legibleScale),
         maxScale: 6,
         boundaryMargin: const EdgeInsets.all(ChartViewport.margin * 2),
-        child: SizedBox(
-          width: widget.size.width + ChartViewport.margin * 2,
-          height: widget.size.height + ChartViewport.margin * 2,
-          child: Padding(
-            padding: const EdgeInsets.all(ChartViewport.margin),
-            child: widget.child,
+        child: RepaintBoundary(
+          key: widget.captureKey,
+          child: SizedBox(
+            width: widget.size.width + ChartViewport.margin * 2,
+            height: widget.size.height + ChartViewport.margin * 2,
+            child: Padding(
+              padding: const EdgeInsets.all(ChartViewport.margin),
+              child: widget.child,
+            ),
           ),
         ),
       );
@@ -149,6 +161,7 @@ class ChartCanvas extends StatelessWidget {
     required this.records,
     required this.onTapPerson,
     this.options = const ChartOptions(),
+    this.captureKey,
     super.key,
   });
 
@@ -159,12 +172,16 @@ class ChartCanvas extends StatelessWidget {
   /// How the reader asked for this to be drawn.
   final ChartOptions options;
 
+  /// Where an export reads the chart from — see [ChartViewport.captureKey].
+  final GlobalKey? captureKey;
+
   @override
   Widget build(BuildContext context) {
     final metrics = layout.metrics;
 
     return ChartViewport(
       size: layout.size,
+      captureKey: captureKey,
       focus: layout.subject == null
           ? null
           : Offset(
@@ -351,10 +368,7 @@ class _PersonBox extends StatelessWidget {
       color: background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.shapeMedium),
-        side: BorderSide(
-          color: border,
-          width: placement.isSubject ? 2 : 1,
-        ),
+        side: BorderSide(color: border, width: placement.isSubject ? 2 : 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

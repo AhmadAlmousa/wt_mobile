@@ -48,16 +48,21 @@ class ChartExportFailed implements Exception {
 ///
 /// [title] names the file and the share sheet; [origin] is where the sharing
 /// sheet should appear from on the platforms that anchor it to a widget.
+///
+/// [page] draws the chart again as shapes, and is what a PDF is made from
+/// when there is one — see `chart_pdf.dart`. Without it a PDF is the captured
+/// picture on a sized page, which is a screenshot with a border.
 Future<void> shareChart({
   required GlobalKey boundary,
   required ChartFormat format,
   required String title,
+  Future<Uint8List> Function()? page,
   Rect? origin,
 }) async {
-  final image = await _capture(boundary);
   final bytes = switch (format) {
-    ChartFormat.image => image.bytes,
-    ChartFormat.pdf => await _pageOf(image, title: title),
+    ChartFormat.image => (await _capture(boundary)).bytes,
+    ChartFormat.pdf when page != null => await page(),
+    ChartFormat.pdf => await _pageOf(await _capture(boundary), title: title),
   };
 
   final directory = await getTemporaryDirectory();
@@ -119,11 +124,7 @@ Future<_Captured> _capture(GlobalKey boundary) async {
   try {
     final data = await rendered.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) throw const ChartExportFailed('nothing to encode');
-    return _Captured(
-      data.buffer.asUint8List(),
-      size.width,
-      size.height,
-    );
+    return _Captured(data.buffer.asUint8List(), size.width, size.height);
   } finally {
     rendered.dispose();
   }
@@ -147,9 +148,8 @@ Future<Uint8List> _pageOf(_Captured chart, {required String title}) async {
   document.addPage(
     pw.Page(
       pageFormat: page,
-      build: (context) => pw.FittedBox(
-        child: pw.Image(pw.MemoryImage(chart.bytes)),
-      ),
+      build: (context) =>
+          pw.FittedBox(child: pw.Image(pw.MemoryImage(chart.bytes))),
     ),
   );
   return document.save();

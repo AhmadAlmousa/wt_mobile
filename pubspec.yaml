@@ -7,7 +7,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Keep in step with `kAppVersion` in lib/core/webtrees_client.dart, which puts
 # this number in the User-Agent every request carries. Site administrators read
 # that string in their logs, so it has to name the build they actually have.
-version: 0.13.2+15
+version: 0.14.0+16
 
 environment:
   sdk: ^3.12.2
@@ -43,11 +43,13 @@ dependencies:
   # Sharing a chart. A family tree is drawn to be shown to the family, and a
   # screenshot of a phone-sized window is not the chart.
   #
-  # `pdf` is pure Dart and used only to put an already-rendered picture on a
-  # sized page — no fonts are embedded, which is what keeps Arabic shaping out
-  # of a library that would have to reimplement it. `share_plus` hands the
-  # file to whatever the reader already uses, and `path_provider` says where a
-  # temporary file may live.
+  # `pdf` is pure Dart, and the chart is drawn into it again as shapes rather
+  # than photographed: a family chart is the kind of document somebody prints
+  # large, and a raster page has already decided how large that can be. It
+  # embeds the app's own Cairo face and runs the bidirectional algorithm
+  # itself, which is what makes an Arabic chart a real document rather than a
+  # picture of one. `share_plus` hands the file to whatever the reader already
+  # uses, and `path_provider` says where a temporary file may live.
   pdf: ^3.13.0
   share_plus: ^13.3.0
   path_provider: ^2.1.6

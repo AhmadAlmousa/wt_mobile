@@ -40,7 +40,6 @@ final class FamilyRecord implements RequestHandlerInterface
         $people = new PersonPresenter(Request::thumbnail($request));
         $facts  = new FactPresenter($people, new DatePresenter($tree));
 
-        return Json::ok((new FamilyPresenter($people, $facts))
-            ->present($family, FamilyPresenter::OWN));
+        return Json::ok((new FamilyPresenter($people, $facts))->record($family));
     }
 }

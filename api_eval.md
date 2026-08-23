@@ -1081,3 +1081,101 @@ Three capabilities are cleared on that reading — `access`, `individual`,
 have been exercised against 40 real records and the module against none, so the
 remaining steps are a lab loaded from a copy of the real tree, and then the
 module installed on the instance itself.
+
+---
+
+## 16. What the real tree changed, and what a reader changed after that
+
+**Added 2026-08-23, after the module was installed on `tree.almou.sa`.** §15
+ended by naming the two steps left: a lab loaded from real data, and the module
+running on the instance itself. Both have happened, and then a third thing
+happened that this document had not anticipated at all — somebody used the app.
+
+### The real tree: two disagreements in 1,463 people
+
+The module answered against 1,463 real people rather than fourteen invented
+ones, and `tool/live_check.dart` read the same records through both transports.
+**Two differences, both on one woman's record, and nothing else across the
+tree.**
+
+- Her lifespan read `…–`. `Individual::lifespan()` always writes something,
+  because a chart box wants the same height for everybody — so the HTML path
+  showed an ellipsis and a dash for a person the tree records no dates for.
+  The module answered null, and null is right.
+- The module read no second name for her. §4 lists `getAllNames()` as the
+  structured answer and it is, but the module had used
+  `GedcomRecord::alternateName()`, which is narrower than it looks: it answers
+  only when the primary and secondary names differ by **character set**. She
+  has two Arabic `NAME` lines. The accordion's reading was right.
+
+One fix on each side, which is the honest split. Walking the tree with
+`--sample` then found two more classes that a single record could not:
+`Individual::isDead()` *infers* death from age, so a person born in 1850 with
+no death recorded was dead to the module and unknown to a chart box; and a
+converted date repeated its qualifier — `about 1875 (about 1292)` where
+webtrees writes `about 1875 (1292)`.
+
+That is four in total from real data, after five errors from reading source
+(§14) and six from first execution (§15). The trend is the finding.
+
+### Then a reader looked at the screen
+
+Four more faults, none of which any check in this project could see. Two were
+in the module and are the reason this section exists.
+
+**A family's members were being sent as facts.** `FamilyPresenter` asked
+`Family::facts([], true)` and presented everything it got. `HUSB`, `WIFE` and
+`CHIL` are facts like any other to webtrees, so a family of four answered a
+marriage *and* four pointers, indistinguishable from events to any client. The
+app already had those people as `spouses` and `children`, so it drew both: the
+parents card listed the marriage and then "husband · wife · son · son", and
+every family card wore a pill per member.
+
+**webtrees answers this itself, twice and differently, and §4 missed both.**
+
+| Where a family is shown | What webtrees prints | Evidence |
+|---|---|---|
+| In its own right | every fact **except** `FAM:HUSB`, `FAM:WIFE`, `FAM:CHIL` | `app/Http/Controllers/FamilyPage.php` — the same filter at 2.2.6 and 2.3 |
+| Inside a member's page | only `Gedcom::MARRIAGE_EVENTS + DIVORCE_EVENTS` | `resources/views/modules/relatives/family.phtml` |
+
+So a presenter needs both: `record()` for the first, `summary()` for the
+second. This is the general lesson of §4 restated — *the module presents;
+webtrees decides* — applied to a question §4 did not think to ask, which is
+not "what does a family record contain" but "what does webtrees **show** of
+it, and where".
+
+The fixture is why it survived everything. `test/fixtures/module/` was written
+from the design in §7 of this document rather than captured from a running
+server, so it held exactly the facts the design said it would and never the
+pointers a server actually sends. That is §14's lesson (a claim checked
+against source is not a claim checked against behaviour) one level further
+out: a fixture checked against a design is not a fixture checked against a
+server. The standing check is now on the wire — `live_check` diffs the family
+events both transports report, and fails on the old module.
+
+The other module-side consequence is small and worth stating: **a client must
+not assume the module it is talking to is the module it was written against.**
+`capabilities` versions the feature *set*, not the shape of any payload within
+it, and a site upgrades its module when it chooses to. The app therefore drops
+the three pointer tags again on the way in. §11's "additive-only within a
+version" is a promise about fields, and this was a bug about *values* — which
+no version scheme catches.
+
+### Two things §7's payloads should have said
+
+- **`facts` on a family means events.** Stated here because "the facts of a
+  family" is ambiguous in exactly the way that caused this, and a reader of
+  §7's example payload would not have known which was meant.
+- **`spouses` and `children` are the membership, and the only statement of
+  it.** A client that also reads membership out of `facts` will double it.
+
+### What is still untested
+
+Unchanged from §15 in kind, narrowed in degree: a manager's or an editor's
+view, a tree with pending edits, and the notes, sources and media capabilities
+— `tree.almou.sa` runs none of those three tab modules, and this account can
+see none of its 86 media objects. And now one more, which is not about the
+module at all: **nothing in this project looks at the result.** Every check it
+owns answers "is this value right", and the four faults above were all "is
+this what a person would want to see". A device, and the habit of opening the
+app after changing it, is the only thing that closes that.

@@ -1,7 +1,9 @@
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
@@ -17,6 +19,7 @@ import 'chart_export.dart';
 import 'chart_layout.dart';
 import 'chart_options.dart';
 import 'chart_options_sheet.dart';
+import 'chart_pdf.dart';
 import 'fan_canvas.dart';
 import 'fan_layout.dart';
 
@@ -193,82 +196,92 @@ class _ChartScreenState extends State<ChartScreen> {
     final text = AppText.of(context);
 
     return FutureBuilder<ChartData>(
-          future: _chart,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      future: _chart,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-            final error = snapshot.error;
-            if (error != null) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: MessagePanel.error(
-                  error is WebtreesError
-                      ? error.localized(text)
-                      : text.chartFailed,
+        final error = snapshot.error;
+        if (error != null) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: MessagePanel.error(
+              error is WebtreesError ? error.localized(text) : text.chartFailed,
+            ),
+          );
+        }
+
+        final chart = snapshot.data!;
+        if (chart.size <= 1) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                text.chartEmpty,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-              );
-            }
-
-            final chart = snapshot.data!;
-            if (chart.size <= 1) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Text(
-                    text.chartEmpty,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            final ancestors = chart.ancestors;
-            if (ancestors != null &&
-                _options.shape == ChartShape.circle &&
-                widget.kind == ChartKind.ancestors) {
-              return FanCanvas(
-                layout: layoutFan(
-                  ancestorsShowing(ancestors, _options.show),
-                ),
-                onTapPerson: _onTapPerson,
-              );
-            }
-
-            return RepaintBoundary(
-              key: _capture,
-              child: ChartCanvas(
-                layout: _layoutFor(chart, context),
-                records: widget.records,
-                options: _options,
-                onTapPerson: _onTapPerson,
               ),
-            );
+            ),
+          );
+        }
+
+        final ancestors = chart.ancestors;
+        if (ancestors != null &&
+            _options.shape == ChartShape.circle &&
+            widget.kind == ChartKind.ancestors) {
+          return FanCanvas(
+            layout: layoutFan(ancestorsShowing(ancestors, _options.show)),
+            captureKey: _capture,
+            onTapPerson: _onTapPerson,
+          );
+        }
+
+        return ChartCanvas(
+          layout: _layoutFor(chart, context),
+          records: widget.records,
+          options: _options,
+          captureKey: _capture,
+          onTapPerson: _onTapPerson,
+        );
       },
     );
   }
 
   ChartOptions get _options => widget.settings.chartOptions;
 
-  ChartLayout _layoutFor(ChartData chart, BuildContext context) {
-    // A compact chart trades the photographs for smaller boxes, which is what
-    // makes five generations fit on a screen somebody is holding in one hand.
-    const compact = ChartMetrics(
-      boxWidth: 120,
-      boxHeight: 44,
-      generationGap: 28,
-      siblingGap: 8,
-    );
-    final metrics = _options.shape == ChartShape.compact
-        ? compact
-        : const ChartMetrics();
-    final widthOf = _options.fitToName
-        ? _measurer(context, metrics)
-        : null;
+  /// How big the boxes are, which is the one thing the shape decides for
+  /// itself.
+  ///
+  /// A compact chart trades the photographs for smaller boxes, which is what
+  /// makes five generations fit on a screen somebody is holding in one hand.
+  ChartMetrics get _metrics => _options.shape == ChartShape.compact
+      ? const ChartMetrics(
+          boxWidth: 120,
+          boxHeight: 44,
+          generationGap: 28,
+          siblingGap: 8,
+        )
+      : const ChartMetrics();
+
+  ChartLayout _layoutFor(ChartData chart, BuildContext context) => _layoutWith(
+    chart,
+    widthOf: _measured(context),
+    mirrored: Directionality.of(context) == TextDirection.rtl,
+  );
+
+  /// The same layout, from measurements taken earlier.
+  ///
+  /// Separated so a page can be drawn after the sheet that asked for it has
+  /// closed and there is no context left to measure with.
+  ChartLayout _layoutWith(
+    ChartData chart, {
+    required BoxWidth? widthOf,
+    required bool mirrored,
+  }) {
+    final metrics = _metrics;
 
     // Hiding a sex cuts every branch reached through it, which is what a
     // reader asking for the male line means — see [ShowPeople].
@@ -291,18 +304,78 @@ class _ChartScreenState extends State<ChartScreen> {
         metrics: metrics,
         widthOf: widthOf,
       ),
-      _ => layoutDescendants(
-        descendants!,
-        metrics: metrics,
-        widthOf: widthOf,
-      ),
+      _ => layoutDescendants(descendants!, metrics: metrics, widthOf: widthOf),
     };
 
     // Arabic reads the other way, and so does its chart: generations march
     // away from the reader's starting corner, not towards it.
-    return Directionality.of(context) == TextDirection.rtl
-        ? layout.mirrored()
-        : layout;
+    return mirrored ? layout.mirrored() : layout;
+  }
+
+  /// The name measurer this chart is drawn with, or null when boxes are all
+  /// one width.
+  BoxWidth? _measured(BuildContext context) =>
+      _options.fitToName ? _measurer(context, _metrics) : null;
+
+  /// The chart drawn again as shapes, for a PDF worth printing.
+  ///
+  /// Not the captured picture on a page: a family chart is the kind of
+  /// document somebody prints large, and a screenshot at any resolution has
+  /// already decided how large that can be.
+  Future<Uint8List> _drawPage({
+    required String title,
+    required ChartInk ink,
+    required BoxWidth? widthOf,
+    required bool mirrored,
+  }) async {
+    final chart = await _chart;
+
+    final ancestors = chart.ancestors;
+    if (ancestors != null &&
+        _options.shape == ChartShape.circle &&
+        widget.kind == ChartKind.ancestors) {
+      return fanChartPage(
+        layout: layoutFan(ancestorsShowing(ancestors, _options.show)),
+        ink: ink,
+        title: title,
+      );
+    }
+
+    final layout = _layoutWith(chart, widthOf: widthOf, mirrored: mirrored);
+
+    return boxChartPage(
+      layout: layout,
+      options: _options,
+      ink: ink,
+      title: title,
+      rightToLeft: mirrored,
+      photos: await _photos(layout),
+    );
+  }
+
+  /// The faces already on screen, for the page to embed.
+  ///
+  /// Best-effort and one at a time: a photograph that will not come back is
+  /// an ordinary thing on a tree, and the initial stands in for it exactly as
+  /// it does on the chart itself.
+  Future<Map<String, Uint8List>> _photos(ChartLayout layout) async {
+    if (!_options.showPhotos) return const {};
+
+    final urls = {
+      for (final placement in layout.people)
+        if (placement.person.thumbnailUrl != null)
+          placement.person.thumbnailUrl!,
+    };
+    final photos = <String, Uint8List>{};
+
+    for (final url in urls) {
+      try {
+        photos[url] = await widget.records.image(url);
+      } on Object catch (problem) {
+        developer.log('No photo for the page: $problem', name: _log);
+      }
+    }
+    return photos;
   }
 
   /// A box wide enough for the name in it.
@@ -327,10 +400,7 @@ class _ChartScreenState extends State<ChartScreen> {
         maxLines: 1,
       )..layout();
 
-      return (painter.width + photo + 24).clamp(
-        metrics.boxWidth * 0.7,
-        widest,
-      );
+      return (painter.width + photo + 24).clamp(metrics.boxWidth * 0.7, widest);
     };
   }
 
@@ -379,11 +449,26 @@ class _ChartScreenState extends State<ChartScreen> {
       ),
     );
 
+    // The ink is read now, while there is still a context to read it from:
+    // the page is built after the sheet that asked for it has closed.
+    final ink = ChartInk(
+      colors: Theme.of(context).colorScheme,
+      people: PersonColors.of(context),
+    );
+    final metrics = _measured(context);
+    final mirrored = Directionality.of(context) == TextDirection.rtl;
+
     try {
       await shareChart(
         boundary: _capture,
         format: chosen,
         title: title,
+        page: () => _drawPage(
+          title: title,
+          ink: ink,
+          widthOf: metrics,
+          mirrored: mirrored,
+        ),
         origin: _shareOrigin(),
       );
     } on ChartExportFailed catch (problem) {

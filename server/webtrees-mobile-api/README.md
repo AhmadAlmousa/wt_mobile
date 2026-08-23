@@ -123,6 +123,12 @@ Two consequences worth knowing:
 - `capabilities.features` announces additive ones, so an old client and a new
   module — or the reverse — degrade **per capability**, not per release.
 - Within a version: new fields yes; renamed or removed fields no.
+- `capabilities.module` states this module's own version, and a client should
+  read it as information rather than as a promise. **1.0.1** stopped sending a
+  family's `HUSB`, `WIFE` and `CHIL` lines as facts: they are already answered
+  as `spouses` and `children`, and a client that drew both drew each member
+  twice. No field changed, so no version scheme could have announced it — which
+  is why a client should drop those three tags itself whatever the module says.
 
 ## Layout
 

@@ -220,6 +220,54 @@ void main() {
     });
   });
 
+  group('a family on a person’s page', () {
+    test('shows what happened to the couple, not who is in it', () async {
+      // `HUSB`, `WIFE` and `CHIL` are facts like any other to webtrees, and a
+      // module that hands a family's facts over unfiltered answers a marriage
+      // *and* one pointer per member — which reached the screen as the word
+      // "son" repeated once per son. The module filters them now; the app
+      // drops them again on the way in, because which version of the module a
+      // site runs is the site's choice.
+      final records = ModuleRecordsTransport(
+        clientFor({
+          '/tree/main/mobile-api/v1/individual/X42': (_) => Canned(
+            200,
+            contentType: 'application/json',
+            body: '''
+            {
+              "xref": "X42", "name": "عبد الله", "sex": "male",
+              "facts": [], "notes": [], "sources": [], "media": [],
+              "sections": [], "charts": [], "warnings": [],
+              "families": [{
+                "xref": "F1", "kind": "parents", "label": "الوالدان",
+                "spouses": [{"xref": "X1", "name": "محمد"},
+                            {"xref": "X2", "name": "فاطمة"}],
+                "children": [{"xref": "X42", "name": "عبد الله"}],
+                "endedInDivorce": false,
+                "facts": [
+                  {"tag": "MARR", "label": "زواج"},
+                  {"tag": "HUSB", "label": "زوج"},
+                  {"tag": "WIFE", "label": "زوجة"},
+                  {"tag": "CHIL", "label": "مولود"},
+                  {"tag": "CHIL", "label": "مولود"}
+                ]
+              }]
+            }
+            ''',
+          ),
+        }),
+      );
+
+      final person = await records.individual('main', 'X42');
+      final family = person.families.single;
+
+      expect(family.facts.map((fact) => fact.tag), ['MARR']);
+      // And the people themselves are still there, where they belong.
+      expect(family.spouses.length, 2);
+      expect(family.children.single.xref, 'X42');
+    });
+  });
+
   group('charts', () {
     test('turns the site’s own chart classes into module endpoints', () {
       final handles = ModuleRecordsTransport.chartHandles('main', 'X42', const [

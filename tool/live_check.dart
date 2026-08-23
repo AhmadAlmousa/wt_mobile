@@ -831,6 +831,14 @@ Future<void> comparePerson(
   note('children', byHtml.children.length, byJson.children.length);
   note('primary facts', byHtml.primaryFacts.length, byJson.primaryFacts.length);
 
+  // What happened to each couple, and nothing else. A family's `HUSB`, `WIFE`
+  // and `CHIL` lines are facts like any other to webtrees, so a module that
+  // asks for a family's facts unfiltered answers a marriage *and* one pointer
+  // per member — which arrived on screen as the word "son" repeated once per
+  // son. The relatives tab prints only marriage and divorce events, so this
+  // compares what the two transports call an event, not how they render it.
+  note('family facts', _familyFacts(byHtml), _familyFacts(byJson));
+
   // The headline claim: every fact typed, including the ones no chart box
   // ever printed a class for. The module may name *more*, never fewer.
   int typed(IndividualRecord record) =>
@@ -884,6 +892,21 @@ Future<void> comparePerson(
   if (!bothModule.contains(bothStock)) {
     note('date (2.3, module must not lose the page)', bothStock, bothModule);
   }
+}
+
+/// Every family event a record carries, in an order neither transport chose.
+///
+/// Labels rather than values: the page renders a marriage as one string of
+/// date and place, and the module sends the two apart — so the rendered text
+/// is allowed to differ where the list of events is not.
+String _familyFacts(IndividualRecord record) {
+  final labels =
+      record.families
+          .expand((family) => family.facts)
+          .map((fact) => fact.label)
+          .toList()
+        ..sort();
+  return labels.join(' · ');
 }
 
 /// How many generations a chart turned out to hold.

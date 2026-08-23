@@ -61,7 +61,7 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
      */
     public const int API_VERSION = 1;
 
-    public const string MODULE_VERSION = '1.0.0';
+    public const string MODULE_VERSION = '1.0.1';
 
     public const string AUTHOR = 'webtrees_mobile';
 

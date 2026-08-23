@@ -13,10 +13,18 @@ import 'fan_layout.dart';
 /// their child's. Painted rather than built from widgets, because a fan is
 /// arcs and rotated text — neither of which a box of widgets does well.
 class FanCanvas extends StatelessWidget {
-  const FanCanvas({required this.layout, required this.onTapPerson, super.key});
+  const FanCanvas({
+    required this.layout,
+    required this.onTapPerson,
+    this.captureKey,
+    super.key,
+  });
 
   final FanLayout layout;
   final void Function(PersonRef person) onTapPerson;
+
+  /// Where an export reads the fan from — see [ChartViewport.captureKey].
+  final GlobalKey? captureKey;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +32,7 @@ class FanCanvas extends StatelessWidget {
 
     return ChartViewport(
       size: Size(layout.diameter, layout.diameter),
+      captureKey: captureKey,
       child: GestureDetector(
         // The whole fan is one canvas, so which person was tapped is a
         // question of geometry: how far from the middle, and at what angle.

@@ -104,6 +104,18 @@ FactEntry factFrom(Map<String, Object?> json) {
   );
 }
 
+/// The lines that make a family a family, rather than things that happened
+/// to it.
+///
+/// webtrees keeps `HUSB`, `WIFE` and `CHIL` in the same list as a marriage,
+/// and a module that hands that list over unfiltered puts the word "son" on a
+/// person's page once per son. The module answers only events now, and its
+/// own family page has always filtered exactly these three — but which
+/// version of the module a site runs is the site's choice, so the app drops
+/// them again on the way in. It already has these people as `spouses` and
+/// `children`.
+const Set<String> _pointerTags = {'HUSB', 'WIFE', 'CHIL'};
+
 /// Reads one family block.
 FamilyGroup familyFrom(Map<String, Object?> json) => FamilyGroup(
   xref: stringOf(json['xref']) ?? '',
@@ -115,7 +127,9 @@ FamilyGroup familyFrom(Map<String, Object?> json) => FamilyGroup(
   },
   spouses: peopleFrom(json['spouses']),
   children: peopleFrom(json['children']),
-  facts: factsFrom(json['facts']),
+  facts: factsFrom(
+    json['facts'],
+  ).where((fact) => !_pointerTags.contains(fact.tag)).toList(),
   endedInDivorce: json['endedInDivorce'] == true,
 );
 
@@ -252,9 +266,7 @@ StatisticDataset _datasetFrom(Map<String, Object?> json) => StatisticDataset(
       if (row is Map<String, Object?>)
         StatisticRow(
           label: stringOf(row['label']) ?? '',
-          values: [
-            for (final value in listOf(row['values'])) ?doubleOf(value),
-          ],
+          values: [for (final value in listOf(row['values'])) ?doubleOf(value)],
         ),
   ],
 );

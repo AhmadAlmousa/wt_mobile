@@ -156,19 +156,19 @@ final class IndividualRecord implements RequestHandlerInterface
         $groups = [];
 
         foreach ($individual->childFamilies() as $family) {
-            $groups[] = $presenter->present($family, FamilyPresenter::PARENTS, $individual);
+            $groups[] = $presenter->summary($family, FamilyPresenter::PARENTS, $individual);
         }
 
         foreach ($individual->spouseFamilies() as $family) {
-            $groups[] = $presenter->present($family, FamilyPresenter::OWN, $individual);
+            $groups[] = $presenter->summary($family, FamilyPresenter::OWN, $individual);
         }
 
         foreach ($individual->childStepFamilies() as $family) {
-            $groups[] = $presenter->present($family, FamilyPresenter::STEP, $individual);
+            $groups[] = $presenter->summary($family, FamilyPresenter::STEP, $individual);
         }
 
         foreach ($individual->spouseStepFamilies() as $family) {
-            $groups[] = $presenter->present($family, FamilyPresenter::STEP, $individual);
+            $groups[] = $presenter->summary($family, FamilyPresenter::STEP, $individual);
         }
 
         return $groups;
