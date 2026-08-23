@@ -184,8 +184,7 @@ void main() {
         expect(hijri, isNot(contains('١٩٠١')));
       });
 
-      test('publishes the notes, sources and photographs a site has',
-          () async {
+      test('publishes the notes, sources and photographs a site has', () async {
         final person = await build().individual('main', 'X42');
 
         expect(person.notes.first.text, startsWith('هاجر إلى الكويت'));
@@ -207,6 +206,39 @@ void main() {
         // passes them back unread.
         expect(person.charts.keys, contains(ChartKind.ancestors));
         expect(person.charts[ChartKind.ancestors], isNotEmpty);
+      });
+
+      test('a lifespan is years or nothing, never an ellipsis', () async {
+        // `Individual::lifespan()` always writes something — `…–` for someone
+        // with no dates at all — because the chart layout wants every box the
+        // same height. Shown as-is that puts an ellipsis under every undated
+        // person in the tree. Both transports answer null instead, and a real
+        // tree is where they first disagreed about it.
+        final person = await build().individual('main', 'X42');
+        final everyone = [
+          person.asReference,
+          ...person.parents,
+          ...person.children,
+        ];
+        final digit = RegExp(r'\p{Nd}', unicode: true);
+
+        for (final one in everyone) {
+          expect(
+            one.lifespan,
+            anyOf(isNull, matches(digit)),
+            reason: '${one.xref} carries a lifespan with no years in it',
+          );
+        }
+      });
+
+      test('a second recorded name is a second recorded name', () async {
+        // Not `GedcomRecord::alternateName()`, which answers only when the two
+        // names differ by *character set* — so a person recorded twice in the
+        // same script has none by that rule and one by the accordion's. A real
+        // tree had exactly that, and the transports disagreed.
+        final person = await build().individual('main', 'X42');
+
+        expect(person.alternateName, 'Abdullah Almousa');
       });
 
       test('a record that is not there is not an empty one', () async {

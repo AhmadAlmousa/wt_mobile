@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
   if (address == null) {
     stderr.writeln(
       'Usage: dart run tool/live_check.dart --url HOST '
-      '[--user NAME] [--search TERM] [--language TAG]',
+      '[--user NAME] [--search TERM] [--language TAG] [--person XREF]',
     );
     exitCode = 64;
     return;
@@ -342,10 +342,16 @@ Future<void> main(List<String> args) async {
           person.sex.name,
           ok: person.sex != Sex.unknown,
         );
+        // Null is a real answer: a person the tree records no dates for has
+        // no years to show, and webtrees' own `…–` is a rendering decision
+        // rather than information. What would be wrong is a lifespan with no
+        // digits in it, which is what this used to accept.
         report(
           'lifespan read from the record',
-          person.lifespan ?? '(none)',
-          ok: person.lifespan != null,
+          person.lifespan ?? '(no dates recorded for them)',
+          ok:
+              person.lifespan == null ||
+              RegExp(r'\p{Nd}', unicode: true).hasMatch(person.lifespan!),
         );
         report(
           'death recorded',
@@ -649,9 +655,11 @@ Future<void> main(List<String> args) async {
         );
       }
 
-      // Prefer the account's own record — certain to be visible to this
-      // reader, and usually the best-populated — then whatever search finds.
+      // Prefer whoever was asked for. Chasing a disagreement means going back
+      // to the one record that showed it, and twice now that record has been
+      // neither the account's own nor the first search hit.
       final xref =
+          options['person'] ??
           tree.myXref ??
           statedXref ??
           (await stock.search(

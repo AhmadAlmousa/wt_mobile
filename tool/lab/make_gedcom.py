@@ -56,6 +56,7 @@ def individual(
     sex: str,
     *,
     latin: tuple[str, str] | None = None,
+    second_name: tuple[str, str] | None = None,
     birth: str | None = None,
     birth_place: str | None = None,
     death: str | None = None,
@@ -80,6 +81,13 @@ def individual(
         out(2, "TYPE", "romanized")
         out(2, "GIVN", latin[0])
         out(2, "SURN", latin[1])
+
+    # A second name in the same script. `@N.N.` is GEDCOM's "name unknown",
+    # which webtrees renders as an ellipsis.
+    if second_name is not None:
+        given = second_name[0] or "@N.N."
+        out(1, "NAME", f"{given} /{second_name[1]}/")
+        out(2, "SURN", second_name[1])
 
     out(1, "SEX", sex)
 
@@ -211,7 +219,13 @@ def build() -> None:
         occupation="مهندس",
         famc="F2", fams=["F5"],
     )
-    individual("X61", "هيا", "الموسى", "F", birth="1932", famc="F2")
+    # Two names in the *same* script, the second with an unknown given name.
+    # webtrees' own `alternateName()` answers null for this — it only reports a
+    # second name in a different character set — while the names accordion the
+    # HTML path reads shows it. A real tree had exactly this, and it is the one
+    # record the two transports ever disagreed about.
+    individual("X61", "هيا", "الموسى", "F", birth="1932", famc="F2",
+               second_name=("", "الموسى الصائغ"))
     individual(
         "X62", "سارة", "الموسى", "F",
         birth="1945", death="2001", famc="F3",

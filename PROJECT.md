@@ -898,9 +898,13 @@ the parser behind it stays, fixtures and all, and stays tested.
 | `individuals` | 2.2.6 · 2.3 — same result count for the same query | ✅ |
 | `family`, `ancestors`, `descendants`, `relationship`, `timeline`, `statistics`, `media`, `notes`, `sources` | answer identically on both, but are not yet diffed against the stock path field by field | ⬜ |
 
-Cleared on **synthetic** data. §9 #18 is the standing caveat: fourteen invented
-people is not 1,463 real ones, and nothing here has met the tree it was built
-for.
+Cleared against **`tree.almou.sa` itself** — the real 1,463-person tree, with
+the module installed there — as well as against both labs. The two records that
+disagreed there are bugs 36 and 37, both fixed, and nothing else differed.
+
+Still not exercised on real data, and so still uncleared: the notes, sources
+and media capabilities (this site runs none of those three tab modules), a
+manager's or editor's view, and pending edits. §9 #18 carries the rest.
 
 **Exit criteria**
 
@@ -1630,7 +1634,50 @@ permanent — every capability keeps its HTML path, because the first constraint
 is that the app works against an untouched instance. What §13 rule 6 actually
 gates is which capabilities the composer may *prefer* the module for, and that
 is now a ledger in §5. Three are cleared: `access`, `individual`, `individuals`.
-All on fourteen invented people, which is why §9 #18 stays open.
+All on fourteen invented people — the entry below is what happened when it met
+1,463 real ones.
+
+---
+
+### 2026-08-23 (later still) — the real tree
+
+The module was installed on `tree.almou.sa` and answered against 1,463 real
+people rather than fourteen invented ones. **Two disagreements between the
+transports, both on one woman's record, and nothing else across the tree.**
+
+- Her lifespan read `…–`. `Individual::lifespan()` always writes something —
+  a chart box wants the same height for everybody — so the HTML path showed an
+  ellipsis and a dash under a person the tree records no dates for. The module
+  answered null. **Null is right**, and the stock path now agrees: a lifespan
+  with no digit in it, in any script, is a rendering decision rather than
+  information.
+- The module read no second name for her. `GedcomRecord::alternateName()` is
+  narrower than it looks — it answers only when the primary and secondary names
+  differ by **character set**, so a person recorded twice in the same script
+  has none by that rule. She has two Arabic `NAME` lines, the second with an
+  unknown given name (`@N.N.` → `…`). **The accordion's reading is right**: it
+  is what the tree records, and the module now reads `getAllNames()` instead.
+
+One fix on each side, which is the honest split: neither transport was simply
+wrong, and the interface is what has to hide the difference. Both are now
+contract-tested, and `tool/lab/make_gedcom.py` grew a person with two
+same-script names so the case cannot regress unnoticed.
+
+`tool/live_check.dart` gained `--person XREF`. Chasing a disagreement means
+going back to the one record that showed it, and twice now that record has been
+neither the account's own nor the first search hit.
+
+**What the real tree did *not* find is worth as much as what it did.** Search
+counts matched at 50 and 50. Enumeration returned a first page of 1,463 —
+something no stock route can do at all. Sex, deceased, every relative count,
+the fact tags, the role, and the statistics all agreed. The relationship,
+chart, timeline and statistics endpoints answered. After a document argued from
+source got five things wrong and a first execution got six more, the real tree
+finding only two is the first evidence that this is converging.
+
+Still unexercised, and now the top of §9 #18: a manager's or editor's view,
+pending edits, and the notes/sources/media capabilities — this site runs none
+of those three tab modules, so nothing has ever read them from a real server.
 
 ---
 
@@ -1674,6 +1721,8 @@ All on fourteen invented people, which is why §9 #18 stays open.
 | 33 | Only an anonymous `404` proved a tree private; 2.3 answers `400`, silently downgrading every private tree there to `memberOrVisitor` | **A 2.3 lab install** |
 | 34 | The version was read only from a `200`; 2.3 answers `400` for `GET /login` and renders the page anyway | **A 2.3 lab install** |
 | 35 | The lab set tree privacy through `setPreference('REQUIRE_AUTHENTICATION')`, which schema 45 turned into a column — so the tree was never private, and it looked exactly like the module leaking one | **Checking the database rather than believing the symptom** |
+| 36 | Every undated person carried a lifespan of `…–`. `Individual::lifespan()` always writes something so a chart box keeps its height; the app showed it | **The real tree** |
+| 37 | The module read no second name for a person recorded twice in the *same* script. `GedcomRecord::alternateName()` answers only when the two differ by character set | **The real tree** |
 
 Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
 the fixtures held a second marriage — a fixture that reproduces exactly what
@@ -1682,6 +1731,19 @@ had been warning about since the beginning. 27 was the reverse: the *captured*
 2.2.6 markup had `fact_BIRT` all along, and a first reading of the 2.3
 template invented a qualified form that webtrees has never emitted. Read the
 capture before believing the template.
+
+Bugs 36 and 37 are the two the *real* tree found, on the first request the
+module ever served against 1,463 people rather than fourteen invented ones —
+and neither could have come from anywhere else. Both were disagreements between
+the transports on one woman's record: a lifespan of `…–` where she has no
+dates, and a second Arabic name that the HTML path read from the names
+accordion and `alternateName()` refused to report because it only ever reports
+a name in a *different script*. One was fixed on each side. Nothing else
+differed, on any of the 1,463.
+
+That is the argument for the contract suite in one line: two transports over
+the same tree, and the only thing that could have told them apart was running
+both over data neither had seen.
 
 Bugs 30–35 all arrived in one afternoon, from the same cause: **the module was
 executed for the first time.** Every one had survived a document argued from
@@ -2033,8 +2095,9 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 # Exercise the app's own data layer end to end
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
+#   --person XREF     diff this record specifically, when one disagrees
 
-flutter test          # 505 tests
+flutter test          # 509 tests
 flutter analyze       # must stay clean
 
 # The server module. Static first — structure, unused imports, and every
@@ -2234,21 +2297,23 @@ Both tools read the password from the terminal with echo disabled, or from
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.
-18. **The module runs, on synthetic data only.** *(Was "written and has never
-   answered a request"; narrowed twice, still open.)* It is installed on a
+18. **The module runs against the real tree.** *(Was "written and has never
+   answered a request", then "synthetic data only"; narrowed three times,
+   still open.)* It is installed on a
    2.2.6 and a 2.3 lab (§8), every endpoint answers on both, and
    `tool/live_check.dart` reads the same person through both transports and
    finds them identical — name, sex, deceased, lifespan, every relative count,
    primary facts, tags named, and the same date in both calendars. Executing it
    cost six bugs in an afternoon (§7, 30–35) after a document argued from
    source, 508 green tests and a live 2.2.6 run had all passed it.
-   **What is still untested is the data.** The lab tree is fourteen invented
-   people built to hold the shapes the parsers care about; the real one is
-   1,463 people with whatever a century of record-keeping put in it. The
-   scrapers have been exercised against 40 real records and the module against
-   none, so the next step is a lab loaded from a **copy** of the real tree —
-   locally, never committed — and after that the module installed on
-   `tree.almou.sa` itself.
+   **It is now installed on `tree.almou.sa`** and has answered against
+   the real 1,463-person tree. Two disagreements, both on one record, both
+   fixed (§7, 36–37); nothing else differed. That is the strongest evidence
+   the project has, and it is still not proof: one account, one tree, one
+   afternoon, and a reader whose role is Member. What has *not* been exercised
+   is a manager's view, a tree with pending edits, notes/sources/media tabs
+   (this site runs none of the three), or a photograph — this account can see
+   none, though the tree reports 86.
    Two things remain true regardless: running two transports doubles the
    meaningful test surface for as long as both exist, which is forever; and no
    capability is cleared until its endpoint has passed live against real data

@@ -25,7 +25,7 @@ PersonRef? personFromChartBox(Element box) {
     '.wt-chart-box-name:not(.wt-chart-box-name-alt)',
   );
 
-  final lifespan = textOf(box.querySelector('.wt-chart-box-lifespan'));
+  final lifespan = _lifespanOf(box);
 
   return PersonRef(
     xref: xref,
@@ -68,6 +68,24 @@ bool deathRecordedIn(Element box, {String? lifespan}) {
   // person whose facts this account may not see — has said nothing, so the
   // lifespan is asked instead.
   return sawATaggedFact ? false : _lifespanEndsInADeath(lifespan);
+}
+
+/// The years a chart box printed, or null when it printed none.
+///
+/// `Individual::lifespan()` always writes something — a person with no dates
+/// at all still gets `…–`, or a bare `…`, because the chart layout wants a
+/// line of the same height for everybody. That is a rendering decision, not
+/// information: shown as-is it puts an ellipsis and a dash under every
+/// undated person in the tree. The module answers null for the same record,
+/// and the two transports have to agree.
+///
+/// Kept whenever there is a digit *in any script* — Arabic-Indic included,
+/// since this is what the tree it was built for renders.
+String? _lifespanOf(Element box) {
+  final text = textOf(box.querySelector('.wt-chart-box-lifespan'));
+  if (text == null) return null;
+
+  return RegExp(r'\p{Nd}', unicode: true).hasMatch(text) ? text : null;
 }
 
 /// Whether a rendered lifespan carries a death year, an ellipsis included.

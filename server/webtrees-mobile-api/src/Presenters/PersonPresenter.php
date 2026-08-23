@@ -46,13 +46,49 @@ final class PersonPresenter
             // reader may not see the name, so a hidden person is still a row
             // rather than a gap - exactly as the website draws them.
             'name'          => Text::of($individual->fullName()),
-            'alternateName' => Text::orNull($individual->alternateName()),
+            'alternateName' => $this->alternateName($individual),
             'sex'           => self::sexName($this->compat->sexCode($individual)),
             'deceased'      => $individual->isDead(),
             'lifespan'      => $this->lifespan($individual),
             'thumbnail'     => $this->thumbnailUrl($individual),
             'private'       => !$individual->canShow(),
         ];
+    }
+
+    /**
+     * A second name form the tree records — a romanized name beside an Arabic
+     * one, a married name beside a maiden one.
+     *
+     * **Not `GedcomRecord::alternateName()`**, which is narrower than it
+     * looks: it answers only when the primary and secondary names differ by
+     * *character set*, so a person recorded twice in the same script has none.
+     * A real tree disagreed — a woman with two Arabic `NAME` lines, the second
+     * with an unknown given name — where the HTML path read the second line
+     * from the names accordion and this read null.
+     *
+     * The accordion's reading is the right one: it is what the tree actually
+     * records, and it is what the two transports have to agree on.
+     */
+    private function alternateName(Individual $individual): string|null
+    {
+        if (!$individual->canShowName()) {
+            return null;
+        }
+
+        $all     = $individual->getAllNames();
+        $primary = $all[$individual->getPrimaryName()]['full'] ?? '';
+
+        foreach ($all as $index => $name) {
+            if ($index === $individual->getPrimaryName()) {
+                continue;
+            }
+
+            if (($name['full'] ?? '') !== $primary) {
+                return Text::orNull($name['full']);
+            }
+        }
+
+        return null;
     }
 
     /**
