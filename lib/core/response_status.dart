@@ -61,13 +61,24 @@ enum TreeVisibility {
 
   /// Reads an anonymous fetch of a tree page.
   ///
-  /// Only `404` proves privacy: webtrees fails to bind `{tree}` when the
-  /// caller may not see it. A `403` would mean the tree exists but the page is
-  /// barred, which says nothing about visitors, and a `5xx` says nothing at
-  /// all.
+  /// A tree the caller may not see fails to bind as a `{tree}` route
+  /// parameter, and **the two supported versions report that differently** —
+  /// confirmed against a private tree on both:
+  ///
+  /// * 2.2.x hands the unmatched route to the not-found handler: `404`.
+  /// * 2.3 lets the route match with a null tree, and `Validator::tree()`
+  ///   throws `HttpBadRequestException`: `400`.
+  ///
+  /// Both mean the same thing here, because the app composed this URL and a
+  /// `400` cannot be a malformed request of its own making. Reading only
+  /// `404` — which is what this did until a 2.3 lab said otherwise — silently
+  /// downgrades every private tree on 2.3 to [memberOrVisitor].
+  ///
+  /// A `403` still proves nothing: the tree exists but that page is barred,
+  /// which says nothing about what a visitor may see. Nor does a `5xx`.
   factory TreeVisibility.of(Reply reply) => switch (reply.status) {
     200 => TreeVisibility.public,
-    404 => TreeVisibility.private,
+    400 || 404 => TreeVisibility.private,
     _ => TreeVisibility.unknown,
   };
 }

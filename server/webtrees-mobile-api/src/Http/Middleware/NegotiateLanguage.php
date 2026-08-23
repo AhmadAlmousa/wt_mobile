@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace WebtreesMobileApi\Http\Middleware;
 
+use Fisharebest\Webtrees\Gedcom;
 use Fisharebest\Webtrees\I18N;
+use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Services\ModuleService;
 use Fisharebest\Webtrees\Validator;
 use Psr\Http\Message\ResponseInterface;
@@ -33,11 +35,21 @@ use function trim;
  * Module route middleware runs inside `Router`, i.e. after `UseLanguage`, so
  * `I18N::init()` here rebinds the translations for this request and nothing
  * else. Nothing is written to the session or to the user.
+ *
+ * **`I18N::init()` alone is not enough**, and only running it showed why. The
+ * global stack registers every GEDCOM tag's label *after* `UseLanguage` and
+ * *before* `Router` — and `Gedcom::registerTags()` evaluates each label
+ * eagerly, so by the time this runs the element factory is already holding
+ * translations in the session's language. Re-initialising gave a payload whose
+ * *dates* were English and whose *labels* were still Arabic. The tags have to
+ * be registered again.
  */
 final class NegotiateLanguage implements MiddlewareInterface
 {
-    public function __construct(private readonly ModuleService $module_service)
-    {
+    public function __construct(
+        private readonly ModuleService $module_service,
+        private readonly Gedcom $gedcom,
+    ) {
     }
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -52,8 +64,12 @@ final class NegotiateLanguage implements MiddlewareInterface
 
         $tag = $this->choose($wanted, $available);
 
-        if ($tag !== null) {
+        // Only when it actually differs: re-registering every GEDCOM tag is
+        // not free, and the common case is a client reading in the language
+        // the account is already set to.
+        if ($tag !== null && $tag !== I18N::languageTag()) {
             I18N::init($tag);
+            $this->gedcom->registerTags(Registry::elementFactory(), true);
         }
 
         return $handler->handle($request);

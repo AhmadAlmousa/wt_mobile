@@ -604,6 +604,8 @@ Future<void> main(List<String> args) async {
         ok: left == right,
       );
 
+      String? statedXref;
+
       if (capabilities.has('access')) {
         final stated = await ModuleAccessTransport(client).describe();
         compare('account', access.account.username, stated.account.username);
@@ -620,11 +622,30 @@ Future<void> main(List<String> args) async {
           'role in "${tree.name}"',
           'stock=${tree.role.name}  module=${stated.trees.first.role.name}',
         );
+        statedXref = stated.trees.first.myXref;
+        // The account's own record is *stored* against the user, but a stock
+        // client can only find it by scraping a menu link that not every page
+        // renders. The module reading one where the probe found none is a
+        // finding rather than a mismatch.
+        report(
+          'own record',
+          'stock=${tree.myXref ?? '(not on the page)'}  '
+              'module=${statedXref ?? '(not set)'}',
+        );
       }
 
-      final xref = tree.myXref;
+      // Prefer the account's own record — certain to be visible to this
+      // reader, and usually the best-populated — then whatever search finds.
+      final xref =
+          tree.myXref ??
+          statedXref ??
+          (await stock.search(
+            tree.name,
+            options['search'] ?? 'a',
+          )).people.firstOrNull?.xref;
+
       if (xref == null) {
-        stdout.writeln('  SKIP  no own record to compare');
+        stdout.writeln('  SKIP  nobody to compare');
       } else {
         final byHtml = await stock.individual(tree.name, xref);
         final byJson = await module.individual(tree.name, xref);

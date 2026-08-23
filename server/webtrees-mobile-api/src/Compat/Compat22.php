@@ -91,6 +91,9 @@ final class Compat22 implements CompatInterface
         return $module_service
             ->findByInterface(ModuleLanguageInterface::class, true)
             ->map(static fn (ModuleLanguageInterface $module): string => $module->locale()->languageTag())
+            // `findByInterface()` keys its collection by module name, and a
+            // keyed array is a JSON *object*. The client wants a list.
+            ->values()
             ->all();
     }
 

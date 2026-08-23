@@ -132,23 +132,30 @@ class InstanceProbe {
   /// which anonymous visitors can always reach.
   Future<String> _readVersion(List<Notice> warnings) async {
     final reply = await _client.get('/login');
-    if (!reply.isOk) {
-      warnings.add(const VersionUnreadable());
-      return '';
-    }
 
     if (reply.body.contains('Cookie check')) {
       throw const BlockedAsBot('cookie-challenge');
     }
 
+    // Deliberately not gated on `isOk`. webtrees 2.3 answers `400` for
+    // `GET /login` and still renders the whole page — meta tags included —
+    // where 2.2.6 answers `200`. The generator tag is on every page built on
+    // the default layout, error pages among them, so what decides this is
+    // whether the tag is there and not which status carried it. Requiring
+    // `200` cost the version on every 2.3 site, and the version is what tells
+    // the parsers which markup to expect.
     final version = RegExp(
       r'<meta name="generator" content="webtrees ([^"]+)"',
     ).firstMatch(reply.body)?.group(1);
 
     if (version == null) {
-      warnings.add(const SiteUnidentified());
+      // No tag at all: either this is not webtrees, or nothing came back.
+      warnings.add(
+        reply.isOk ? const SiteUnidentified() : const VersionUnreadable(),
+      );
       return '';
     }
+
     return version;
   }
 
