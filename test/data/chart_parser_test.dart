@@ -126,9 +126,7 @@ void main() {
         // Merging them would put a child under the wrong mother, which is not
         // a crowded chart but a false one.
         expect(chart.families.last.spouse?.xref, 'X51');
-        expect(chart.families.last.children.map((n) => n.person.xref), [
-          'X62',
-        ]);
+        expect(chart.families.last.children.map((n) => n.person.xref), ['X62']);
       });
 
       test('goes on down the generations', () {

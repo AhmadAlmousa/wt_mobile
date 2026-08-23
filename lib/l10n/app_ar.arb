@@ -256,5 +256,58 @@
         "type": "String"
       }
     }
-  }
+  },
+  "diagnostics": "التشخيص",
+  "diagnosticsWhy": "ما يعرفه التطبيق عن هذا الموقع. يفيد إرفاقه ببلاغ عن خلل: فيه عنوان الموقع واسم المستخدم، وليس فيه كلمة السر.",
+  "diagnosticsSite": "الموقع",
+  "diagnosticsAddress": "العنوان",
+  "diagnosticsUrlStyle": "نمط العناوين",
+  "diagnosticsUrlPretty": "مسارات مقروءة",
+  "diagnosticsUrlQuery": "سلاسل استعلام",
+  "diagnosticsSiteVersion": "إصدار webtrees",
+  "diagnosticsUnreadable": "تعذّرت قراءته",
+  "diagnosticsHealth": "الخادم",
+  "diagnosticsHealthOk": "لا يبلّغ عن أي مشكلة",
+  "diagnosticsHealthDegraded": "يبلّغ عن نقص إضافات PHP اختيارية",
+  "diagnosticsNoSite": "لم يُحدَّد أي موقع بعد.",
+  "diagnosticsAccount": "الحساب",
+  "diagnosticsSignedInAs": "مسجَّل الدخول باسم",
+  "diagnosticsConnection": "الاتصال",
+  "diagnosticsStageDisconnected": "لم يُختَر موقع",
+  "diagnosticsStageConnecting": "جارٍ التعرّف على الموقع",
+  "diagnosticsStageSignedOut": "الموقع معروف، والدخول غير مسجَّل",
+  "diagnosticsStageSigningIn": "جارٍ تسجيل الدخول",
+  "diagnosticsStageSignedIn": "الدخول مسجَّل",
+  "diagnosticsModule": "وحدة واجهة الجوّال",
+  "diagnosticsModuleAbsent": "غير مثبَّتة. يُقرأ كل شيء من صفحات الموقع نفسها، وهي الحالة المعتادة وتعمل دائمًا.",
+  "diagnosticsModuleVersion": "إصدار الوحدة",
+  "diagnosticsApiVersion": "إصدار الواجهة",
+  "diagnosticsModuleSaysWebtrees": "إصدار webtrees كما تذكره الوحدة",
+  "diagnosticsLimits": "الحدود",
+  "diagnosticsLimitsValue": "{page} في الصفحة · {generations} أجيال · صور بعرض {image} بكسل",
+  "@diagnosticsLimitsValue": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "generations": {
+        "type": "int"
+      },
+      "image": {
+        "type": "int"
+      }
+    }
+  },
+  "diagnosticsLanguages": "اللغات التي يكتب بها هذا الموقع",
+  "diagnosticsReading": "من أين يُقرأ كل جزء",
+  "diagnosticsReadingWhy": "تُعتمد الوحدة قدرةً قدرةً، فوحدة أقدم تظل تمنح الطريق السريع لما تجيب عنه.",
+  "diagnosticsFromModule": "الوحدة",
+  "diagnosticsFromPages": "صفحات الموقع",
+  "diagnosticsSearch": "البحث",
+  "diagnosticsFindings": "الملاحظات",
+  "diagnosticsApp": "التطبيق",
+  "diagnosticsAppVersion": "إصدار التطبيق",
+  "diagnosticsUserAgent": "معرّف العميل",
+  "diagnosticsCopy": "نسخ التقرير",
+  "diagnosticsCopied": "نُسخ التقرير"
 }

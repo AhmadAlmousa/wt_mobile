@@ -79,7 +79,10 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     final client = widget.session.client;
 
     return CapabilityChartsTransport(
-      stock: ChartsRepository(client, version: widget.session.instance?.version),
+      stock: ChartsRepository(
+        client,
+        version: widget.session.instance?.version,
+      ),
       module: _capabilities.isPresent ? ModuleChartsTransport(client) : null,
     );
   }
@@ -210,6 +213,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
         builder: (context, state) => AccessScreen(
           session: widget.session,
           settings: widget.settings,
+          capabilities: _capabilities,
           onSignedOut: () => _router.go(Routes.connect),
           // Stacked, so a reader who chose one of several trees can go back
           // to the list with the system back gesture.

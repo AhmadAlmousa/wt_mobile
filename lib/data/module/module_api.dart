@@ -215,9 +215,8 @@ int? _int(Object? value) => switch (value) {
   _ => null,
 };
 
-String? _string(Object? value) => value is String && value.isNotEmpty
-    ? value
-    : null;
+String? _string(Object? value) =>
+    value is String && value.isNotEmpty ? value : null;
 
 Set<String> _strings(Object? value) => value is List
     ? {

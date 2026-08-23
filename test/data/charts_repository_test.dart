@@ -208,10 +208,7 @@ void main() {
       // setting. With it on, two people linked only by a marriage answer "no
       // link" — which is correct, and looks like a failure unless the app
       // says why.
-      expect(
-        charts.bloodLinesOnly('/tree/main/relationships-1-3/X42'),
-        isTrue,
-      );
+      expect(charts.bloodLinesOnly('/tree/main/relationships-1-3/X42'), isTrue);
       expect(
         charts.bloodLinesOnly('/tree/main/relationships-0-99/X42'),
         isFalse,
@@ -361,10 +358,7 @@ void main() {
       // no tree preference narrows it — so this is a request the server
       // means to answer rather than a trick played on it.
       expect(
-        ChartsRepository.withGenerations(
-          '/tree/main/ancestors-tree-4/X42',
-          7,
-        ),
+        ChartsRepository.withGenerations('/tree/main/ancestors-tree-4/X42', 7),
         '/tree/main/ancestors-tree-7/X42',
       );
       expect(
@@ -469,23 +463,28 @@ void main() {
       expect(server.routes, contains('/tree/main/relationships-0-99/X42/X43'));
     });
 
-    test('can ask for blood lines only on a site that allows anything',
-        () async {
-      serve({
-        ...site(),
-        '/tree/main/relationships-1-99/X42/X43': (_) =>
-            Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
-      });
+    test(
+      'can ask for blood lines only on a site that allows anything',
+      () async {
+        serve({
+          ...site(),
+          '/tree/main/relationships-1-99/X42/X43': (_) =>
+              Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
+        });
 
-      await charts.relationship(
-        '/tree/main/relationships-0-99/X42',
-        from: 'X42',
-        to: 'X43',
-        bloodLinesOnly: true,
-      );
+        await charts.relationship(
+          '/tree/main/relationships-0-99/X42',
+          from: 'X42',
+          to: 'X43',
+          bloodLinesOnly: true,
+        );
 
-      expect(server.routes, contains('/tree/main/relationships-1-99/X42/X43'));
-    });
+        expect(
+          server.routes,
+          contains('/tree/main/relationships-1-99/X42/X43'),
+        );
+      },
+    );
 
     test('never touches the recursion beside it', () async {
       // That one *is* clamped by the tree, and it is what stops a deep search

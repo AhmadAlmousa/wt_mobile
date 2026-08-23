@@ -316,7 +316,6 @@ class _Answer extends StatelessWidget {
                 ],
               ],
             ],
-
           ],
         );
       },
@@ -425,9 +424,7 @@ class _Ways extends StatelessWidget {
                 avatar: Icon(icon(which), size: 17),
                 label: Text(label(which)),
                 selected: which == side,
-                onSelected: routes.offers(which)
-                    ? (_) => onSide(which)
-                    : null,
+                onSelected: routes.offers(which) ? (_) => onSide(which) : null,
               ),
           ],
         ),

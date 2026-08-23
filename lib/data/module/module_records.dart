@@ -223,8 +223,9 @@ final class ModuleRecordsTransport implements RecordsTransport {
     final reply = await _client.getBytes(
       _client.url.routeOf(url),
       query: {
-        for (final entry
-            in Uri.parse(Uri.decodeFull(url)).queryParameters.entries)
+        for (final entry in Uri.parse(
+          Uri.decodeFull(url),
+        ).queryParameters.entries)
           if (entry.key != 'route') entry.key: entry.value,
       },
     );

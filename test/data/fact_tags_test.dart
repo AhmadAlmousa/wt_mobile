@@ -65,16 +65,18 @@ void main() {
       expect(qualified.isDivorce('Divorce'), isTrue);
     });
 
-    test('finds a divorce inside a caption that runs several labels together',
-        () {
-      // A descendants chart announces a family as one sentence, with no
-      // markup between the marriage, the divorce and the child count.
-      expect(
-        index.mentionsDivorce('الزواج 1940 — الطلاق 1948 — ولد واحد'),
-        isTrue,
-      );
-      expect(index.mentionsDivorce('الزواج 1925 — ولدان'), isFalse);
-    });
+    test(
+      'finds a divorce inside a caption that runs several labels together',
+      () {
+        // A descendants chart announces a family as one sentence, with no
+        // markup between the marriage, the divorce and the child count.
+        expect(
+          index.mentionsDivorce('الزواج 1940 — الطلاق 1948 — ولد واحد'),
+          isTrue,
+        );
+        expect(index.mentionsDivorce('الزواج 1925 — ولدان'), isFalse);
+      },
+    );
 
     test('says nothing about a label it never saw', () {
       expect(index.tagFor('المهنة'), isNull);

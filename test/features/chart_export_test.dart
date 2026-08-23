@@ -1,11 +1,9 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/theme.dart';
-import 'package:webtrees_mobile/data/transport.dart';
 import 'package:webtrees_mobile/domain/charts.dart';
 import 'package:webtrees_mobile/domain/records.dart';
 import 'package:webtrees_mobile/features/charts/chart_canvas.dart';
@@ -14,24 +12,7 @@ import 'package:webtrees_mobile/features/charts/chart_options.dart';
 import 'package:webtrees_mobile/features/charts/chart_pdf.dart';
 import 'package:webtrees_mobile/features/charts/fan_layout.dart';
 
-/// A transport that is never asked anything: a chart with no photographs on
-/// it fetches nothing.
-class _NoRecords implements RecordsTransport {
-  @override
-  Future<Uint8List> image(String url) async => Uint8List(0);
-
-  @override
-  Future<IndividualRecord> individual(String tree, String xref) =>
-      throw UnimplementedError();
-
-  @override
-  Future<SearchPage> search(String tree, String query, {int page = 1}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<Map<ChartKind, String>> treeCharts(String tree) =>
-      throw UnimplementedError();
-}
+import '../support/no_records.dart';
 
 AncestorNode _line(
   String xref, {
@@ -79,7 +60,7 @@ void main() {
           home: Scaffold(
             body: ChartCanvas(
               layout: layout,
-              records: _NoRecords(),
+              records: const NoRecords(),
               captureKey: capture,
               onTapPerson: (_) {},
             ),

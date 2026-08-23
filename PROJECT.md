@@ -847,7 +847,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **3b** | Rest of the read model (families, sources, notes, media tab, paging) | ✅ |
 | **4** | Interface (Material 3 Expressive theme, Arabic/RTL, navigation) | ✅ |
 | **4a** | Getting out of the way — resume, one-tree, back stack, calendar choice | ✅ |
-| **5** | Hardening (golden tests, CI, diagnostics) | ⬜ |
+| **5** | Hardening (golden tests, CI, failure states, diagnostics) | ✅ |
 | **6a** | Charts: discovery, ancestors and descendants, drawn natively | ✅ |
 | **6b** | Charts: fan/circle, compact, hourglass — the same data, redrawn | ✅ |
 | **6c** | Relationships — how any two people in a tree are connected | ✅ |
@@ -1740,6 +1740,70 @@ Cairo face carries them, so the same file the interface is set in produces
 mirrored the way the screen mirrors it. Rendered and looked at, both shapes,
 in both directions.
 
+### 2026-08-23 (later still) — Phase 5: the checks the last phase proved were missing
+
+Phase 8c ended by opening §9 #22 — *nothing the project owns can see the
+screen* — after four faults were found by a person using the app that 509
+tests, a static checker, two labs and a walk of the real tree had all passed.
+This is that risk answered, and it is the phase the plan has called
+"hardening" since before any of it was written: golden tests, CI, error-state
+coverage and a diagnostics screen.
+
+**CI, at last, for the app.** `module.yml` has checked the PHP since Phase 8a
+while the Dart — most of the project — had nothing. `.github/workflows/app.yml`
+runs three jobs, deliberately separate because a red build should say which
+kind of wrong it is: `analyze`, `test` (with `dart format` enforced, and the
+generated localizations regenerated and diffed so the ARB files and the Dart
+cannot drift), and `goldens`. Making format a gate meant formatting the
+repository once; twelve files that had never been through the formatter moved,
+which is churn worth taking exactly once.
+
+**Goldens, of the parts a person judges rather than asserts on.** Fourteen
+small pictures — avatars in every combination of sex and death, in both
+directions and both themes; a person in a list; a family whose marriage ended;
+the message panels — at 200 KB for the set. Component-level on purpose: a
+whole-screen golden fails whenever anything moves, which teaches everyone to
+accept the diff without reading it, and these fail for one reason each. Whole
+screens are still rendered by `tool/preview/render_preview.dart`, as pictures
+to look at rather than as assertions.
+
+What a golden can and cannot do is worth stating plainly, because it is easy
+to oversell: **it catches a change, not a mistake.** The first picture is only
+as good as the eye that approved it — a golden taken a day earlier would have
+frozen the smudged mourning ribbon of bug 41 as correct. Its value is that the
+ribbon, now looked at and agreed, cannot quietly become a smudge again.
+Approving these meant looking at all fourteen, and that turned up nothing
+wrong, but it did make one thing visible that no screenshot had: at the
+default `coupleGap` of 10 points the parted-couple mark is drawn into a gap
+barely wider than itself, which is legible but cramped.
+
+**Failure states, screen by screen.** Eight tests that break one route each
+and assert the reader is told: a search that answers `500` says so rather than
+finding nobody; a person who cannot be fetched is named as missing; markup no
+parser recognises names the parser and mentions the theme; a tab that will not
+load is a *warning* beside a readable record rather than a silently empty
+family. Every one was confirmed to fail against a working site before being
+kept — three were re-run with the breakage removed, and all three went red.
+The connect and sign-in paths already had this; everything past sign-in had
+none of it.
+
+**And a diagnostics screen**, which the plan has asked for since Phase 0 as
+the mitigation for §9 #7. The app discovers the address style it settled on,
+the version it read, the server's health, whether a module answered and what
+it can do — and showed none of it. It now shows all of it, plus the one thing
+nothing else in the app states: **which transport is answering each
+capability.** "The module is installed" and "this screen used the module" are
+different questions, and the second one is what a reader wondering why a date
+is in the wrong calendar actually needs. `Copy report` puts a plain-text
+version on the clipboard, deliberately untranslated because it is written for
+whoever reads the issue rather than whoever files it, carrying the site
+address and the account name and no password, no cookie and no real name.
+
+The honest limit: this closes the *tooling* half of #22 and not the other
+half. Goldens catch regressions in what has been looked at; nothing here makes
+anybody look at something new. A device (§9 #13) and the habit of opening the
+app after changing it are still the only things that do.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -2209,8 +2273,19 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # tags, the family events and a date in both calendars. Family events are
 # there because they were once the only thing that differed (§7, bug 40).
 
-flutter test          # 513 tests
+flutter test          # 541 tests
 flutter analyze       # must stay clean
+dart format lib test tool   # CI fails if this changes anything
+
+# Pictures of the parts a person judges rather than asserts on: avatars with
+# and without the mourning ribbon, a person in a list, a parted couple, the
+# message panels — each in both directions and both themes. Tagged, so the
+# other 527 can run without them and a red golden is never confused for a
+# wrong value.
+flutter test --tags golden
+flutter test --exclude-tags golden
+# A failure means LOOK at the picture. Only then:
+flutter test --tags golden --update-goldens
 
 # The server module. Static first — structure, unused imports, and every
 # webtrees class it names checked against BOTH 2.2.6 and 2.3, failing if
@@ -2245,6 +2320,12 @@ flutter test tool/preview/render_preview.dart --update-goldens
 # Sideloadable builds, one per ABI (~25MB each, against 54MB fat)
 flutter build apk --release --split-per-abi
 ```
+
+CI runs `.github/workflows/app.yml` (analyze · test · goldens) and
+`module.yml` (`php -l` on 8.3 and 8.4, plus `check_module.py` against both
+webtrees versions). The goldens job is pinned to one Flutter version and one
+runner on purpose: a golden compares rendered pixels, and text rendering is
+not identical across engines or platforms.
 
 Running the GUI on Linux needs a toolchain this machine does not yet have:
 
@@ -2315,7 +2396,10 @@ Both tools read the password from the terminal with echo disabled, or from
    an argument from source, not evidence.
 7. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    tab fragments rather than whole pages, a two-version fixture matrix, and
-   `ParseFailure` naming the parser, selector and version. **Still open:** the
+   `ParseFailure` naming the parser, selector and version — which a reader can
+   now *see*, along with the version and address style the app settled on, on
+   the diagnostics screen Phase 5 added. Eight failure-state tests check that
+   each screen says so rather than going blank. **Still open:** the
    fixtures are transcribed from upstream templates, not captured from a live
    site, so no non-default theme, language or module configuration has ever
    been parsed. Narrowed a little in Phase 3b — real pages from
@@ -2450,19 +2534,23 @@ Both tools read the password from the terminal with echo disabled, or from
    surname partition (webtrees caps it at 5,000) and pages it in PHP. Both are
    bounded and both are what the website itself does, but the target tree is
    1,463 people and neither has been measured on one ten times that.
-22. **Nothing the project owns can see the screen.** Four faults (§7, 40–43)
+22. **Nothing the project owns can see the screen.** *(Half closed by Phase
+   5.)* Four faults (§7, 40–43)
    were found by a person using the app, after 509 tests, a static checker
    across both webtrees versions, two lab installs, a field-by-field diff of
    both transports and a 60-record sample walk of the real tree had all
    passed. Two were module bugs the fixtures could not hold, because the
    fixtures were written from the design rather than captured from a server;
    two were interface bugs where a comment described the intent and no
-   assertion checked it. Each fix ships with a check that fails on the old
-   code — `live_check` now diffs family events, and the export test asserts
-   the capture is wider than the device — but the *class* of fault is open:
-   `tool/preview/render_preview.dart` renders every screen and asserts
-   nothing, so it only helps somebody who looks. The real mitigation is a
-   device (see 13) and the habit of opening the app after changing it.
+   assertion checked it.
+   **Phase 5 answered the tooling half**: fourteen component goldens freeze
+   the parts a person judges — the mourning ribbon among them — eight tests
+   check that every screen says so when what it needs does not arrive, and CI
+   runs all of it. **What that does not do is make anybody look at something
+   new.** A golden catches a change, not a mistake: taken a day earlier it
+   would have frozen bug 41's smudge as correct. So the other half stands, and
+   the only things that close it are a device (see 13) and the habit of
+   opening the app after changing it.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

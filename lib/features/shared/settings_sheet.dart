@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../data/diagnostics.dart';
 import '../../data/settings_store.dart';
 import '../../domain/dates.dart';
 import '../../l10n/app_localizations.dart';
+import 'diagnostics_screen.dart';
 
 /// Lets the reader choose the theme and the language.
 ///
 /// Reachable from the first screen onward, because someone who reads Arabic
 /// should not have to sign in through an English form to find the switch.
 class SettingsSheet extends StatelessWidget {
-  const SettingsSheet({required this.settings, super.key});
+  const SettingsSheet({required this.settings, this.diagnostics, super.key});
 
   final SettingsStore settings;
 
-  static Future<void> show(BuildContext context, SettingsStore settings) =>
-      showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (context) => SettingsSheet(settings: settings),
-      );
+  /// What the app knows about the site, when there is a site to know about.
+  ///
+  /// A snapshot rather than a live reading: the sheet is built when it opens,
+  /// and a diagnostics screen that changed under the reader while they copied
+  /// it would be worse than one that is a moment stale.
+  final Diagnostics? diagnostics;
+
+  static Future<void> show(
+    BuildContext context,
+    SettingsStore settings, {
+    Diagnostics? diagnostics,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) =>
+        SettingsSheet(settings: settings, diagnostics: diagnostics),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +109,19 @@ class SettingsSheet extends StatelessWidget {
               const SizedBox(height: 10),
               _Footnote(text.calendarOnlyWhenOffered),
               const SizedBox(height: 28),
+
+              // Last, and quiet: nobody opens the settings looking for it,
+              // and everybody who needs it needs it badly.
+              if (diagnostics case final report?) ...[
+                _GroupLabel(text.diagnostics),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.troubleshoot_outlined),
+                  label: Text(text.diagnostics),
+                  onPressed: () => DiagnosticsScreen.show(context, report),
+                ),
+                const SizedBox(height: 28),
+              ],
 
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(),

@@ -1,0 +1,10 @@
+# Tags this suite uses. Declaring them keeps `--tags` and `--exclude-tags`
+# from warning about a name nothing recognises, and — more usefully — makes
+# the set discoverable.
+tags:
+  # Tests that compare rendered pixels against a committed picture. Split out
+  # because they fail for a different reason from everything else: text
+  # rendering is not identical across Flutter versions or platforms, so a red
+  # golden means "look at the diff", not "a value is wrong".
+  golden:
+    description: Compares rendered pixels against a committed picture.

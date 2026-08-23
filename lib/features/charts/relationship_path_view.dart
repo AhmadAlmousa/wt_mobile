@@ -95,10 +95,7 @@ class _Rung extends StatelessWidget {
           const SizedBox(width: 12),
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 5,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                 color: colors.secondaryContainer,
                 borderRadius: BorderRadius.circular(100),

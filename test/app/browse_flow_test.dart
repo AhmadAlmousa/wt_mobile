@@ -751,10 +751,7 @@ void main() {
     Color fillBehind(String name) {
       final box = tester.widget<DecoratedBox>(
         find
-            .ancestor(
-              of: find.text(name),
-              matching: find.byType(DecoratedBox),
-            )
+            .ancestor(of: find.text(name), matching: find.byType(DecoratedBox))
             .first,
       );
       return (box.decoration as BoxDecoration).color!;

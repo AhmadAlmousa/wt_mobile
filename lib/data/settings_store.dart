@@ -76,7 +76,9 @@ class SettingsStore extends ChangeNotifier {
         (view) => view.name == calendar,
         orElse: () => CalendarView.both,
       );
-      _chartOptions = _chartOptionsFrom(await _preferences.getString(_chartKey));
+      _chartOptions = _chartOptionsFrom(
+        await _preferences.getString(_chartKey),
+      );
     } on Exception catch (problem) {
       developer.log(
         'Could not read settings: $problem',

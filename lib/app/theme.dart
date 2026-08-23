@@ -51,9 +51,7 @@ abstract final class AppTheme {
         brightness == Brightness.light
             ? SemanticColors.light
             : SemanticColors.dark,
-        brightness == Brightness.light
-            ? PersonColors.light
-            : PersonColors.dark,
+        brightness == Brightness.light ? PersonColors.light : PersonColors.dark,
       ],
       scaffoldBackgroundColor: colors.surface,
       splashFactory: InkSparkle.splashFactory,
@@ -285,10 +283,16 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
   SemanticColors lerp(ThemeExtension<SemanticColors>? other, double t) {
     if (other is! SemanticColors) return this;
     return SemanticColors(
-      warningContainer:
-          Color.lerp(warningContainer, other.warningContainer, t)!,
-      onWarningContainer:
-          Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
+      warningContainer: Color.lerp(
+        warningContainer,
+        other.warningContainer,
+        t,
+      )!,
+      onWarningContainer: Color.lerp(
+        onWarningContainer,
+        other.onWarningContainer,
+        t,
+      )!,
     );
   }
 }

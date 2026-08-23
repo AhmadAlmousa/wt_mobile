@@ -154,8 +154,7 @@ final class FactTagIndex {
 
   /// Whitespace collapsed and case folded, so the same label found in two
   /// places matches itself.
-  static String _key(String label) =>
-      (cleanText(label) ?? '').toLowerCase();
+  static String _key(String label) => (cleanText(label) ?? '').toLowerCase();
 
   /// Every element under [root], whichever kind of node it is.
   ///

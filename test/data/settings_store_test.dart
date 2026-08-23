@@ -49,16 +49,18 @@ void main() {
     expect(again.chartOptions.show, ShowPeople.menOnly);
   });
 
-  test('“as the site sets it” is remembered as an answer, not as nothing',
-      () async {
-    final settings = await reopened();
-    await settings.setChartOptions(const ChartOptions(generations: 5));
-    await settings.setChartOptions(
-      settings.chartOptions.withGenerations(null),
-    );
+  test(
+    '“as the site sets it” is remembered as an answer, not as nothing',
+    () async {
+      final settings = await reopened();
+      await settings.setChartOptions(const ChartOptions(generations: 5));
+      await settings.setChartOptions(
+        settings.chartOptions.withGenerations(null),
+      );
 
-    expect((await reopened()).chartOptions.generations, isNull);
-  });
+      expect((await reopened()).chartOptions.generations, isNull);
+    },
+  );
 
   test('a stored line it cannot read falls back to the defaults', () async {
     // An option renamed, or a value written by an older build. A settings

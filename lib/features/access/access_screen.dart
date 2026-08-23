@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/access_probe.dart';
+import '../../data/diagnostics.dart';
+import '../../data/module/module_api.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
 import '../../domain/access.dart';
@@ -22,11 +24,18 @@ class AccessScreen extends StatefulWidget {
     required this.onSignedOut,
     required this.onBrowseTree,
     required this.onOnlyTree,
+    this.capabilities,
     super.key,
   });
 
   final SessionManager session;
   final SettingsStore settings;
+
+  /// What this site's optional module answered, for the diagnostics screen.
+  ///
+  /// Only the shell knows it — it probes once per sign-in — and the shell is
+  /// not on screen, so it is handed down to the one screen that can show it.
+  final ModuleCapabilities? capabilities;
   final VoidCallback onSignedOut;
 
   /// Opens a tree for browsing. Reading is available to every role, so this is
@@ -101,7 +110,14 @@ class _AccessScreenState extends State<AccessScreen> {
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: text.settings,
-            onPressed: () => SettingsSheet.show(context, widget.settings),
+            onPressed: () => SettingsSheet.show(
+              context,
+              widget.settings,
+              diagnostics: Diagnostics.of(
+                widget.session,
+                capabilities: widget.capabilities,
+              ),
+            ),
           ),
           // Signing out lives in the menu rather than on the bar: this screen
           // is now reached with a back button in the leading slot, and five

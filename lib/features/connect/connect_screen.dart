@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../data/credential_store.dart';
+import '../../data/diagnostics.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
 import '../../l10n/app_localizations.dart';
@@ -105,7 +106,14 @@ class _ConnectScreenState extends State<ConnectScreen> {
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: text.settings,
-            onPressed: () => SettingsSheet.show(context, widget.settings),
+            onPressed: () => SettingsSheet.show(
+              context,
+              widget.settings,
+              // Before sign-in there is no module answer yet, and that is
+              // exactly when somebody most wants to see what the app made of
+              // the address they typed.
+              diagnostics: Diagnostics.of(widget.session),
+            ),
           ),
         ],
       ),

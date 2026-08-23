@@ -104,7 +104,8 @@ void main() {
         clientFor({
           '/tree/main/mobile-api/v1/individual/X42': (_) => const Canned(
             401,
-            body: '{"error":"not_signed_in","message":"Not signed in.",'
+            body:
+                '{"error":"not_signed_in","message":"Not signed in.",'
                 '"detail":null}',
             contentType: 'application/json',
           ),
@@ -122,7 +123,8 @@ void main() {
         clientFor({
           '/tree/main/mobile-api/v1/individual/X42': (_) => const Canned(
             403,
-            body: '{"error":"forbidden","message":"Not a member.",'
+            body:
+                '{"error":"forbidden","message":"Not a member.",'
                 '"detail":null}',
             contentType: 'application/json',
           ),
@@ -204,8 +206,7 @@ void main() {
       expect(server.requests.single.query['limit'], '25');
     });
 
-    test('states the sex a search result has, which HTML never does',
-        () async {
+    test('states the sex a search result has, which HTML never does', () async {
       final records = ModuleRecordsTransport(
         clientFor({
           '/tree/main/mobile-api/v1/individuals': (_) =>
@@ -302,7 +303,8 @@ void main() {
         clientFor({
           '/tree/main/mobile-api/v1/relationship/X42/X99': (_) => const Canned(
             200,
-            body: '{"from":{"xref":"X42","name":"A"},'
+            body:
+                '{"from":{"xref":"X42","name":"A"},'
                 '"to":{"xref":"X99","name":"B"},'
                 '"settings":{"ancestors":1,"recursion":0,'
                 '"clampedRecursion":0,"bloodLinesOnly":true},'
@@ -325,7 +327,8 @@ void main() {
         clientFor({
           '/tree/main/mobile-api/v1/relationship/X42/X60': (_) => const Canned(
             200,
-            body: '{"from":{"xref":"X42","name":"عبد الله"},'
+            body:
+                '{"from":{"xref":"X42","name":"عبد الله"},'
                 '"to":{"xref":"X60","name":"محمد"},'
                 '"settings":{"bloodLinesOnly":false},'
                 '"paths":[{"description":"القرابة: إبن","steps":['

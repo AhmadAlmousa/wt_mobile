@@ -269,7 +269,10 @@ ChartLayout layoutAncestors(
     for (final parentCentre in parentCentres) {
       edges.add(
         ChartEdge(
-          from: Offset(x + (columnWidth[generation] ?? metrics.boxWidth), centreY),
+          from: Offset(
+            x + (columnWidth[generation] ?? metrics.boxWidth),
+            centreY,
+          ),
           to: Offset(columnLeft(generation + 1), parentCentre),
         ),
       );
@@ -397,9 +400,7 @@ ChartLayout layoutDescendants(
           ChartEdge(
             from: Offset(previousRight, y + metrics.boxHeight / 2),
             to: Offset(slot, y + metrics.boxHeight / 2),
-            kind: family.endedInDivorce
-                ? EdgeKind.divorce
-                : EdgeKind.marriage,
+            kind: family.endedInDivorce ? EdgeKind.divorce : EdgeKind.marriage,
           ),
         );
       }
@@ -559,11 +560,7 @@ ChartLayout layoutHourglass(
   final edges = <ChartEdge>[
     ...above.edges,
     for (final edge in below.edges)
-      ChartEdge(
-        from: edge.from + shift,
-        to: edge.to + shift,
-        kind: edge.kind,
-      ),
+      ChartEdge(from: edge.from + shift, to: edge.to + shift, kind: edge.kind),
   ];
 
   // The descendants may reach further left than the ancestors do, so the

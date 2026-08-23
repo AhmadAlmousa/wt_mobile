@@ -66,3 +66,8 @@ key.properties
 /android/.gradle/
 /android/app/build/
 /linux/build/
+
+# What a failing golden writes: the committed picture, the one that was
+# rendered, and two diffs. Useful to look at, never to commit — CI uploads
+# them as an artefact instead.
+test/**/failures/

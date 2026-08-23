@@ -64,12 +64,22 @@ void main() {
       // and spouses the record names. Nothing reads the kinship word, which
       // is translated and would work in one language only.
       expect(
-        routes.matching(RelationshipSide.fatherSide).single.steps.first.person
+        routes
+            .matching(RelationshipSide.fatherSide)
+            .single
+            .steps
+            .first
+            .person
             .xref,
         'DAD',
       );
       expect(
-        routes.matching(RelationshipSide.motherSide).single.steps.first.person
+        routes
+            .matching(RelationshipSide.motherSide)
+            .single
+            .steps
+            .first
+            .person
             .xref,
         'MUM',
       );

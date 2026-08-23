@@ -69,10 +69,10 @@ void main() {
         sosa: 1,
         parents: [AncestorNode(person: person('DAD', Sex.male), sosa: 2)],
       );
-      expect(
-        namesIn(ancestorsShowing(chart, ShowPeople.menOnly)),
-        ['HER', 'DAD'],
-      );
+      expect(namesIn(ancestorsShowing(chart, ShowPeople.menOnly)), [
+        'HER',
+        'DAD',
+      ]);
     });
   });
 
@@ -100,8 +100,10 @@ void main() {
                 ),
               ],
             ),
-            DescendantNode(person: person('DAUGHTER', Sex.female),
-                number: '1.2'),
+            DescendantNode(
+              person: person('DAUGHTER', Sex.female),
+              number: '1.2',
+            ),
           ],
         ),
       ],

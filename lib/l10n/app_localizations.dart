@@ -1098,6 +1098,246 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'The {module} section could not be loaded.'**
   String noticeSectionUnavailable(String module);
+
+  /// No description provided for @diagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get diagnostics;
+
+  /// No description provided for @diagnosticsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'What the app knows about this site. Worth attaching to a bug report: it names the site address and your user name, and never your password.'**
+  String get diagnosticsWhy;
+
+  /// No description provided for @diagnosticsSite.
+  ///
+  /// In en, this message translates to:
+  /// **'Site'**
+  String get diagnosticsSite;
+
+  /// No description provided for @diagnosticsAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get diagnosticsAddress;
+
+  /// No description provided for @diagnosticsUrlStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Address style'**
+  String get diagnosticsUrlStyle;
+
+  /// No description provided for @diagnosticsUrlPretty.
+  ///
+  /// In en, this message translates to:
+  /// **'Readable paths'**
+  String get diagnosticsUrlPretty;
+
+  /// No description provided for @diagnosticsUrlQuery.
+  ///
+  /// In en, this message translates to:
+  /// **'Query strings'**
+  String get diagnosticsUrlQuery;
+
+  /// No description provided for @diagnosticsSiteVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'webtrees version'**
+  String get diagnosticsSiteVersion;
+
+  /// No description provided for @diagnosticsUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not be read'**
+  String get diagnosticsUnreadable;
+
+  /// No description provided for @diagnosticsHealth.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get diagnosticsHealth;
+
+  /// No description provided for @diagnosticsHealthOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports no problems'**
+  String get diagnosticsHealthOk;
+
+  /// No description provided for @diagnosticsHealthDegraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports missing optional PHP extensions'**
+  String get diagnosticsHealthDegraded;
+
+  /// No description provided for @diagnosticsNoSite.
+  ///
+  /// In en, this message translates to:
+  /// **'No site has been identified yet.'**
+  String get diagnosticsNoSite;
+
+  /// No description provided for @diagnosticsAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get diagnosticsAccount;
+
+  /// No description provided for @diagnosticsSignedInAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in as'**
+  String get diagnosticsSignedInAs;
+
+  /// No description provided for @diagnosticsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get diagnosticsConnection;
+
+  /// No description provided for @diagnosticsStageDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'No site chosen'**
+  String get diagnosticsStageDisconnected;
+
+  /// No description provided for @diagnosticsStageConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Identifying the site'**
+  String get diagnosticsStageConnecting;
+
+  /// No description provided for @diagnosticsStageSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Site known, signed out'**
+  String get diagnosticsStageSignedOut;
+
+  /// No description provided for @diagnosticsStageSigningIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in'**
+  String get diagnosticsStageSigningIn;
+
+  /// No description provided for @diagnosticsStageSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get diagnosticsStageSignedIn;
+
+  /// No description provided for @diagnosticsModule.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile API module'**
+  String get diagnosticsModule;
+
+  /// No description provided for @diagnosticsModuleAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed. Everything is read from the site’s own pages, which is the ordinary case and always works.'**
+  String get diagnosticsModuleAbsent;
+
+  /// No description provided for @diagnosticsModuleVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Module version'**
+  String get diagnosticsModuleVersion;
+
+  /// No description provided for @diagnosticsApiVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'API version'**
+  String get diagnosticsApiVersion;
+
+  /// No description provided for @diagnosticsModuleSaysWebtrees.
+  ///
+  /// In en, this message translates to:
+  /// **'webtrees, as the module reports it'**
+  String get diagnosticsModuleSaysWebtrees;
+
+  /// No description provided for @diagnosticsLimits.
+  ///
+  /// In en, this message translates to:
+  /// **'Limits'**
+  String get diagnosticsLimits;
+
+  /// No description provided for @diagnosticsLimitsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{page} per page · {generations} generations · {image} px images'**
+  String diagnosticsLimitsValue(int page, int generations, int image);
+
+  /// No description provided for @diagnosticsLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'Languages this site can write in'**
+  String get diagnosticsLanguages;
+
+  /// No description provided for @diagnosticsReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Where each part is read from'**
+  String get diagnosticsReading;
+
+  /// No description provided for @diagnosticsReadingWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'The module is adopted one capability at a time, so an older module still gives the fast path for whatever it does answer.'**
+  String get diagnosticsReadingWhy;
+
+  /// No description provided for @diagnosticsFromModule.
+  ///
+  /// In en, this message translates to:
+  /// **'Module'**
+  String get diagnosticsFromModule;
+
+  /// No description provided for @diagnosticsFromPages.
+  ///
+  /// In en, this message translates to:
+  /// **'Site pages'**
+  String get diagnosticsFromPages;
+
+  /// No description provided for @diagnosticsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get diagnosticsSearch;
+
+  /// No description provided for @diagnosticsFindings.
+  ///
+  /// In en, this message translates to:
+  /// **'Findings'**
+  String get diagnosticsFindings;
+
+  /// No description provided for @diagnosticsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get diagnosticsApp;
+
+  /// No description provided for @diagnosticsAppVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'App version'**
+  String get diagnosticsAppVersion;
+
+  /// No description provided for @diagnosticsUserAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'User agent'**
+  String get diagnosticsUserAgent;
+
+  /// No description provided for @diagnosticsCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy report'**
+  String get diagnosticsCopy;
+
+  /// No description provided for @diagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Report copied'**
+  String get diagnosticsCopied;
 }
 
 class _AppTextDelegate extends LocalizationsDelegate<AppText> {

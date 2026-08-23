@@ -74,9 +74,9 @@ class _LaunchScreenState extends State<LaunchScreen> {
             const SizedBox(height: 16),
             Text(
               AppText.of(context).signingIn,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
             ),
           ],
         ),

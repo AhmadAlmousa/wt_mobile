@@ -67,10 +67,7 @@ class ChartOptionsSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  text.chartOptions,
-                  style: theme.textTheme.headlineSmall,
-                ),
+                Text(text.chartOptions, style: theme.textTheme.headlineSmall),
                 const SizedBox(height: 24),
 
                 if (offersShape) ...[
@@ -106,8 +103,7 @@ class ChartOptionsSheet extends StatelessWidget {
                   const SizedBox(height: 8),
                   _Generations(
                     value: options.generations,
-                    onChanged: (many) =>
-                        update(options.withGenerations(many)),
+                    onChanged: (many) => update(options.withGenerations(many)),
                   ),
                   const SizedBox(height: 28),
                 ],
@@ -248,9 +244,7 @@ class _Switch extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: colors.onSurfaceVariant),
                 const SizedBox(width: 14),
-                Expanded(
-                  child: Text(label, style: theme.textTheme.titleSmall),
-                ),
+                Expanded(child: Text(label, style: theme.textTheme.titleSmall)),
                 Switch(value: value, onChanged: onChanged),
               ],
             ),

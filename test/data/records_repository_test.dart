@@ -208,20 +208,22 @@ void main() {
         expect(person.isDeceased, isTrue);
       });
 
-      test('a record with no relatives tab claims nothing about the person',
-          () async {
-        final withoutRelatives = site(version: version)
-          ..remove(tabRoute('relatives'));
-        serve(withoutRelatives);
+      test(
+        'a record with no relatives tab claims nothing about the person',
+        () async {
+          final withoutRelatives = site(version: version)
+            ..remove(tabRoute('relatives'));
+          serve(withoutRelatives);
 
-        final person = await records.individual('main', 'X42');
+          final person = await records.individual('main', 'X42');
 
-        // The one place those facts are stated is gone, so the honest answer
-        // is silence — not a guess from the page title's years.
-        expect(person.sex, Sex.unknown);
-        expect(person.isDeceased, isFalse);
-        expect(person.warnings, isNotEmpty);
-      });
+          // The one place those facts are stated is gone, so the honest answer
+          // is silence — not a guess from the page title's years.
+          expect(person.sex, Sex.unknown);
+          expect(person.isDeceased, isFalse);
+          expect(person.warnings, isNotEmpty);
+        },
+      );
 
       test('asks for each tab at the URL the page gave it', () async {
         serve(site(version: version));

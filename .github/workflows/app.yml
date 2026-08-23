@@ -1,0 +1,88 @@
+# The app's own checks, on every push.
+#
+# `module.yml` beside this one covers the PHP; nothing covered the Dart, which
+# is most of the project. Three jobs rather than one, because they answer
+# different questions and a reader of a red build should not have to guess
+# which:
+#
+# - **analyze** — the static rules the project holds itself to. It has never
+#   been allowed to be dirty, and now nothing can quietly make it so.
+# - **test** — the suite. Formatting is checked here too: `dart format` is the
+#   arbiter of layout in this codebase, and a diff that is half reformatted is
+#   a diff nobody can read.
+# - **goldens** — pictures of the parts a person judges rather than asserts on
+#   (`test/features/goldens_test.dart`). Pinned to one Flutter version and one
+#   runner on purpose: a golden compares rendered pixels, and text rendering is
+#   not identical across engines or platforms. A failure here means *look at
+#   the picture* — `flutter test --update-goldens` and read the diff — not
+#   "the number changed".
+
+name: app
+
+on:
+  push:
+    paths-ignore: ['server/**', '**.md']
+  pull_request:
+    paths-ignore: ['server/**', '**.md']
+  workflow_dispatch:
+
+# The version this project develops against. Bump deliberately: a Flutter
+# upgrade can move a glyph by a pixel, which fails every golden at once.
+env:
+  FLUTTER_VERSION: '3.44.2'
+
+jobs:
+  analyze:
+    name: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # Generated localizations are not committed as a build artefact by
+      # accident — they are in the tree — so this also proves the ARB files and
+      # the generated Dart have not drifted apart.
+      - run: flutter gen-l10n
+      - run: git diff --exit-code lib/l10n
+      - run: flutter analyze
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test tool
+      # Excludes the goldens, which have their own job and their own failure
+      # mode.
+      - run: flutter test --exclude-tags golden
+
+  goldens:
+    name: goldens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --tags golden
+
+      # What actually changed, for whoever has to judge it.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: test/features/failures/
+          if-no-files-found: ignore

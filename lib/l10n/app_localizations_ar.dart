@@ -587,4 +587,129 @@ class AppTextAr extends AppText {
   String noticeSectionUnavailable(String module) {
     return 'تعذّر تحميل قسم $module.';
   }
+
+  @override
+  String get diagnostics => 'التشخيص';
+
+  @override
+  String get diagnosticsWhy =>
+      'ما يعرفه التطبيق عن هذا الموقع. يفيد إرفاقه ببلاغ عن خلل: فيه عنوان الموقع واسم المستخدم، وليس فيه كلمة السر.';
+
+  @override
+  String get diagnosticsSite => 'الموقع';
+
+  @override
+  String get diagnosticsAddress => 'العنوان';
+
+  @override
+  String get diagnosticsUrlStyle => 'نمط العناوين';
+
+  @override
+  String get diagnosticsUrlPretty => 'مسارات مقروءة';
+
+  @override
+  String get diagnosticsUrlQuery => 'سلاسل استعلام';
+
+  @override
+  String get diagnosticsSiteVersion => 'إصدار webtrees';
+
+  @override
+  String get diagnosticsUnreadable => 'تعذّرت قراءته';
+
+  @override
+  String get diagnosticsHealth => 'الخادم';
+
+  @override
+  String get diagnosticsHealthOk => 'لا يبلّغ عن أي مشكلة';
+
+  @override
+  String get diagnosticsHealthDegraded => 'يبلّغ عن نقص إضافات PHP اختيارية';
+
+  @override
+  String get diagnosticsNoSite => 'لم يُحدَّد أي موقع بعد.';
+
+  @override
+  String get diagnosticsAccount => 'الحساب';
+
+  @override
+  String get diagnosticsSignedInAs => 'مسجَّل الدخول باسم';
+
+  @override
+  String get diagnosticsConnection => 'الاتصال';
+
+  @override
+  String get diagnosticsStageDisconnected => 'لم يُختَر موقع';
+
+  @override
+  String get diagnosticsStageConnecting => 'جارٍ التعرّف على الموقع';
+
+  @override
+  String get diagnosticsStageSignedOut => 'الموقع معروف، والدخول غير مسجَّل';
+
+  @override
+  String get diagnosticsStageSigningIn => 'جارٍ تسجيل الدخول';
+
+  @override
+  String get diagnosticsStageSignedIn => 'الدخول مسجَّل';
+
+  @override
+  String get diagnosticsModule => 'وحدة واجهة الجوّال';
+
+  @override
+  String get diagnosticsModuleAbsent =>
+      'غير مثبَّتة. يُقرأ كل شيء من صفحات الموقع نفسها، وهي الحالة المعتادة وتعمل دائمًا.';
+
+  @override
+  String get diagnosticsModuleVersion => 'إصدار الوحدة';
+
+  @override
+  String get diagnosticsApiVersion => 'إصدار الواجهة';
+
+  @override
+  String get diagnosticsModuleSaysWebtrees => 'إصدار webtrees كما تذكره الوحدة';
+
+  @override
+  String get diagnosticsLimits => 'الحدود';
+
+  @override
+  String diagnosticsLimitsValue(int page, int generations, int image) {
+    return '$page في الصفحة · $generations أجيال · صور بعرض $image بكسل';
+  }
+
+  @override
+  String get diagnosticsLanguages => 'اللغات التي يكتب بها هذا الموقع';
+
+  @override
+  String get diagnosticsReading => 'من أين يُقرأ كل جزء';
+
+  @override
+  String get diagnosticsReadingWhy =>
+      'تُعتمد الوحدة قدرةً قدرةً، فوحدة أقدم تظل تمنح الطريق السريع لما تجيب عنه.';
+
+  @override
+  String get diagnosticsFromModule => 'الوحدة';
+
+  @override
+  String get diagnosticsFromPages => 'صفحات الموقع';
+
+  @override
+  String get diagnosticsSearch => 'البحث';
+
+  @override
+  String get diagnosticsFindings => 'الملاحظات';
+
+  @override
+  String get diagnosticsApp => 'التطبيق';
+
+  @override
+  String get diagnosticsAppVersion => 'إصدار التطبيق';
+
+  @override
+  String get diagnosticsUserAgent => 'معرّف العميل';
+
+  @override
+  String get diagnosticsCopy => 'نسخ التقرير';
+
+  @override
+  String get diagnosticsCopied => 'نُسخ التقرير';
 }

@@ -124,12 +124,9 @@ final class CapabilityChartsTransport implements ChartsTransport {
     required String from,
     required String to,
     bool? bloodLinesOnly,
-  }) => _for(handle).relationship(
+  }) => _for(
     handle,
-    from: from,
-    to: to,
-    bloodLinesOnly: bloodLinesOnly,
-  );
+  ).relationship(handle, from: from, to: to, bloodLinesOnly: bloodLinesOnly);
 
   @override
   bool bloodLinesOnly(String handle) => _for(handle).bloodLinesOnly(handle);
@@ -139,7 +136,8 @@ final class CapabilityChartsTransport implements ChartsTransport {
       _for(handle).statistics(handle);
 
   @override
-  Future<TimelineChart> timeline(String handle) => _for(handle).timeline(handle);
+  Future<TimelineChart> timeline(String handle) =>
+      _for(handle).timeline(handle);
 }
 
 /// Asks the module who is signed in, or probes for it the long way.
@@ -156,5 +154,6 @@ final class CapabilityAccessTransport implements AccessTransport {
 
   @override
   Future<AccessSummary> describe() =>
-      (capabilities.has(Capability.access) ? module ?? stock : stock).describe();
+      (capabilities.has(Capability.access) ? module ?? stock : stock)
+          .describe();
 }

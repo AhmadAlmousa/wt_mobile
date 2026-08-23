@@ -152,14 +152,14 @@ Future<void> main() async {
     }
     // Signing in lands in the tree, because this account can reach exactly
     // one — so the account screen is a step further in, not a step back.
-    if (steps >= 3 && steps <= 5) {
+    if (steps >= 3 && steps <= 5 || steps == 14) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(find.text('عبد الله الموسى'));
       await tester.pumpAndSettle();
     }
-    if (steps >= 4 && steps <= 5) {
+    if (steps >= 4 && steps <= 5 || steps == 14) {
       // The Android back gesture, which is how anyone actually leaves this
       // screen. `pageBack()` hunts for a back button and finds none here.
       // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
@@ -168,8 +168,20 @@ Future<void> main() async {
       await tester.tap(find.byIcon(Icons.account_circle_outlined));
       await tester.pumpAndSettle();
     }
-    if (steps == 5) {
+    if (steps == 5 || steps == 14) {
       await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+    }
+    // What the app knows about the site, which nothing else on screen says.
+    // It sits at the bottom of the settings sheet, which is taller than a
+    // phone — so the sheet is scrolled the way a reader would scroll it.
+    if (steps == 14) {
+      await tester.drag(
+        find.byType(SingleChildScrollView).last,
+        const Offset(0, -900),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.troubleshoot_outlined));
       await tester.pumpAndSettle();
     }
     // The charts are opened from the person rather than from the account
@@ -316,6 +328,16 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 5,
+        );
+      });
+
+      testWidgets('diagnostics $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'diagnostics-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 14,
         );
       });
 

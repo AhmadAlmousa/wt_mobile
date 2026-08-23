@@ -586,4 +586,131 @@ class AppTextEn extends AppText {
   String noticeSectionUnavailable(String module) {
     return 'The $module section could not be loaded.';
   }
+
+  @override
+  String get diagnostics => 'Diagnostics';
+
+  @override
+  String get diagnosticsWhy =>
+      'What the app knows about this site. Worth attaching to a bug report: it names the site address and your user name, and never your password.';
+
+  @override
+  String get diagnosticsSite => 'Site';
+
+  @override
+  String get diagnosticsAddress => 'Address';
+
+  @override
+  String get diagnosticsUrlStyle => 'Address style';
+
+  @override
+  String get diagnosticsUrlPretty => 'Readable paths';
+
+  @override
+  String get diagnosticsUrlQuery => 'Query strings';
+
+  @override
+  String get diagnosticsSiteVersion => 'webtrees version';
+
+  @override
+  String get diagnosticsUnreadable => 'Could not be read';
+
+  @override
+  String get diagnosticsHealth => 'Server';
+
+  @override
+  String get diagnosticsHealthOk => 'Reports no problems';
+
+  @override
+  String get diagnosticsHealthDegraded =>
+      'Reports missing optional PHP extensions';
+
+  @override
+  String get diagnosticsNoSite => 'No site has been identified yet.';
+
+  @override
+  String get diagnosticsAccount => 'Account';
+
+  @override
+  String get diagnosticsSignedInAs => 'Signed in as';
+
+  @override
+  String get diagnosticsConnection => 'Connection';
+
+  @override
+  String get diagnosticsStageDisconnected => 'No site chosen';
+
+  @override
+  String get diagnosticsStageConnecting => 'Identifying the site';
+
+  @override
+  String get diagnosticsStageSignedOut => 'Site known, signed out';
+
+  @override
+  String get diagnosticsStageSigningIn => 'Signing in';
+
+  @override
+  String get diagnosticsStageSignedIn => 'Signed in';
+
+  @override
+  String get diagnosticsModule => 'Mobile API module';
+
+  @override
+  String get diagnosticsModuleAbsent =>
+      'Not installed. Everything is read from the site’s own pages, which is the ordinary case and always works.';
+
+  @override
+  String get diagnosticsModuleVersion => 'Module version';
+
+  @override
+  String get diagnosticsApiVersion => 'API version';
+
+  @override
+  String get diagnosticsModuleSaysWebtrees =>
+      'webtrees, as the module reports it';
+
+  @override
+  String get diagnosticsLimits => 'Limits';
+
+  @override
+  String diagnosticsLimitsValue(int page, int generations, int image) {
+    return '$page per page · $generations generations · $image px images';
+  }
+
+  @override
+  String get diagnosticsLanguages => 'Languages this site can write in';
+
+  @override
+  String get diagnosticsReading => 'Where each part is read from';
+
+  @override
+  String get diagnosticsReadingWhy =>
+      'The module is adopted one capability at a time, so an older module still gives the fast path for whatever it does answer.';
+
+  @override
+  String get diagnosticsFromModule => 'Module';
+
+  @override
+  String get diagnosticsFromPages => 'Site pages';
+
+  @override
+  String get diagnosticsSearch => 'Search';
+
+  @override
+  String get diagnosticsFindings => 'Findings';
+
+  @override
+  String get diagnosticsApp => 'App';
+
+  @override
+  String get diagnosticsAppVersion => 'App version';
+
+  @override
+  String get diagnosticsUserAgent => 'User agent';
+
+  @override
+  String get diagnosticsCopy => 'Copy report';
+
+  @override
+  String get diagnosticsCopied => 'Report copied';
 }

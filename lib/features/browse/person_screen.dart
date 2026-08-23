@@ -328,15 +328,13 @@ class _CollapsingHeader extends StatelessWidget {
           final tallest = _expanded + top;
           final shortest = kToolbarHeight + top;
           // 0 with the page at the top, 1 once the bar has fully collapsed.
-          final gone = ((tallest - constraints.maxHeight) /
-                  (tallest - shortest))
-              .clamp(0.0, 1.0);
+          final gone =
+              ((tallest - constraints.maxHeight) / (tallest - shortest)).clamp(
+                0.0,
+                1.0,
+              );
 
-          final portrait = lerpDouble(
-            _portraitLarge,
-            _portraitSmall,
-            gone,
-          )!;
+          final portrait = lerpDouble(_portraitLarge, _portraitSmall, gone)!;
           final name = TextStyle.lerp(
             theme.textTheme.headlineSmall,
             theme.textTheme.titleMedium,
@@ -564,10 +562,7 @@ class _SectionCard extends StatelessWidget {
                   ),
               ],
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 6),
-              subtitle!,
-            ],
+            if (subtitle != null) ...[const SizedBox(height: 6), subtitle!],
             const SizedBox(height: 12),
             child,
           ],
@@ -632,11 +627,7 @@ class _FactTile extends StatelessWidget {
           // blank in Arabic.
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              iconForFact(fact.tag),
-              size: 17,
-              color: colors.primary,
-            ),
+            child: Icon(iconForFact(fact.tag), size: 17, color: colors.primary),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -644,7 +635,9 @@ class _FactTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  fact.type == null ? fact.label : '${fact.label} — ${fact.type}',
+                  fact.type == null
+                      ? fact.label
+                      : '${fact.label} — ${fact.type}',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: colors.primary,
                   ),
@@ -671,11 +664,7 @@ class _FactTile extends StatelessWidget {
             ),
           ),
           if (about != null && onOpenPerson != null)
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: colors.onSurfaceVariant,
-            ),
+            Icon(Icons.chevron_right, size: 18, color: colors.onSurfaceVariant),
         ],
       ),
     );
@@ -808,10 +797,7 @@ class _FamilyBlock extends StatelessWidget {
                 for (final fact in family.facts)
                   _Pill(
                     icon: iconForFact(fact.tag),
-                    label: [
-                      fact.label,
-                      ?fact.value,
-                    ].join(' · '),
+                    label: [fact.label, ?fact.value].join(' · '),
                   ),
               ],
             ),
@@ -1052,10 +1038,7 @@ class _Notes extends StatelessWidget {
           for (final note in ordered)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(AppTheme.shapeMedium),
@@ -1109,10 +1092,7 @@ class _Sources extends StatelessWidget {
           for (final citation in citations)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(AppTheme.shapeMedium),

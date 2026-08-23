@@ -290,5 +290,58 @@
         "type": "String"
       }
     }
-  }
+  },
+  "diagnostics": "Diagnostics",
+  "diagnosticsWhy": "What the app knows about this site. Worth attaching to a bug report: it names the site address and your user name, and never your password.",
+  "diagnosticsSite": "Site",
+  "diagnosticsAddress": "Address",
+  "diagnosticsUrlStyle": "Address style",
+  "diagnosticsUrlPretty": "Readable paths",
+  "diagnosticsUrlQuery": "Query strings",
+  "diagnosticsSiteVersion": "webtrees version",
+  "diagnosticsUnreadable": "Could not be read",
+  "diagnosticsHealth": "Server",
+  "diagnosticsHealthOk": "Reports no problems",
+  "diagnosticsHealthDegraded": "Reports missing optional PHP extensions",
+  "diagnosticsNoSite": "No site has been identified yet.",
+  "diagnosticsAccount": "Account",
+  "diagnosticsSignedInAs": "Signed in as",
+  "diagnosticsConnection": "Connection",
+  "diagnosticsStageDisconnected": "No site chosen",
+  "diagnosticsStageConnecting": "Identifying the site",
+  "diagnosticsStageSignedOut": "Site known, signed out",
+  "diagnosticsStageSigningIn": "Signing in",
+  "diagnosticsStageSignedIn": "Signed in",
+  "diagnosticsModule": "Mobile API module",
+  "diagnosticsModuleAbsent": "Not installed. Everything is read from the site’s own pages, which is the ordinary case and always works.",
+  "diagnosticsModuleVersion": "Module version",
+  "diagnosticsApiVersion": "API version",
+  "diagnosticsModuleSaysWebtrees": "webtrees, as the module reports it",
+  "diagnosticsLimits": "Limits",
+  "diagnosticsLimitsValue": "{page} per page · {generations} generations · {image} px images",
+  "@diagnosticsLimitsValue": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "generations": {
+        "type": "int"
+      },
+      "image": {
+        "type": "int"
+      }
+    }
+  },
+  "diagnosticsLanguages": "Languages this site can write in",
+  "diagnosticsReading": "Where each part is read from",
+  "diagnosticsReadingWhy": "The module is adopted one capability at a time, so an older module still gives the fast path for whatever it does answer.",
+  "diagnosticsFromModule": "Module",
+  "diagnosticsFromPages": "Site pages",
+  "diagnosticsSearch": "Search",
+  "diagnosticsFindings": "Findings",
+  "diagnosticsApp": "App",
+  "diagnosticsAppVersion": "App version",
+  "diagnosticsUserAgent": "User agent",
+  "diagnosticsCopy": "Copy report",
+  "diagnosticsCopied": "Report copied"
 }

@@ -289,14 +289,16 @@ void main() {
       expect(overlapsIn(layout), isEmpty);
     });
 
-    test('draws the marriage that ended differently from the one that did not',
-        () {
-      final couples = layout.edges.where((edge) => edge.isCouple).toList();
-      expect(couples.map((edge) => edge.kind), [
-        EdgeKind.marriage,
-        EdgeKind.divorce,
-      ]);
-    });
+    test(
+      'draws the marriage that ended differently from the one that did not',
+      () {
+        final couples = layout.edges.where((edge) => edge.isCouple).toList();
+        expect(couples.map((edge) => edge.kind), [
+          EdgeKind.marriage,
+          EdgeKind.divorce,
+        ]);
+      },
+    );
 
     test('joins each spouse to the box actually beside them', () {
       // A slot pushed along to reach its children is more than one couple gap
