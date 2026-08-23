@@ -1,0 +1,28 @@
+{
+  "offset": 0,
+  "limit": 50,
+  "total": null,
+  "hasMore": false,
+  "people": [
+    {
+      "xref": "X42",
+      "name": "عبد الله الموسى",
+      "alternateName": null,
+      "sex": "male",
+      "deceased": true,
+      "lifespan": "1901–1974",
+      "thumbnail": "/tree/main/media-thumbnail/M11/1?s=aa",
+      "private": false
+    },
+    {
+      "xref": "X43",
+      "name": "نورة الموسى",
+      "alternateName": null,
+      "sex": "female",
+      "deceased": true,
+      "lifespan": "1903–1980",
+      "thumbnail": null,
+      "private": false
+    }
+  ]
+}

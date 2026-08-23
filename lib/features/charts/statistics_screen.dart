@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
-import '../../data/stock/charts_repository.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/charts.dart';
 import '../../domain/statistics.dart';
 import '../../l10n/app_localizations.dart';
@@ -28,8 +27,8 @@ class StatisticsScreen extends StatefulWidget {
   });
 
   final SessionManager session;
-  final RecordsRepository records;
-  final ChartsRepository charts;
+  final RecordsTransport records;
+  final ChartsTransport charts;
   final String tree;
 
   @override

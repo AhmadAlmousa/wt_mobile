@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/charts.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/bidi.dart';
@@ -27,7 +27,7 @@ class RelationshipPathView extends StatelessWidget {
   });
 
   final RelationshipPath path;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final void Function(String xref) onOpenPerson;
 
   @override

@@ -1,0 +1,12 @@
+{
+  "api": 1,
+  "module": "1.0.0",
+  "webtrees": "2.2.6",
+  "generation": "2.2",
+  "auth": ["session"],
+  "features": ["access", "individuals", "individual", "family", "ancestors",
+               "descendants", "relationship", "timeline", "statistics",
+               "media", "notes", "sources"],
+  "limits": {"maxPageSize": 200, "maxGenerations": 10, "maxRecursion": 10, "maxImage": 2000},
+  "languages": ["ar", "en-GB", "en-US"]
+}

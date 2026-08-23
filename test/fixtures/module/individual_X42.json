@@ -1,0 +1,346 @@
+{
+  "xref": "X42",
+  "name": "عبد الله الموسى",
+  "alternateName": "Abdullah Almousa",
+  "sex": "male",
+  "deceased": true,
+  "lifespan": "1901–1974",
+  "thumbnail": "/tree/main/media-thumbnail/M11/1?w=160&h=160&fit=contain&s=aa",
+  "private": false,
+  "pending": null,
+  "facts": [
+    {
+      "tag": "BIRT",
+      "qualifiedTag": "INDI:BIRT",
+      "label": "الميلاد",
+      "origin": "self",
+      "secondary": false,
+      "value": null,
+      "type": null,
+      "date": {
+        "gedcom": "12 MAR 1901",
+        "text": "١٢ مارس ١٩٠١ (٢١ ذو القعدة ١٣١٨)",
+        "qualifier": null,
+        "julianDay": [
+          2415466,
+          2415466
+        ],
+        "rendered": [
+          {
+            "calendar": "gregorian",
+            "escape": "@#DGREGORIAN@",
+            "text": "١٢ مارس ١٩٠١"
+          },
+          {
+            "calendar": "hijri",
+            "escape": "@#DHIJRI@",
+            "text": "٢١ ذو القعدة ١٣١٨"
+          }
+        ]
+      },
+      "place": {
+        "full": "الكويت, الكويت",
+        "short": "الكويت",
+        "gedcom": "الكويت, الكويت",
+        "latitude": null,
+        "longitude": null
+      },
+      "about": null,
+      "aboutFamily": null,
+      "pending": null
+    },
+    {
+      "tag": "DEAT",
+      "qualifiedTag": "INDI:DEAT",
+      "label": "الوفاة",
+      "origin": "self",
+      "secondary": false,
+      "value": null,
+      "type": null,
+      "date": {
+        "gedcom": "1974",
+        "text": "١٩٧٤",
+        "qualifier": null,
+        "julianDay": [
+          2442049,
+          2442413
+        ],
+        "rendered": [
+          {
+            "calendar": "gregorian",
+            "escape": "@#DGREGORIAN@",
+            "text": "١٩٧٤"
+          }
+        ]
+      },
+      "place": null,
+      "about": null,
+      "aboutFamily": null,
+      "pending": null
+    },
+    {
+      "tag": "BIRT",
+      "qualifiedTag": "INDI:EVEN",
+      "label": "ولادة إبن",
+      "origin": "relative",
+      "secondary": true,
+      "value": null,
+      "type": "ولادة إبن",
+      "date": null,
+      "place": null,
+      "about": {
+        "xref": "X60",
+        "name": "محمد الموسى",
+        "alternateName": null,
+        "sex": "male",
+        "deceased": false,
+        "lifespan": "1930–",
+        "thumbnail": null,
+        "private": false
+      },
+      "aboutFamily": null,
+      "pending": null
+    }
+  ],
+  "families": [
+    {
+      "xref": "F1",
+      "label": "الوالدان",
+      "kind": "parents",
+      "spouses": [
+        {
+          "xref": "X7",
+          "name": "الموسى الأب",
+          "alternateName": null,
+          "sex": "male",
+          "deceased": true,
+          "lifespan": "1870–1940",
+          "thumbnail": null,
+          "private": false
+        },
+        {
+          "xref": "X8",
+          "name": "الأم",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": true,
+          "lifespan": "1875–1945",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "children": [
+        {
+          "xref": "X42",
+          "name": "عبد الله الموسى",
+          "alternateName": null,
+          "sex": "male",
+          "deceased": true,
+          "lifespan": "1901–1974",
+          "thumbnail": null,
+          "private": false
+        },
+        {
+          "xref": "X43",
+          "name": "نورة الموسى",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": true,
+          "lifespan": "1903–1980",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "facts": [],
+      "endedInDivorce": false,
+      "pending": null
+    },
+    {
+      "xref": "F2",
+      "label": "عائلته مع سارة",
+      "kind": "own",
+      "spouses": [
+        {
+          "xref": "X42",
+          "name": "عبد الله الموسى",
+          "alternateName": null,
+          "sex": "male",
+          "deceased": true,
+          "lifespan": "1901–1974",
+          "thumbnail": null,
+          "private": false
+        },
+        {
+          "xref": "X50",
+          "name": "سارة",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": false,
+          "lifespan": "1905–",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "children": [
+        {
+          "xref": "X60",
+          "name": "محمد الموسى",
+          "alternateName": null,
+          "sex": "male",
+          "deceased": false,
+          "lifespan": "1930–",
+          "thumbnail": null,
+          "private": false
+        },
+        {
+          "xref": "X61",
+          "name": "نورة",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": false,
+          "lifespan": "1932–",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "facts": [
+        {
+          "tag": "MARR",
+          "qualifiedTag": "FAM:MARR",
+          "label": "الزواج",
+          "origin": "family",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "1925",
+            "text": "١٩٢٥",
+            "qualifier": null,
+            "julianDay": [
+              2424152,
+              2424516
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٢٥"
+              }
+            ]
+          },
+          "place": null,
+          "about": null,
+          "aboutFamily": "F2",
+          "pending": null
+        }
+      ],
+      "endedInDivorce": false,
+      "pending": null
+    },
+    {
+      "xref": "F3",
+      "label": "عائلته مع منيرة",
+      "kind": "own",
+      "spouses": [
+        {
+          "xref": "X42",
+          "name": "عبد الله الموسى",
+          "alternateName": null,
+          "sex": "male",
+          "deceased": true,
+          "lifespan": "1901–1974",
+          "thumbnail": null,
+          "private": false
+        },
+        {
+          "xref": "X51",
+          "name": "منيرة",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": false,
+          "lifespan": "1910–",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "children": [
+        {
+          "xref": "X62",
+          "name": "سارة",
+          "alternateName": null,
+          "sex": "female",
+          "deceased": false,
+          "lifespan": "1935–",
+          "thumbnail": null,
+          "private": false
+        }
+      ],
+      "facts": [],
+      "endedInDivorce": false,
+      "pending": null
+    }
+  ],
+  "notes": [
+    {
+      "label": "ملاحظة",
+      "text": "هاجر إلى الكويت في عام ١٩٢٠.",
+      "xref": null,
+      "secondary": false,
+      "about": {
+        "xref": "X42",
+        "tag": "INDI"
+      },
+      "pending": null
+    }
+  ],
+  "sources": [
+    {
+      "label": "المصدر",
+      "title": "سجل قيد العائلة",
+      "xref": "S4",
+      "details": [
+        "الصفحة: ٤٢"
+      ],
+      "secondary": false,
+      "pending": null
+    }
+  ],
+  "media": [
+    {
+      "xref": "M11",
+      "title": "صورة عبد الله",
+      "note": null,
+      "label": "وسائط",
+      "secondary": false,
+      "pending": null,
+      "files": [
+        {
+          "title": null,
+          "format": "jpeg",
+          "mimeType": "image/jpeg",
+          "isImage": true,
+          "width": 800,
+          "height": 800,
+          "fit": "contain",
+          "url": "/tree/main/media-thumbnail/M11/1?w=800&h=800&fit=contain&s=bb",
+          "download": "/tree/main/media-download/M11/1"
+        }
+      ]
+    }
+  ],
+  "sections": [
+    "personal_facts",
+    "relatives",
+    "notes",
+    "sources_tab",
+    "media"
+  ],
+  "charts": [
+    "menu-chart-ancestry",
+    "menu-chart-descendants",
+    "menu-chart-relationship",
+    "menu-chart-timeline",
+    "menu-chart-statistics"
+  ],
+  "warnings": []
+}

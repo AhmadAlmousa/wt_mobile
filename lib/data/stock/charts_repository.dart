@@ -8,6 +8,7 @@ import '../../core/webtrees_client.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../domain/statistics.dart';
+import '../transport.dart';
 import 'chart_parser.dart';
 import 'dom.dart';
 import 'statistics_parser.dart';
@@ -18,7 +19,7 @@ import 'statistics_parser.dart';
 /// the instance runs and at which address, including the number of
 /// generations its administrator settled on — so the app asks for exactly what
 /// it was offered, and a site with a chart switched off has no button for it.
-final class ChartsRepository {
+final class ChartsRepository implements ChartsTransport {
   ChartsRepository(this._client, {String? version})
     : _parser = ChartParser(version: version);
 
@@ -31,21 +32,22 @@ final class ChartsRepository {
   /// page is a third layout of the same two families, and stitching the two
   /// charts it already knows how to read costs one request more and no new
   /// parser.
+  @override
   Future<ChartData> hourglass({
-    required String ancestorsUrl,
-    required String descendantsUrl,
+    required String ancestorsHandle,
+    required String descendantsHandle,
     required PersonRef subject,
     int? generations,
   }) async {
     final up = await chart(
       ChartKind.ancestors,
-      ancestorsUrl,
+      ancestorsHandle,
       subject: subject,
       generations: generations,
     );
     final down = await chart(
       ChartKind.descendants,
-      descendantsUrl,
+      descendantsHandle,
       subject: subject,
       generations: generations,
     );
@@ -62,6 +64,7 @@ final class ChartsRepository {
   ///
   /// [generations] replaces the number the site's own link carries — see
   /// [withGenerations]. Null asks for exactly what was offered.
+  @override
   Future<ChartData> chart(
     ChartKind kind,
     String url, {
@@ -115,6 +118,7 @@ final class ChartsRepository {
   /// never touched: that one *is* clamped, by `min(recursion,
   /// max_recursion)`, and it is what stops a deep search costing the server a
   /// minute.
+  @override
   Future<List<RelationshipPath>> relationship(
     String url, {
     required String from,
@@ -153,6 +157,7 @@ final class ChartsRepository {
   /// the numbers actually are, exactly as a record's tabs do. A tab that
   /// yields no sections — webtrees offers one for *building* a chart rather
   /// than showing one — simply contributes nothing.
+  @override
   Future<TreeStatistics> statistics(String url) async {
     final page = await _fragment(url, probe: 'reading the statistics');
     final document = html.parse(page);
@@ -176,6 +181,7 @@ final class ChartsRepository {
   /// The address comes from the page as every other does, and already carries
   /// the person it is for — webtrees' own menu link puts them in the query as
   /// `xrefs[0]`, because a timeline can hold several people at once.
+  @override
   Future<TimelineChart> timeline(String url) async {
     final body = await _fragment(url, probe: 'reading the timeline');
     return _parser.parseTimeline(body);
@@ -217,7 +223,8 @@ final class ChartsRepository {
   /// setting, and this project's own target has it on — so two people linked
   /// only by a marriage answer "no link", which is correct and would
   /// otherwise look like a failure.
-  static bool bloodLinesOnly(String url) {
+  @override
+  bool bloodLinesOnly(String url) {
     final match = RegExp(
       r'/relationships-(\d+)-\d+',
     ).firstMatch(Uri.decodeFull(url));

@@ -91,8 +91,8 @@ void main() {
       serve(site());
 
       final chart = await charts.hourglass(
-        ancestorsUrl: '/tree/main/ancestors-tree-4/X42',
-        descendantsUrl: '/tree/main/descendants-tree-3/X42',
+        ancestorsHandle: '/tree/main/ancestors-tree-4/X42',
+        descendantsHandle: '/tree/main/descendants-tree-3/X42',
         subject: subject,
       );
 
@@ -209,14 +209,14 @@ void main() {
       // link" — which is correct, and looks like a failure unless the app
       // says why.
       expect(
-        ChartsRepository.bloodLinesOnly('/tree/main/relationships-1-3/X42'),
+        charts.bloodLinesOnly('/tree/main/relationships-1-3/X42'),
         isTrue,
       );
       expect(
-        ChartsRepository.bloodLinesOnly('/tree/main/relationships-0-99/X42'),
+        charts.bloodLinesOnly('/tree/main/relationships-0-99/X42'),
         isFalse,
       );
-      expect(ChartsRepository.bloodLinesOnly('/tree/main/whatever'), isFalse);
+      expect(charts.bloodLinesOnly('/tree/main/whatever'), isFalse);
     });
 
     test('refuses an address it does not recognise', () async {

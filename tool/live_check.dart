@@ -21,6 +21,9 @@ import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
+import 'package:webtrees_mobile/data/module/module_access.dart';
+import 'package:webtrees_mobile/data/module/module_api.dart';
+import 'package:webtrees_mobile/data/module/module_records.dart';
 import 'package:webtrees_mobile/data/session.dart';
 import 'package:webtrees_mobile/data/stock/charts_repository.dart';
 import 'package:webtrees_mobile/data/stock/records_repository.dart';
@@ -116,6 +119,30 @@ Future<void> main(List<String> args) async {
     final language = options['language'] ?? 'ar';
     await session.useLanguage(language);
     report('server asked to render in', language);
+
+    // The optional module. A site without one answers 404 here and every
+    // later check runs against HTML, which is the ordinary case and the floor
+    // the app is built on.
+    stdout.writeln('\n=== Module ===');
+    final capabilities = await ModuleCapabilities.probe(client);
+    report(
+      'mobile API module',
+      capabilities.isPresent
+          ? 'v${capabilities.moduleVersion} on webtrees '
+                '${capabilities.webtreesVersion} — '
+                '${capabilities.features.length} capabilities'
+          : 'not installed (the stock transport answers everything)',
+    );
+    if (capabilities.isPresent) {
+      report('capabilities', (capabilities.features.toList()..sort()).join(', '));
+      report('languages offered', (capabilities.languages.toList()..sort()).join(', '));
+      report(
+        'limits',
+        'page≤${capabilities.maxPageSize} '
+            'generations≤${capabilities.maxGenerations} '
+            'image≤${capabilities.maxImage}',
+      );
+    }
 
     stdout.writeln('\n=== Access ===');
     final access = await AccessProbe(client).describe();
@@ -331,14 +358,22 @@ Future<void> main(List<String> args) async {
         // The dictionary the ribbon, the fact icons and the divorce mark all
         // rest on. An empty one is not a failure — every reader degrades —
         // but it means this site gives none of the three.
-        final tagged = person.facts.where((fact) => fact.tag != null).toList();
+        //
+        // Asked of whoever turned out to have facts, not of the subject: a
+        // person with no facts at all has no tags to name, and reporting that
+        // as a failure of the dictionary says something false about the site.
+        final tagged = dateSource.facts
+            .where((fact) => fact.tag != null)
+            .toList();
         report(
           'facts named by GEDCOM tag',
-          tagged.isEmpty
+          dateSource.facts.isEmpty
+              ? 'nobody on hand has any facts to name'
+              : tagged.isEmpty
               ? 'NONE — this site emits no fact blocks in its chart boxes'
-              : '${tagged.length} of ${person.facts.length} — '
+              : '${tagged.length} of ${dateSource.facts.length} — '
                     '${tagged.map((f) => f.tag).toSet().take(8).join(', ')}',
-          ok: tagged.isNotEmpty,
+          ok: dateSource.facts.isEmpty || tagged.isNotEmpty,
         );
         final divorced = person.families
             .where((family) => family.endedInDivorce)
@@ -413,8 +448,8 @@ Future<void> main(List<String> args) async {
           );
         } else {
           final hourglass = await chartRepository.hourglass(
-            ancestorsUrl: up,
-            descendantsUrl: down,
+            ancestorsHandle: up,
+            descendantsHandle: down,
             subject: PersonRef(xref: person.xref, name: person.name),
           );
           report(
@@ -551,6 +586,120 @@ Future<void> main(List<String> args) async {
             ok: bytes.isNotEmpty,
           );
         }
+      }
+    }
+
+    // The only check that would have caught bugs 5 and 14-16: two transports
+    // reading the same tree, compared field by field. A unit suite cannot see
+    // a disagreement here, because each side passes its own fixtures.
+    if (capabilities.isPresent && access.trees.isNotEmpty) {
+      stdout.writeln('\n=== Module vs stock ===');
+      final tree = access.trees.first;
+      final stock = RecordsRepository(client, version: instance.version);
+      final module = ModuleRecordsTransport(client);
+
+      void compare(String label, Object? left, Object? right) => report(
+        label,
+        left == right ? '$left' : 'stock=$left  module=$right',
+        ok: left == right,
+      );
+
+      if (capabilities.has('access')) {
+        final stated = await ModuleAccessTransport(client).describe();
+        compare('account', access.account.username, stated.account.username);
+        compare(
+          'administrator',
+          access.isAdministrator,
+          stated.isAdministrator,
+        );
+        compare('trees visible', access.trees.length, stated.trees.length);
+        // The one place the two are *allowed* to differ, and the reason the
+        // module is worth having: a public tree cannot distinguish a member
+        // from a visitor over HTTP, and the module simply says which.
+        report(
+          'role in "${tree.name}"',
+          'stock=${tree.role.name}  module=${stated.trees.first.role.name}',
+        );
+      }
+
+      final xref = tree.myXref;
+      if (xref == null) {
+        stdout.writeln('  SKIP  no own record to compare');
+      } else {
+        final byHtml = await stock.individual(tree.name, xref);
+        final byJson = await module.individual(tree.name, xref);
+
+        compare('name', byHtml.name, byJson.name);
+        compare('alternate name', byHtml.alternateName, byJson.alternateName);
+        compare('sex', byHtml.sex.name, byJson.sex.name);
+        compare('deceased', byHtml.isDeceased, byJson.isDeceased);
+        compare('lifespan', byHtml.lifespan, byJson.lifespan);
+        compare('parents', byHtml.parents.length, byJson.parents.length);
+        compare('siblings', byHtml.siblings.length, byJson.siblings.length);
+        compare('spouses', byHtml.spouses.length, byJson.spouses.length);
+        compare('children', byHtml.children.length, byJson.children.length);
+        compare(
+          'primary facts',
+          byHtml.primaryFacts.length,
+          byJson.primaryFacts.length,
+        );
+
+        // The headline claim: every fact typed, including the ones no chart
+        // box ever printed a class for.
+        int typed(IndividualRecord record) =>
+            record.facts.where((fact) => fact.tag != null).length;
+        report(
+          'facts naming their GEDCOM tag',
+          'stock=${typed(byHtml)}/${byHtml.facts.length}  '
+              'module=${typed(byJson)}/${byJson.facts.length}',
+          ok: typed(byJson) >= typed(byHtml),
+        );
+
+        // A date has to survive the crossing intact, calendars included —
+        // this is what makes an Arabic tree readable at all.
+        final left = byHtml.facts.firstWhere(
+          (fact) => fact.date != null,
+          orElse: () => const FactEntry(label: ''),
+        );
+        final right = byJson.facts.firstWhere(
+          (fact) => fact.label == left.label && fact.date != null,
+          orElse: () => const FactEntry(label: ''),
+        );
+        if (left.date == null || right.date == null) {
+          stdout.writeln('  SKIP  no dated fact in common');
+        } else {
+          compare(
+            'date (both calendars)',
+            left.date!.display(CalendarView.both),
+            right.date!.display(CalendarView.both),
+          );
+          compare(
+            'date (hijri only)',
+            left.date!.display(CalendarView.hijri),
+            right.date!.display(CalendarView.hijri),
+          );
+        }
+      }
+
+      if (capabilities.has('individuals')) {
+        final term = options['search'] ?? 'a';
+        final byHtml = await stock.search(tree.name, term);
+        final byJson = await module.search(tree.name, term);
+        report(
+          'search "$term"',
+          'stock=${byHtml.people.length}  module=${byJson.people.length}'
+              ' (the module dedupes multi-name rows across the whole cursor,'
+              ' so fewer is correct)',
+        );
+
+        // The thing no stock route can do at all.
+        final listed = await module.search(tree.name, '');
+        report(
+          'enumerating the tree',
+          '${listed.people.length} in the first page'
+              '${listed.hasMore ? ' (more)' : ''}',
+          ok: listed.people.isNotEmpty,
+        );
       }
     }
 

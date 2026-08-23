@@ -1,0 +1,17 @@
+{
+  "account": {"username": "mobile", "realName": "Mobile Client", "email": "mobile@example.test"},
+  "isAdministrator": false,
+  "trees": [
+    {
+      "name": "main",
+      "title": "الموسى الصائغ",
+      "role": "member",
+      "private": true,
+      "myXref": "X42",
+      "modules": {
+        "tabs": ["personal_facts", "relatives", "notes", "sources_tab", "media"],
+        "charts": ["menu-chart-ancestry", "menu-chart-descendants", "menu-chart-relationship", "menu-chart-timeline"]
+      }
+    }
+  ]
+}

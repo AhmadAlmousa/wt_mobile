@@ -6,7 +6,7 @@ import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/charts.dart';
 import '../../domain/dates.dart';
 import '../../domain/records.dart';
@@ -33,7 +33,7 @@ class PersonScreen extends StatefulWidget {
   });
 
   final SessionManager session;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final SettingsStore settings;
   final String tree;
   final String xref;
@@ -155,7 +155,7 @@ class _PersonBody extends StatelessWidget {
   });
 
   final IndividualRecord person;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final CalendarView calendar;
   final VoidCallback onReload;
   final void Function(String xref) onOpenPerson;
@@ -292,7 +292,7 @@ class _CollapsingHeader extends StatelessWidget {
   });
 
   final IndividualRecord person;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final VoidCallback onReload;
 
   /// How tall the bar is with the page at the top.
@@ -710,7 +710,7 @@ class _Relatives extends StatelessWidget {
   /// divorce — which is recorded against the family and nowhere else.
   final List<FactEntry> facts;
 
-  final RecordsRepository records;
+  final RecordsTransport records;
   final CalendarView calendar;
   final void Function(String xref) onOpenPerson;
 
@@ -762,7 +762,7 @@ class _FamilyBlock extends StatelessWidget {
   /// listed again inside it.
   final String self;
 
-  final RecordsRepository records;
+  final RecordsTransport records;
   final CalendarView calendar;
   final void Function(String xref) onOpenPerson;
 
@@ -858,7 +858,7 @@ class _Photos extends StatelessWidget {
   const _Photos({required this.media, required this.records});
 
   final List<MediaItem> media;
-  final RecordsRepository records;
+  final RecordsTransport records;
 
   @override
   Widget build(BuildContext context) {

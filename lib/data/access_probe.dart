@@ -5,6 +5,7 @@ import '../core/response_status.dart';
 import '../core/webtrees_client.dart';
 import '../domain/access.dart';
 import '../domain/notice.dart';
+import 'transport.dart';
 
 /// Works out which trees the signed-in user can reach, and their role in each.
 ///
@@ -12,7 +13,7 @@ import '../domain/notice.dart';
 /// technique is to use webtrees' own access middleware as the oracle: it runs
 /// before any controller, so a route the user may not have answers `403`
 /// without rendering anything. A `200` means the role is held.
-class AccessProbe {
+class AccessProbe implements AccessTransport {
   const AccessProbe(this._client);
 
   final WebtreesClient _client;
@@ -29,6 +30,7 @@ class AccessProbe {
   ];
 
   /// Gathers the account details, the visible trees and the role in each.
+  @override
   Future<AccessSummary> describe() async {
     final warnings = <Notice>[];
 

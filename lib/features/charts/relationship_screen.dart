@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
-import '../../data/stock/charts_repository.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
@@ -40,8 +39,8 @@ class RelationshipScreen extends StatefulWidget {
   });
 
   final SessionManager session;
-  final RecordsRepository records;
-  final ChartsRepository charts;
+  final RecordsTransport records;
+  final ChartsTransport charts;
   final String tree;
   final String xref;
   final void Function(String xref) onOpenPerson;
@@ -160,7 +159,7 @@ class _RelationshipScreenState extends State<RelationshipScreen> {
               // force, not which one the administrator chose.
               bloodOnly:
                   _bloodOnly ??
-                  ChartsRepository.bloodLinesOnly(
+                  widget.charts.bloodLinesOnly(
                     person.charts[ChartKind.relationship] ?? '',
                   ),
               onBloodOnly: (only) => setState(() {
@@ -199,7 +198,7 @@ class _Answer extends StatelessWidget {
   final Future<List<RelationshipPath>> paths;
   final IndividualRecord subject;
   final PersonRef to;
-  final RecordsRepository records;
+  final RecordsTransport records;
 
   final RelationshipSide side;
   final ValueChanged<RelationshipSide> onSide;
@@ -348,7 +347,7 @@ class _Comparing extends StatelessWidget {
   });
 
   final PersonRef person;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final VoidCallback onChooseAgain;
 
   @override
@@ -465,7 +464,7 @@ class _PersonPicker extends StatefulWidget {
   });
 
   final SessionManager session;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final String tree;
   final String prompt;
   final void Function(PersonRef person) onPicked;

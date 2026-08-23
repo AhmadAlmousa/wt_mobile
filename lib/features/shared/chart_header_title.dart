@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/records.dart';
 import '../browse/authenticated_image.dart';
 import 'bidi.dart';
@@ -27,7 +27,7 @@ class ChartHeaderTitle extends StatelessWidget {
   /// chart's own name is all there is to show.
   final PersonRef? person;
 
-  final RecordsRepository records;
+  final RecordsTransport records;
 
   @override
   Widget build(BuildContext context) {

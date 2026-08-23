@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import '../../l10n/app_localizations.dart';
@@ -31,7 +31,7 @@ class SearchScreen extends StatefulWidget {
   });
 
   final SessionManager session;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final String tree;
 
   /// What the family calls this tree, when the app was told.

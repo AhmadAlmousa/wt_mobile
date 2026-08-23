@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/records.dart';
 
 /// A photo fetched through the signed-in session.
@@ -29,7 +29,7 @@ class AuthenticatedImage extends StatefulWidget {
   });
 
   final String? url;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final double size;
 
   /// The person's name, used to draw an initial when they have no photo.

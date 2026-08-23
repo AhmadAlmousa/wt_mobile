@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/records.dart';
 import '../browse/authenticated_image.dart';
 import '../shared/bidi.dart';
@@ -153,7 +153,7 @@ class ChartCanvas extends StatelessWidget {
   });
 
   final ChartLayout layout;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final void Function(PersonRef person) onTapPerson;
 
   /// How the reader asked for this to be drawn.
@@ -316,7 +316,7 @@ class _PersonBox extends StatelessWidget {
   });
 
   final ChartPlacement placement;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final VoidCallback onTap;
   final ChartOptions options;
 

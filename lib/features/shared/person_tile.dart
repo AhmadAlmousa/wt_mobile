@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/stock/records_repository.dart';
+import '../../data/transport.dart';
 import '../../domain/records.dart';
 import '../browse/authenticated_image.dart';
 import 'bidi.dart';
@@ -25,7 +25,7 @@ class PersonTile extends StatelessWidget {
   });
 
   final PersonRef person;
-  final RecordsRepository records;
+  final RecordsTransport records;
   final VoidCallback onOpen;
 
   /// A tighter row, for a list inside a card rather than one filling a page.

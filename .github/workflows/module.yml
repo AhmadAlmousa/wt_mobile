@@ -1,0 +1,62 @@
+# The mitigation §11 of api_eval.md asks for: check the server module against
+# both supported webtrees versions, every time it changes.
+#
+# What this proves, and what it does not. It proves the module parses on every
+# PHP the two versions support, and — through `tool/check_module.py` — that
+# every webtrees class it names exists in *both* 2.2.6 and 2.3, with anything
+# version-specific confined to `src/Compat/`. That is the drift this module is
+# actually exposed to: 2.3 rewrote routing and replaced five types, and 2.4 may
+# rewrite something else.
+#
+# It does not run the endpoints. That needs a webtrees install, a database and
+# a GEDCOM, and until it exists the honest check is `tool/live_check.dart`
+# against a real instance, which compares both transports field by field.
+
+name: module
+
+on:
+  push:
+    paths: ['server/**', 'tool/check_module.py', '.github/workflows/module.yml']
+  pull_request:
+    paths: ['server/**', 'tool/check_module.py', '.github/workflows/module.yml']
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The range webtrees 2.2.x and 2.3 both declare: "php": "8.3 - 8.6".
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Lint every file
+        run: find server -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  compatibility:
+    name: 2.2.6 and 2.3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Needs the tag as well as the default branch, because the check
+      # compares each import against both.
+      - name: Check out webtrees beside us
+        run: |
+          git clone --filter=blob:none https://github.com/fisharebest/webtrees.git ../webtrees
+          git -C ../webtrees fetch --depth 1 origin refs/tags/2.2.6:refs/tags/2.2.6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: No version outside Compat/
+        run: python3 tool/check_module.py ../webtrees

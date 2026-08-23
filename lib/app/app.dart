@@ -3,11 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/capabilities.dart';
+import '../data/module/module_api.dart';
+import '../data/module/module_charts.dart';
+import '../data/module/module_records.dart';
 import '../data/session_manager.dart';
 import '../data/settings_store.dart';
 import '../data/stock/charts_repository.dart';
 import '../data/stock/media_cache.dart';
 import '../data/stock/records_repository.dart';
+import '../data/transport.dart';
 import '../domain/charts.dart';
 import '../features/access/access_screen.dart';
 import '../features/auth/sign_in_screen.dart';
@@ -43,23 +48,41 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   /// the cache must not outlive the session that filled it.
   final MediaCache _media = MediaCache();
 
+  /// What the current site's optional module can do, if it has one.
+  ///
+  /// Probed once per connection and never required: `ModuleCapabilities.none`
+  /// — a site with no module, which is the ordinary case — selects the stock
+  /// transport for everything, and that is the floor the app is built on.
+  ModuleCapabilities _capabilities = ModuleCapabilities.none;
+
   /// A repository bound to the current signed-in client.
   ///
   /// Built per navigation rather than held, because the client is replaced
   /// whenever the app reconnects or signs in again — a cached repository would
   /// go on talking through a closed one.
-  RecordsRepository get _records => RecordsRepository(
-    widget.session.client,
-    version: widget.session.instance?.version,
-    mediaCache: _media,
-  );
+  RecordsTransport get _records {
+    final client = widget.session.client;
+    final version = widget.session.instance?.version;
+
+    return CapabilityRecordsTransport(
+      stock: RecordsRepository(client, version: version, mediaCache: _media),
+      module: _capabilities.isPresent
+          ? ModuleRecordsTransport(client, mediaCache: _media)
+          : null,
+      capabilities: _capabilities,
+    );
+  }
 
   /// Charts are read through the same client, and the same reasoning: it is
   /// replaced whenever the app reconnects, so nothing may hold one.
-  ChartsRepository get _charts => ChartsRepository(
-    widget.session.client,
-    version: widget.session.instance?.version,
-  );
+  ChartsTransport get _charts {
+    final client = widget.session.client;
+
+    return CapabilityChartsTransport(
+      stock: ChartsRepository(client, version: widget.session.instance?.version),
+      module: _capabilities.isPresent ? ModuleChartsTransport(client) : null,
+    );
+  }
 
   /// Whether the app has already walked into the account's only tree.
   ///
@@ -75,12 +98,37 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   }
 
   void _onSessionChanged() {
-    if (widget.session.isSignedIn) return;
+    if (widget.session.isSignedIn) {
+      unawaited(_probeModule());
+      return;
+    }
     // Family photographs must not outlive the account that fetched them, and
     // the next account may not see the same single tree.
     _media.clear();
     _openedOnlyTree = false;
+    _capabilities = ModuleCapabilities.none;
   }
+
+  /// Asks the site whether it runs the mobile API module.
+  ///
+  /// One cheap request per sign-in, and nothing waits for it: until it answers
+  /// every screen reads HTML, which is what it would do on a site with no
+  /// module at all. A failure here is not an error — it is the ordinary case.
+  Future<void> _probeModule() async {
+    if (_probing) return;
+    _probing = true;
+
+    try {
+      final found = await ModuleCapabilities.probe(widget.session.client);
+      if (mounted && found.isPresent) setState(() => _capabilities = found);
+    } on Object {
+      // Any failure means "no module", which is the default already in force.
+    } finally {
+      _probing = false;
+    }
+  }
+
+  bool _probing = false;
 
   /// Keeps the server rendering in the language the app is reading in.
   ///

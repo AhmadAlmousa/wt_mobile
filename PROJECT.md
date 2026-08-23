@@ -31,8 +31,10 @@ are relative to the parent workspace, which is **not** version-controlled.
 | Path | What it is |
 |---|---|
 | `webtrees_mobile/` | The Flutter app — **the repository**, and where this file lives |
+| `webtrees_mobile/server/webtrees-mobile-api/` | The optional webtrees module, written to `api_eval.md`. Copy it into an instance's `modules_v4/` |
 | `../webtrees/` | Upstream webtrees source, read-only reference (2.3.0-dev, `2.2.6` tag available); its own clone |
 | `../webtrees-API/` | Third-party API module, **evaluated and rejected** — see §2; its own clone |
+| `api_eval.md` | Design basis for an optional **purpose-built API module** — see §2 |
 | `../CLAUDE.md` | Flutter/Dart coding standards for this workspace |
 
 Real genealogy data must stay out of the repository: `.gitignore` excludes
@@ -56,20 +58,76 @@ fixtures go in **sanitized**, under `test/fixtures/`.
 
 Full assessment: <https://claude.ai/code/artifact/43243a7c-4600-45f7-aa15-fdcd202984ed>
 
+A fuller architectural evaluation — what an API module built *for this app*
+would look like, which webtrees internals it would reuse, and how the app
+would migrate to it one capability at a time — is in **`api_eval.md`**.
+
 Classified **Category 4 — not suitable as the main mobile API**. It is competent
 work for what it was built for (server-side automation and AI/MCP access), but
 the mismatch is structural, not a matter of missing endpoints:
 
-- Its only OAuth2 grant is **client credentials with confidential clients**. A
+- Its only OAuth2 grant is **client credentials with confidential clients**
+  (`src/WebtreesApi.php:764` enables exactly `ClientCredentialsGrant`). A
   shipped mobile binary cannot keep a secret.
-- Every request runs as one shared **technical user**, collapsing per-user
-  privacy, tree access and edit attribution into a single identity.
-- Data arrives as raw GEDCOM, pushing calendar, name and label logic into Dart.
-- No pagination anywhere; writes pass whole records through the query string.
-- It does not boot on webtrees 2.3 (the routing API changed).
-- `TestApi` mints a 1000-year, all-scope, non-revocable token from a route with
-  no auth middleware. **Report upstream after reproducing in a lab install.**
-  Not currently exposed on `tree.almou.sa` — the module is not installed there.
+- Every request runs as one shared **technical user** —
+  `src/Http/Middleware/Login.php` does
+  `Auth::login($user_service->find((int) $oauth_user_id))` — collapsing
+  per-user privacy, tree access and edit attribution into a single identity.
+- Data arrives as raw GEDCOM or GEDCOM-X (`GetRecord.php`), pushing calendar,
+  name and label logic into Dart.
+- No pagination anywhere — not one of its 22 endpoints takes an `offset` or a
+  `limit`; writes pass whole records through the query string.
+- **It does not boot on webtrees 2.3, for two independent reasons.** `boot()`
+  calls `$router->get(…)->allows(…)->extras(…)` on what is now a
+  `RouteCollection` whose only registration methods are `add()` and `group()`;
+  and its handlers read `Auth::PRIV_PRIVATE`, replaced by the `AccessLevel`
+  enum. Either alone is fatal.
+- It vendors 8.6 MB of its own dependencies — `league/oauth2-server`,
+  `swagger-php`, `php-gedcom` — and `"replace"`s eight PSR packages to avoid
+  colliding with core's vendor tree.
+- `TestApi` mints an all-scope, non-revocable token from a route with no auth
+  middleware: registered at `src/WebtreesApi.php:251` with no `extras()`, and
+  `UNLIMITED_EXPIRATION_INTERVAL` is literally `'P1000Y'`
+  (`AccessTokenRepository.php:66`). **Report upstream after reproducing in a
+  lab install.** Not currently exposed on `tree.almou.sa` — the module is not
+  installed there.
+
+### The module is a new one, and it is written
+
+`api_eval.md` (2026-08-23) worked the question through and recommended a
+**separate, purpose-built module**, adopted as a capability-negotiated fast
+path beside the stock transport rather than as a replacement for it. Extending
+`webtrees-API` would have meant rewriting auth, transport and payload —
+everything except the module skeleton.
+
+It now exists, at `server/webtrees-mobile-api/`: thirteen read-only `GET`
+endpoints, no vendored dependencies, and one adapter class per webtrees minor
+version. **It has never been executed** — there is no PHP on this machine — so
+§9 #18 governs what may be claimed for it, and no parser has been retired.
+
+Three findings carry that, and each is a fact about upstream rather than a
+preference:
+
+- **The version-compatibility surface is small.** 2.3's `InvokeController`
+  short-circuits with `if ($controller instanceof RequestHandlerInterface)
+  return $controller->handle($request);`, which is all 2.2.6's `RequestHandler`
+  ever did — so PSR-15 handlers are version-neutral. Everything that does need
+  an adapter fits in eleven methods, now measured rather than estimated (§3).
+- **Privacy needs no reimplementation at all.** A module running as the *real*
+  user inherits `canShow()`, `canShowName()`, `Fact::canShow()` and
+  `TreeService::all()` exactly as the website uses them.
+- **The hard parts are already public API**: translated labels per GEDCOM tag,
+  structured names, signed media URLs at any size, typed statistics, and search
+  with real pagination.
+
+Auth would be the **webtrees session the app already holds** in v1 — no new
+surface, no secret in the binary — with revocable per-user *device tokens* as a
+v2 refinement. Never client credentials; if OAuth2 is ever wanted, it is
+authorization code with PKCE.
+
+The module must stay optional. The first constraint in §1 is that the app works
+against an untouched instance, so the stock transport is the floor and every
+capability keeps its HTML path. That is permanent, not transitional.
 
 ### Decisions taken with the user
 
@@ -78,11 +136,12 @@ the mismatch is structural, not a matter of missing endpoints:
 | Data strategy | **Hybrid.** Stock HTTP/HTML transport always works; probe for an optional module and switch to a JSON fast path when present |
 | Staying signed in | Password in the OS keystore, biometric-gated, silent re-login on expiry |
 | v1 scope | **Read-only browsing.** Editing, moderation and offline sync deferred to v2 |
-| Finding people (v1) | **Search, not enumeration.** The only JSON endpoint requires a non-empty query (§3), and no stock route paginates a whole tree cheaply |
+| Finding people (v1) | **Search, not enumeration** — *on a stock instance*. Its only JSON endpoint requires a non-empty query (§3), and no stock route paginates a whole tree cheaply. With the module, an empty query enumerates and `surname=` gives a real initial index |
 | Where the app opens | **The last site, signed in.** An address typed once should not be typed again, and a list of one saved site is not a choice. The launch screen resumes it and steps aside; the connect screen is what you see when there is nothing to resume |
 | Where the tree list goes | **Skipped when there is one tree.** The account screen keeps its diagnostic job and stays one tap away, but it is not a destination when it holds a single card |
 | Which calendar to show | **The reader's, per the markup.** A tree's `CALENDAR_FORMAT` is a manager-level preference no member can change, so the choice is made in the app, over dates the server has already rendered — never by converting anything |
-| Module capability probe | **Deferred** until a module contract exists. Probing for something undefined has nothing to test against; and any future module must reuse the webtrees session or OAuth **authorization code with PKCE** — never client credentials in a shipped binary |
+| Module capability probe | **Built.** `GET /mobile-api/v1/capabilities` is anonymous and cheap, and answers a `features` array so an old app and a new module degrade *per capability* rather than per release. Probed once per sign-in; a site that answers `404` — which is every real site today — takes the stock path for everything and reports nothing wrong |
+| Module authentication | **The webtrees session the app already holds.** No new surface, no secret in the binary, and per-user privacy for free because `Auth::user()` *is* the reader. Revocable per-user device tokens are the v2 refinement; never client credentials |
 
 ---
 
@@ -188,7 +247,8 @@ anonymous `/my-account`.
   building, so the same person can arrive again on the next one.
 - Enumeration, if ever needed, means `/tree/{t}/individual-list` partitioned by
   surname or initial. Its "show all" mode renders the entire tree server-side,
-  so it is not a pagination API.
+  so it is not a pagination API. *In-process* it is a different story — see
+  "What changes with a server-side module" below.
 - Thumbnails are HMAC-signed with a server-side `glide-key` and are
   **unforgeable**; signed URLs must be harvested from HTML or that endpoint.
 - **A signed thumbnail URL is not an authorization token.**
@@ -337,6 +397,116 @@ anonymous `/my-account`.
   the translated word for it, and the silhouette class
   (`wt-individual-silhouette-m`) exists only for someone with no media on a
   tree with silhouettes on — kept as a fallback, relied on for nothing.
+
+### What changes with a server-side module
+
+Everything above describes what a *stock* instance publishes over HTTP. A
+custom module runs **inside** webtrees, so it is bound by different rules —
+confirmed by reading both versions while writing `api_eval.md`.
+
+- **Module routes are still bound by the global middleware.**
+  `app/Webtrees.php:154` orders it
+  `… BadBotBlocker … UseSession → UseLanguage → … → BootModules → Router`,
+  and a module's own route middleware runs *inside* `Router`. Three
+  consequences:
+  - The **bad-bot User-Agent rule applies to API routes too**, so `kUserAgent`
+    and `BotListCheck` stay load-bearing even if every parser is retired.
+  - `CheckCsrf` is injected unconditionally by `Router`, and its
+    `EXCLUDE_ROUTES` is a `private const` a module cannot extend — so read
+    endpoints must be **GET**, which sidesteps the question entirely.
+  - A module **can** set the request language per request. `UseLanguage`
+    consults `Accept-Language` only when the session holds none, but a module
+    middleware runs after it and may call `I18N::init($tag)` for that request
+    alone — **without** writing the account's stored preference, which no stock
+    route can avoid (§9 #16).
+- **Handlers are version-portable; route registration is not.** 2.3's
+  `InvokeController` begins `if ($controller instanceof
+  RequestHandlerInterface) return $controller->handle($request);` — which is
+  all 2.2.6's `RequestHandler` ever did. So a PSR-15 handler is version-neutral.
+
+  **The compat surface is eleven methods.** This table replaces the seven-row
+  one written before the module existed: building it found five differences
+  that reading had missed and three rows that were never needed. Confirmed by
+  `tool/check_module.py`, which resolves every import against both versions.
+
+  | Concern | 2.2.6 | 2.3 |
+  |---|---|---|
+  | `Registry::routeFactory()->routeMap()` | `Aura\Router\Map`, `->get($name,$path)->extras(…)` | `RouteCollection`, `->add($url,$class,$mw)` |
+  | Fact sorting | `Fact::sortFacts()` (static) | `Services\FactSortService::sort()` |
+  | Families by marriage date | `Family::marriageDateComparator()` | `Comparators\FamilyComparator::byMarriageDate` |
+  | Children by birth date | `Individual::birthDateComparator()` | `Comparators\IndividualComparator::byBirthDate` |
+  | `Individual::sex()` | `string` — `M`/`F`/`U`/`X` | `Enums\Sex`, backed by the same letters |
+  | Date qualifier | `Date::$qual1` / `$qual2` | `Date::$type` (`DateType`) |
+  | Calendar escape | `AbstractCalendarDate::ESCAPE` const | `calendarEscape()`, a `CalendarEscape` enum |
+  | A calendar date as GEDCOM | `format('%@ %A %O %E')` | `format()` gone — assemble from `calendarEscape()`, `day()`, `gedcomMonth()`, `year()` |
+  | `StatisticsData::countIndividualsBySex()` | takes the letter | takes `Enums\Sex` |
+  | A site's language tags | `ModuleLanguageInterface::locale()` | `->language()`; `Factories\LanguageFactory` is 2.3-only |
+  | Adapter identity | — | reported by `/capabilities` as `generation` |
+
+  **Three differences turn out not to be differences at all**, and the first is
+  the useful one. *Access level never comes up*: `canShow()`, `canShowName()`,
+  `facts($filter, $sort, $access_level)` and `Fact::canShow()` all default to
+  the current user's, so code that lets webtrees decide never names
+  `Auth::PRIV_*` or `AccessLevel`. *`UserService`* is never constructed —
+  both containers autowire it from its type hints, `ClockInterface` included.
+  *The matched route object* only matters to code that inspects a route.
+
+  Two more were avoided rather than adapted. `ResponseFactoryInterface::response()`
+  takes an `int` in 2.2.6 and an `HttpStatusCode` in 2.3 — so the module builds
+  every response from the **PSR-17** factories both versions bind in the
+  container, and names no status type. And `I18N::language()->formatDate()`,
+  which `api_eval.md` recommended for rendering a converted date, **does not
+  exist in 2.2.6** — `Date::display(null, null, false)` does, in both, and with
+  its tags stripped it is the same string.
+
+  Privacy, search, charts, media, facts, names and `StatisticsData` have
+  **identical** public APIs in both — which is why `webtrees-API` failing on
+  2.3 twice over (the Aura router *and* `Auth::PRIV_*`) is a property of its
+  design rather than of webtrees.
+- **A module route is not always reached.** On 2.2.6, when `{tree}` names a
+  tree that does not exist or that the reader may not see, `Router` hands the
+  request to webtrees' own not-found handler **before** module middleware runs
+  — so the `404` arrives as an HTML page rather than as the module's error
+  envelope. 2.3 binds the attribute to null and lets the handler answer. A
+  client must read any `404` as not-found regardless of the body.
+- **Privacy needs no reimplementation.** `GedcomRecord::canShow()`,
+  `canShowName()`, `facts($filter, $sort, $access_level)` and
+  `Fact::canShow()` all default to the current user's `Auth::accessLevel()`,
+  and a `{tree}` route parameter binds through `TreeService::all()`, which
+  already hides trees the user may not see. A module authenticating as the real
+  person inherits the model exactly — relationship privacy included.
+- **A tree *can* be enumerated in-process, though not over a stock route.**
+  `SearchService::searchIndividualNames($trees, $search, $offset, $limit)`
+  applies no filter for an empty term array, so the same method that searches
+  also walks a whole tree ordered by `n_sort`. `paginateQuery()` dedupes
+  multi-name rows across the *whole* cursor and applies `canShow()` **before**
+  counting down the offset — which fixes both halves of the paging trap above.
+  It is a PHP cursor rather than a SQL `LIMIT`, so the cost is `O(offset)`.
+- **Media can be requested at any size.** `MediaFile::imageUrl($w, $h, $fit)`
+  mints the signed URL server-side and `downloadUrl()` addresses the original.
+  The 100-pixel ceiling in §9 #3 is a property of the media *tab*, not of
+  webtrees.
+- **Labels and tags can both be had.** `Registry::elementFactory()->make($tag)
+  ->label()` gives the translated label for any tag and `->value($v, $tree)` the
+  translated form of an enumerated value. This is what `FactTagIndex` exists to
+  approximate from chart-box classes — and unlike the dictionary, it can name a
+  tag no chart box ever rendered.
+- **Relationship *naming* is public; relationship *path-finding* is not.**
+  `RelationshipService::nameFromPath()` is public, so the site's own wording
+  survives. But `RelationshipsChartModule::calculateRelationships()` is
+  `private`, along with `allAncestors()` and `excludeFamilies()` — roughly 150
+  lines of Dijkstra over the `link` table that a module must reimplement.
+  `fisharebest/algorithm` is already a core dependency, so the algorithm is
+  available; the graph construction and the exclusion loop are not. It would be
+  the module's **only** duplicated core logic, and therefore its only silent
+  drift risk.
+- **A module may set CORS headers.** `SecurityHeaders` sets five headers, none
+  of them CORS, and only fills in what a response has not already set — so a
+  module route can add `Access-Control-Allow-Origin`. Flutter Web is ruled out
+  on a stock instance (§3, Platform) and would become possible with one.
+
+Full treatment, with the endpoint set and the migration order, in
+`api_eval.md`.
 
 ### Charts
 
@@ -531,7 +701,9 @@ style, and any widget calling `copyWith(fontWeight:)` would silently ignore it.
   like a crash and is really a heap it was never going to be given. Sized down
   to 2G; a project this small has never come close to needing more.
 
-**No CORS headers → Flutter Web cannot work.** Mobile and desktop only.
+**No CORS headers → Flutter Web cannot work.** Mobile and desktop only. This
+is a property of the stock instance rather than of webtrees: `SecurityHeaders`
+sets no CORS header at all, so a module could add one on its own routes.
 `local_auth` has no Linux support, so the biometric gate degrades to an open
 gate on desktop — the sign-in screen now says so in as many words, rather than
 promising a fingerprint prompt that will never appear.
@@ -566,18 +738,31 @@ it. A real signing config is needed before any distribution.
 ## 4. Architecture
 
 ```
-webtrees_mobile/lib/
-  core/      webtrees_url · webtrees_client · errors · response_status
-             secret_store · unlock_gate
-  l10n/      app_en.arb · app_ar.arb  (generated AppText)
-  data/      instance_probe · session · access_probe
-             credential_store · session_manager · settings_store
-    stock/   dom · chart_box · record_parser · records_repository
-             chart_parser · charts_repository · media_cache
-    module/  ModuleTransport  (JSON)                           ← v2
-  domain/    instance · access · records · charts · dates · notice
-  features/  launch · connect · auth · access · browse · charts · shared
+webtrees_mobile/
+  lib/
+    core/      webtrees_url · webtrees_client · errors · response_status
+               secret_store · unlock_gate
+    l10n/      app_en.arb · app_ar.arb  (generated AppText)
+    data/      transport (the interfaces) · capabilities (the composer)
+               instance_probe · session · access_probe
+               credential_store · session_manager · settings_store
+      stock/   dom · chart_box · record_parser · records_repository
+               chart_parser · charts_repository · media_cache
+      module/  module_api · module_decode · module_records
+               module_charts · module_access
+    domain/    instance · access · records · charts · dates · notice
+    features/  launch · connect · auth · access · browse · charts · shared
+  server/webtrees-mobile-api/   the optional webtrees module (PHP)
+    src/Compat/                 the whole 2.2-vs-2.3 surface: eleven methods
+    src/Http/                   Json · ApiException · middleware · handlers
+    src/Presenters/             person · fact · date · place · family · media
+    src/Support/                parameter validation · the relationship graph
 ```
+
+`data/transport.dart` says what the app needs from an instance;
+`data/capabilities.dart` decides, **per capability**, which implementation
+answers it. A site with no module — which is every real site today — takes the
+stock path for everything, and that is the floor rather than a fallback.
 
 `data/stock/chart_box.dart` is shared on purpose: `chart-box` is the one piece
 of markup every part of webtrees agrees on — the relatives tab, a pedigree, a
@@ -625,7 +810,7 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **1c** | Session manager (keep-alive, silent re-login) | ✅ |
 | **1d** | Connect + sign-in **screens** | ✅ |
 | **2a** | Access detection **data layer** (trees, roles, account) | ✅ |
-| **2b** | Capability probe for the optional module | ⏸ deferred — see §2 |
+| **2b** | Capability probe for the optional module | ✅ — `GET /mobile-api/v1/capabilities`, selected per capability |
 | **2c** | "Your access" screen | ✅ |
 | **2d** | Stabilization — status interpretation, resume, credential semantics | ✅ |
 | **3a** | Vertical slice — search → person → facts → relatives → photo | ✅ |
@@ -642,7 +827,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **7a** | Identity — who a person is, seen before it is read | ✅ |
 | **7b** | Charts — grouping, marital status, controls, export | ✅ |
 | **7c** | Relationships — the path drawn, and the ways through it | ✅ |
-| **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
+| **8a** | The server module — a read-only JSON API, and the transports to use it | ✅ — written, not yet executed (no PHP on this machine) |
+| **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
 markup, because all of it is HTML for a wide mouse-driven screen. What it takes
@@ -1151,6 +1337,180 @@ and how many facts the dictionary could name.
 
 ---
 
+### 2026-08-23 — What an API would be worth, and what it would cost
+
+No code changed. The app has spent seven phases learning to read HTML well, and
+the question this answers is whether it should have to: `api_eval.md` is a
+full architectural evaluation of a purpose-built webtrees module for this
+client, written to be the design basis if one is ever built.
+
+**The scraping is not the whole cost, but it is most of it.** 2,168 lines in
+`lib/data/stock/`, ~1,700 lines of parser tests, 212 KB of two-version
+fixtures — and nine of the twenty-seven bugs in §7. Every one of those bugs is
+the same shape: markup said something the parser did not expect, or a fixture
+said something a real server never sends.
+
+**`webtrees-API` was already rejected; this says why in file and line.** Two of
+the reasons hardened. It does not boot on 2.3 for **two** independent reasons,
+not one — the Aura router is gone *and* `Auth::PRIV_*` is gone — so it is not
+one upgrade away from working. And `TestApi`'s "1000-year token" is literally
+`'P1000Y'`, minted from a route registered with no middleware at all. The
+upstream report still needs a lab reproduction first.
+
+**The interesting finding was how small the compat problem is.** 2.3's
+`InvokeController` opens by short-circuiting to
+`RequestHandlerInterface::handle()`, which is all 2.2.6's `RequestHandler` ever
+did — so a PSR-15 handler is version-neutral, and the entire 2.2-vs-2.3 surface
+a module touches is seven differences, now tabulated in §3. Privacy, search,
+charts, media, facts, names and statistics have identical public APIs in both.
+That turns "webtrees breaks custom modules" from a reason not to build one into
+a bounded, testable adapter.
+
+**Three open risks turn out to be properties of the *markup*, not of webtrees.**
+A photograph is stuck at 100 pixels because that is what the media tab signs —
+`MediaFile::imageUrl($w, $h, $fit)` will sign any size (§9 #3). The app has to
+rewrite the account's language preference because no stock route sets only the
+session — a module middleware runs after `UseLanguage` and can call
+`I18N::init()` for one request (§9 #16). A tree cannot be enumerated over HTTP,
+but `SearchService::searchIndividualNames` with an empty term array walks one
+in `n_sort` order, deduped and privacy-filtered before the offset is counted
+(§3) — which is both halves of the paging trap, fixed upstream all along.
+
+**And one thing a module would not fix for free.**
+`RelationshipsChartModule::calculateRelationships()` is `private`, so the
+Dijkstra that finds a path between two people — about 150 lines — would have to
+be reimplemented. It would be the module's only duplicated core logic and
+therefore its only silent-drift risk. The *naming* is safe:
+`RelationshipService::nameFromPath()` is public, so `أخ أكبر` stays the site's
+word and not the app's invention.
+
+**A real 2.3 bug fell out of the reading.** `Date::display()` puts the whole
+calendar-conversion block inside `if ($this->date2 !== null)`
+(`app/Date.php:160-176`), so an ordinary single date loses its conversion — on
+the website, not just here. §9 #15 had this as an unverified suspicion; it is
+now confirmed from source and needs reproducing on a running 2.3 install before
+it is reported.
+
+**The recommendation is a separate module, adopted per capability.** Not a
+replacement: §1's first constraint is that the app works against an untouched
+instance, so every capability keeps its HTML path permanently. The migration
+starts with something that is valuable even if no module is ever written —
+extracting transport interfaces from the two concrete repositories — and
+proceeds one capability at a time with both live and `tool/live_check.dart`
+comparing them. Which is the lesson of bugs 5 and 14–16 applied in advance,
+for once, instead of afterwards.
+
+---
+
+### 2026-08-23 (later) — Phase 8a: the module `api_eval.md` designed
+
+Written, and not yet run. There is no PHP, no composer and no webtrees install
+on this machine, so the module has been verified by reading source rather than
+by executing it — a limit that governs everything below and decides the
+migration order.
+
+**`server/webtrees-mobile-api/` is the whole of it: 37 files, no vendored
+dependencies.** Thirteen `GET` endpoints, one handler each, every one a PSR-15
+`RequestHandlerInterface` — which is what makes the handler layer
+version-neutral, because 2.3's `InvokeController` opens by short-circuiting to
+exactly that and 2.2.6's `RequestHandler` never did anything else.
+
+**The compat surface is eleven methods, and it is not the seven `api_eval.md`
+predicted.** Three of its rows turned out to be unnecessary and five
+differences it had not found turned out to matter. The most useful discovery is
+the first of those: **the module never names an access level at all.**
+`canShow()`, `canShowName()`, `facts()` and `Fact::canShow()` all default to
+the current user's, so `Auth::PRIV_*` versus the `AccessLevel` enum — the
+difference that kills `webtrees-API` on 2.3 — simply never comes up for code
+that lets webtrees decide. What does need adapting is listed in §3, and the
+full accounting is in `api_eval.md` §14.
+
+**Three claims in the design document were wrong, and one of them would have
+shipped a module that did not boot on 2.2.6.** `formatDate()` — recommended
+there as the version-neutral way to render a converted date — does not exist in
+2.2.6 at all; it arrived with `Contracts\LanguageInterface` in 2.3. The
+version-neutral answer is `Date::display(null, null, false)` with its tags
+stripped, which renders the whole date in the reader's language with no links
+and no conversions. `sosaStradonitzAncestorPaths()` is likewise 2.3-only.
+
+**`tool/check_module.py` is what stands in for a compiler.** It checks every
+file's structure, flags unused imports, and — the part that earns its keep —
+resolves every `Fisharebest\Webtrees\…` import against **both** the 2.3
+working tree and the `2.2.6` tag, failing if anything outside `src/Compat/`
+names a class that exists in only one. That is the rule the compat layer exists
+to enforce, and it is now enforced rather than intended.
+`.github/workflows/module.yml` runs it in CI alongside `php -l` on 8.3 and 8.4.
+
+**On the app side the valuable half was step one, which needed no module at
+all.** `data/transport.dart` names what the app needs from an instance —
+`RecordsTransport`, `ChartsTransport`, `AccessTransport` — and the two stock
+repositories now implement it. Every screen takes the interface. That refactor
+is worth having whether or not a module is ever installed, which is exactly why
+`api_eval.md` §13 puts it first.
+
+The one wrinkle: `ChartsRepository.bloodLinesOnly` was a *static* that parsed a
+URL, and a site's answer to "do you search blood lines only" is not something
+every transport can read from an address. It is an instance method now, and the
+module answers it from the `settings` the server echoes back.
+
+**Selection is per capability, and nothing is all-or-nothing.**
+`data/capabilities.dart` composes the two: a feature the module advertises goes
+to JSON, everything else to HTML, and a site with no module at all — which is
+every site today — behaves exactly as before. Charts are routed by their
+*handle* rather than by the capability list, because a record fetched by one
+transport carries addresses only that transport can read.
+
+**One suite now runs against both.** `test/data/transport_contract_test.dart`
+asserts the same fifteen behaviours of each, over two fixture sets describing
+the same sanitized family — and it earned itself immediately by catching a
+fixture that gave the subject one spouse where the HTML gave him two. A
+difference between the transports is not a bug in a parser; it is a difference
+the interface was supposed to hide.
+
+`tool/live_check.dart` gained the other half of that check: against a real
+instance it reads the same person through both transports and diffs them field
+by field — name, sex, lifespan, every relative count, and the same date in
+both calendars. Run against `tree.almou.sa`, which does not have the module
+installed, it correctly reports *not installed* and every stock check still
+passes, which is the regression this refactor most needed to not cause.
+
+**What the module can say that a page cannot.** Every fact's bare GEDCOM tag,
+including a relative's death under its own translated label — the one case the
+chart-box dictionary provably cannot learn, because no box ever printed it.
+Which of five lists a fact came from, where the markup offers one `collapse`
+class. Whether a family is the one a person was born into. A person's own sex,
+without going to their relatives tab to find their chart box. A role, stated,
+where the probe ladder has to infer one and cannot separate Member from Visitor
+on a public tree at all. A whole tree enumerated in name order, deduplicated
+and privacy-filtered *before* the offset is counted. And a photograph at
+whatever size the screen wants.
+
+**A date is where it pays best.** The module sends the raw GEDCOM, the
+Julian-day bounds, the qualifier, and one rendered string per calendar with its
+escape attached — so `CalendarView` finally works on 2.3, where the markup
+names no calendar at all. It also sidesteps the 2.3 bug in §9 #15: webtrees
+puts its whole conversion block inside `if ($this->date2 !== null)`, so a single
+date loses its conversion on the website, while the module converts from
+`convertToCalendar()` and is not affected.
+
+**The relationship finder is the one thing that could silently drift.**
+`RelationshipsChartModule::calculateRelationships()` is `private`, along with
+`allAncestors()` and `excludeFamilies()`, so about 150 lines of Dijkstra over
+the `link` table had to be reimplemented. They are byte-identical in 2.2.6 and
+2.3 but for a trailing comma, and `src/Support/RelationshipFinder.php` is a
+deliberate line-for-line port rather than an improvement — because the moment
+it is improved it starts answering something the website does not, and no test
+on either side would notice. The *naming* is safe:
+`RelationshipService::nameFromPath()` is public, so `أخ أكبر` stays the site's
+word.
+
+**None of this retires a parser.** `api_eval.md` §13 rule 6 says a parser goes
+only after its endpoint has passed live against real data, and no endpoint has
+run at all yet. The stock path is the floor, permanently, and today it is also
+the only path any real instance uses.
+
+---
+
 ## 7. Bugs found, and what they taught
 
 | # | Bug | Caught by |
@@ -1183,6 +1543,8 @@ and how many facts the dictionary could name.
 | 25 | Chart buttons appeared in the site's menu order, and skipped their own rule | **Rendered preview** |
 | 26 | d'Aboville numbers restarted at each family, so two children were `1.1` | **A richer fixture** |
 | 27 | `fact_INDI:DEAT` was read out of the 2.3 template; the class is bare, `fact_DEAT` | **A captured fixture** |
+| 28 | `api_eval.md` recommended `I18N::language()->formatDate()` as version-neutral; it does not exist in 2.2.6 at all | **Reading both versions while writing the code** |
+| 29 | The contract suite's fixture gave the subject one spouse where the HTML fixture gave him two | **The contract suite, on its first run** |
 
 Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
 the fixtures held a second marriage — a fixture that reproduces exactly what
@@ -1191,6 +1553,15 @@ had been warning about since the beginning. 27 was the reverse: the *captured*
 2.2.6 markup had `fact_BIRT` all along, and a first reading of the 2.3
 template invented a qualified form that webtrees has never emitted. Read the
 capture before believing the template.
+
+Bugs 28 and 29 are the newest pair, and they are about *documents* rather than
+markup. 28: `api_eval.md` is argued from source and cites a file and a line for
+every claim, and it still got `formatDate()` wrong — because the method exists,
+and the reading checked that rather than checking *which version* it exists in.
+Nothing but writing the code against both trees would have found it. 29 is the
+contract suite paying for itself before it had run twice: it compares the two
+transports over two fixture sets, so a fixture that quietly disagreed with the
+captured HTML failed immediately instead of hiding until a live run.
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -1515,8 +1886,13 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 464 tests
+flutter test          # 508 tests
 flutter analyze       # must stay clean
+
+# The server module, on a machine with no PHP: structure, unused imports, and
+# every webtrees class it names checked against BOTH 2.2.6 and 2.3 — failing
+# if anything outside src/Compat/ exists in only one.
+python3 tool/check_module.py [../webtrees]
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
@@ -1574,6 +1950,10 @@ Both tools read the password from the terminal with echo disabled, or from
    app cannot ask for a bigger copy — the full image lives behind the media
    *record* page, which v1 has no screen for. The gallery therefore shows
    thumbnails that do not open. Worth revisiting with a media record screen.
+   **This is a limit of the media tab, not of webtrees**:
+   `MediaFile::imageUrl($w, $h, $fit)` mints a signed URL at any size and
+   `downloadUrl()` addresses the original, so a module closes this outright
+   (§3).
 4. **A chart is only as small as the tree it draws.** The app places one
    widget per person, which a chart of a few dozen handles without noticing.
    A large family at three generations of descendants is already ninety-odd
@@ -1587,6 +1967,11 @@ Both tools read the password from the terminal with echo disabled, or from
    the grid itself. The parser answers an empty path rather than a wrong one
    when the walk finds nothing, and the screen says the site found no link —
    which would be indistinguishable from a theme it could not read.
+   A module removes the grid but not the whole problem:
+   `RelationshipService::nameFromPath()` is public, so the wording stays the
+   site's, but `RelationshipsChartModule::calculateRelationships()` is
+   `private` — so ~150 lines of Dijkstra would have to be reimplemented, and
+   that reimplementation could drift from what the website answers (§3).
 6. **The charts have been read on 2.2.6 only.** Both parsers run against
    fixtures for 2.2.6 and 2.3, and the two versions' chart templates differ by
    one attribute — but 2.3 has never answered a real request here, so that is
@@ -1610,8 +1995,18 @@ Both tools read the password from the terminal with echo disabled, or from
    gracefully on the development machine.
 11. **Upstream module API churn.** webtrees does not guarantee stability for
    custom modules; 2.3 changed routing substantially. If the optional PHP module
-   is built (v2), isolate volatile core APIs behind one adapter and run CI
-   against both 2.2.x and 2.3.
+   is built, isolate volatile core APIs behind one adapter and run CI against
+   both 2.2.x and 2.3. **The size of that adapter is now measured** — eleven
+   methods, tabulated in §3 — and PSR-15 handlers are portable across both
+   versions unchanged, which is what makes a single adapter class realistic.
+   `webtrees-API` is the counter-example: it took the churn head-on and is
+   dead on 2.3 (§2).
+   *(Mitigation now built rather than planned.)* `src/Compat/` is the only
+   place a version may be named, and `tool/check_module.py` fails the build if
+   anything outside it imports a class that exists in only one version.
+   `.github/workflows/module.yml` runs that plus `php -l` on 8.3 and 8.4. What
+   neither can catch is a *method* that changed behaviour without changing its
+   signature — for that there is no substitute for a lab install.
 12. **Only the app is version-controlled.** The repository is `webtrees_mobile/`
    (this document included). The parent workspace, `CLAUDE.md` and the two
    upstream clones have no shared history.
@@ -1638,25 +2033,69 @@ Both tools read the password from the terminal with echo disabled, or from
    sections an instance offers (`sections offered` in `tool/live_check.dart`),
    which is the raw material for the compatibility matrix this still needs
    before release.
-15. **Choosing a calendar works on 2.2.6 and not on 2.3.** The choice depends
-   on the `cal` parameter of the calendar links webtrees wraps each date in;
-   2.3's rewritten `Date::display` emits no links, so nothing states which
-   calendar a rendered date is in and the app shows both. Two further 2.3
-   observations, unverified against a running server: the conversion is
-   appended only when the date has a *second* part (`$this->date2 !== null`),
-   which would drop it from ordinary single dates; and it is bracketed rather
-   than parenthesised. Worth reproducing on a 2.3 install and reporting
-   upstream before building around it.
-16. **The app writes the account's language preference.** Aligning the server's
+15. **Choosing a calendar works on 2.2.6 and not on 2.3, and one half of that
+   is an upstream bug.** The choice depends on the `cal` parameter of the
+   calendar links webtrees wraps each date in; 2.3's rewritten `Date::display`
+   emits no links, so nothing states which calendar a rendered date is in and
+   the app shows both.
+   **Confirmed from source 2026-08-23** while writing `api_eval.md`: 2.3 puts
+   the whole conversion block *inside* `if ($this->date2 !== null)`
+   (`app/Date.php:160-176`), so an ordinary single date loses its conversion
+   entirely — not merely for this app, but on the website. That is a defect
+   rather than a design change, and it is worth reproducing on a running 2.3
+   install and **reporting upstream**. The bracketing (`[…]` rather than
+   `(…)`) is deliberate and needs no report.
+   A module would sidestep both: it reads `convertToCalendar()` directly and
+   emits the calendar as data (§3).
+16. **The app writes the account's language preference.** *(Closed by a module;
+   open on stock.)* Aligning the server's
    rendering language is the only way to get Arabic dates on a stock site
    (§3), and `SelectLanguage` sets the session *and* the user preference
    together. So using the app in English changes what the website greets that
-   account with. Disclosed in the settings sheet; an optional module could
-   avoid it, nothing stock can.
+   account with. Disclosed in the settings sheet; nothing stock can avoid it.
+   **A module can, and the mechanism is now known**: module route middleware
+   runs inside `Router`, i.e. after `UseLanguage`, so it may call
+   `I18N::init($tag)` from `Accept-Language` for one request and touch neither
+   the session nor the stored preference (§3).
 17. **The Android compile-SDK override** rewrites every plugin subproject
    through a deprecated Gradle API (§3). It works against the SDK installed
    here and should be treated as a temporary, version-specific workaround —
    it needs CI on a clean machine to stay honest.
+18. **The API module is written and has never answered a request.** *(Was
+   "designed and not written"; the risk narrowed rather than closed.)* There is
+   no PHP, no composer and no webtrees install on this machine, so
+   `server/webtrees-mobile-api/` has been verified by reading source and by
+   `tool/check_module.py` — which resolves every `Fisharebest\Webtrees\…`
+   import against **both** versions and fails on anything version-specific
+   outside `src/Compat/` — and by nothing else. Writing it already contradicted
+   the design in five places (§3, `api_eval.md` §14), one of which would have
+   shipped a module that did not boot on 2.2.6, which is a fair estimate of how
+   much more a running server will find.
+   That is the failure mode §7 keeps recording: bugs 14–16 were 185 green tests
+   agreeing with a fake more permissive than the real thing. Two things to
+   expect: the scrapers have been exercised against 40 real records and the
+   module has not been at all, and running two transports doubles the
+   meaningful test surface for as long as both exist — which, because the stock
+   path is permanent, is forever.
+   **Next step, and it is a prerequisite for everything else:** install the
+   module on a lab 2.2.x *and* a lab 2.3, and run
+   `tool/live_check.dart`, which now reads the same person through both
+   transports and diffs them field by field. No parser is retired until its
+   endpoint has passed that.
+19. **`RelationshipFinder` is the module's only duplicated core logic.**
+   `RelationshipsChartModule::calculateRelationships()` and its two helpers are
+   `private`, so ~150 lines of Dijkstra over the `link` table are ported rather
+   than called. They are byte-identical in 2.2.6 and 2.3 today, and the port is
+   deliberately literal — but nothing makes upstream keep them that way, and a
+   divergence would be silent on both sides. Mitigate by testing module output
+   against the rendered chart for a set of known pairs, which needs a lab
+   install (see 18).
+20. **The module's surname index and enumeration have never met a large tree.**
+   `searchIndividualNames()` walks a PHP cursor rather than a SQL `LIMIT`, so
+   a deep offset is `O(offset)`; `searchIndividualsAdvanced()` fetches a whole
+   surname partition (webtrees caps it at 5,000) and pages it in PHP. Both are
+   bounded and both are what the website itself does, but the target tree is
+   1,463 people and neither has been measured on one ten times that.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

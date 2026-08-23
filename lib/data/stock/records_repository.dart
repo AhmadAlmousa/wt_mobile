@@ -11,28 +11,18 @@ import '../../core/webtrees_client.dart';
 import '../../domain/charts.dart';
 import '../../domain/notice.dart';
 import '../../domain/records.dart';
+import '../transport.dart';
 import 'dom.dart';
 import 'fact_tags.dart';
 import 'media_cache.dart';
 import 'record_parser.dart';
-
-/// One page of search results, and whether more exist.
-final class SearchPage {
-  const SearchPage({required this.people, required this.hasMore});
-
-  final List<PersonRef> people;
-
-  /// webtrees fetches one row beyond the page to answer this, so it is exact
-  /// rather than a guess from a full page.
-  final bool hasMore;
-}
 
 /// Reads people from a stock webtrees site.
 ///
 /// Stock webtrees has no API, so this is HTML with one JSON exception. Each
 /// method says which route it uses and what it may assume of the answer;
 /// nothing here infers a fact from a status code it was not promised.
-final class RecordsRepository {
+final class RecordsRepository implements RecordsTransport {
   RecordsRepository(this._client, {String? version, MediaCache? mediaCache})
     : _parser = RecordParser(version: version),
       _media = mediaCache ?? MediaCache();
@@ -52,6 +42,7 @@ final class RecordsRepository {
   /// carries a `nextUrl` when more exist — but that URL is built from the
   /// tree, `at` and the page number **only**, dropping the query, so following
   /// it would search for nothing. Paging is therefore done by number.
+  @override
   Future<SearchPage> search(String tree, String query, {int page = 1}) async {
     if (query.trim().isEmpty) {
       return const SearchPage(people: [], hasMore: false);
@@ -174,6 +165,7 @@ final class RecordsRepository {
   /// Read from the tree's own page, because that is where webtrees puts the
   /// links to them — the statistics of a whole database belong to nobody in
   /// particular, so no person's page carries a link with their xref in it.
+  @override
   Future<Map<ChartKind, String>> treeCharts(String tree) async {
     final reply = await _client.get('/tree/$tree');
     if (!reply.isOk) {
@@ -193,6 +185,7 @@ final class RecordsRepository {
   ///
   /// A site with the relatives tab switched off yields a record without
   /// relatives and a warning saying so, rather than a failure.
+  @override
   Future<IndividualRecord> individual(String tree, String xref) async {
     final reply = await _fetchRecord(
       '/tree/$tree/individual/$xref',
@@ -391,6 +384,7 @@ final class RecordsRepository {
   /// on watermarking from that — so an unauthenticated fetch gets a refusal or
   /// somebody else's view of the file. Anything caching these bytes must key
   /// on the site and the account, and drop them at sign-out.
+  @override
   Future<Uint8List> image(String url) async {
     final cached = _media[url];
     if (cached != null) return cached;
