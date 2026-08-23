@@ -95,8 +95,8 @@ final class FactEntry {
   /// What webtrees calls this fact, already translated by the server.
   final String label;
 
-  /// The GEDCOM tag behind [label] — `INDI:DEAT`, `FAM:DIV` — where the page
-  /// said enough to know it.
+  /// The GEDCOM tag behind [label] — `DEAT`, `DIV` — where the page said
+  /// enough to know it.
   ///
   /// The label itself is translated, so an interface that switched on it
   /// would work in English and quietly do nothing in Arabic. The tag comes

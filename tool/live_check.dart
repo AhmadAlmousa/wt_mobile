@@ -289,6 +289,65 @@ Future<void> main(List<String> args) async {
           report('date, hijri only', sample.display(CalendarView.hijri));
         }
 
+        // Everything the interface says about *who* a person is comes from
+        // the chart boxes on the relatives tab: the sex in a class, the death
+        // in a tagged fact block. Both were read from the upstream templates
+        // rather than from a captured page, so this is the check that turns
+        // them from a reading into a fact (PROJECT.md §3, §9).
+        stdout.writeln('\n=== Who a person is ===');
+        report(
+          'sex read from the record',
+          person.sex.name,
+          ok: person.sex != Sex.unknown,
+        );
+        report(
+          'lifespan read from the record',
+          person.lifespan ?? '(none)',
+          ok: person.lifespan != null,
+        );
+        report(
+          'death recorded',
+          person.isDeceased ? 'yes' : 'no — nothing said so',
+        );
+
+        final relatives = [
+          ...person.parents,
+          ...person.siblings,
+          ...person.spouses,
+          ...person.children,
+        ];
+        report(
+          'relatives with a sex',
+          '${relatives.where((r) => r.sex != Sex.unknown).length}'
+              ' of ${relatives.length}',
+          ok: relatives.isEmpty || relatives.any((r) => r.sex != Sex.unknown),
+        );
+        report(
+          'relatives the tree records as dead',
+          '${relatives.where((r) => r.isDeceased).length}'
+              ' of ${relatives.length}',
+        );
+
+        // The dictionary the ribbon, the fact icons and the divorce mark all
+        // rest on. An empty one is not a failure — every reader degrades —
+        // but it means this site gives none of the three.
+        final tagged = person.facts.where((fact) => fact.tag != null).toList();
+        report(
+          'facts named by GEDCOM tag',
+          tagged.isEmpty
+              ? 'NONE — this site emits no fact blocks in its chart boxes'
+              : '${tagged.length} of ${person.facts.length} — '
+                    '${tagged.map((f) => f.tag).toSet().take(8).join(', ')}',
+          ok: tagged.isNotEmpty,
+        );
+        final divorced = person.families
+            .where((family) => family.endedInDivorce)
+            .length;
+        report(
+          'families whose marriage ended',
+          '$divorced of ${person.families.length}',
+        );
+
         // The charts a site runs are the app's to discover, not to assume:
         // every one of them is a module an administrator can switch off.
         stdout.writeln('\n=== Charts ===');

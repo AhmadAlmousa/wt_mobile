@@ -6,12 +6,18 @@
 /// the language this app was built for.
 ///
 /// Its own chart boxes give the answer away. `Fact::summary()` renders each
-/// fact as `<div class="fact_INDI:DEAT"><span class="label">…</span>: …</div>`
-/// — the class carries the tag, the span carries this site's translation of
-/// it — and webtrees puts a run of those inside every `chart-box`: the
-/// person's birth and death in `.wt-chart-box-facts`, and *everything*,
-/// their spouse families included, in the hidden `.wt-chart-box-zoom-dropdown`
+/// fact as `<div class="fact_DEAT"><span class="label">…</span>: …</div>` —
+/// the class carries the GEDCOM tag, the span carries this site's translation
+/// of it — and webtrees puts a run of those inside every `chart-box`: the
+/// person's birth and death in `.wt-chart-box-facts`, and *everything*, their
+/// spouse families included, in the hidden `.wt-chart-box-zoom-dropdown`
 /// beside it.
+///
+/// The tag in that class is **bare**: `Fact::summary()` builds the class from
+/// the fact's own `$tag` property — the word off the GEDCOM line — and not
+/// from `Fact::tag()`, which qualifies it with the record type. So a family's
+/// divorce is `fact_DIV` and not `fact_FAM:DIV`. Nothing is lost by that: a
+/// death is only ever an individual's and a divorce only ever a family's.
 ///
 /// So a page that shows any person at all teaches the app what this site
 /// calls a death and what it calls a divorce, and that dictionary then names
@@ -56,8 +62,7 @@ final class FactTagIndex {
   /// An index that knows nothing, for a page that offered no fact blocks.
   static final FactTagIndex empty = FactTagIndex(const {});
 
-  /// Lower-cased label to the qualified tag it stood for, e.g.
-  /// `death` → `INDI:DEAT`.
+  /// Lower-cased label to the tag it stood for, e.g. `وفاة` → `DEAT`.
   ///
   /// Lower-cased because a label may be rendered with different capitals in
   /// different places — a table header and a chart box — while Arabic, which
@@ -76,7 +81,7 @@ final class FactTagIndex {
     final tags = <String, String>{};
 
     for (final element in _elementsIn(root)) {
-      final tag = qualifiedTagOf(element);
+      final tag = tagOf(element);
       if (tag == null) continue;
 
       final label = textOf(element.querySelector('.label'));
@@ -87,8 +92,8 @@ final class FactTagIndex {
     return FactTagIndex(tags);
   }
 
-  /// The qualified tag [label] stands for on this site, or null when this
-  /// page never named one.
+  /// The tag [label] stands for on this site, or null when this page never
+  /// named one.
   String? tagFor(String? label) =>
       label == null ? null : _tagsByLabel[_key(label)];
 
@@ -119,26 +124,31 @@ final class FactTagIndex {
     return false;
   }
 
-  /// The tag part of a `fact_INDI:DEAT` class, qualified, or null when the
-  /// element carries no such class.
-  static String? qualifiedTagOf(Element element) {
+  /// The GEDCOM tag a `fact_DEAT` class names, or null when the element
+  /// carries no such class.
+  ///
+  /// A qualifying prefix is accepted and dropped. Stock webtrees does not
+  /// write one — see the note above — but a theme or a custom module that
+  /// built the class from `Fact::tag()` instead would, and reading `DEAT` out
+  /// of `fact_INDI:DEAT` costs one line.
+  static String? tagOf(Element element) {
     for (final name in element.classes) {
       final match = _factClass.firstMatch(name);
-      if (match != null) return '${match.group(1)}:${match.group(2)}';
+      if (match != null) return match.group(1);
     }
     return null;
   }
 
-  /// The bare tag of a qualified one: `INDI:DEAT` → `DEAT`.
-  static String? bareTagOf(String? qualified) {
-    if (qualified == null) return null;
-    final colon = qualified.indexOf(':');
-    return colon < 0 ? qualified : qualified.substring(colon + 1);
+  /// The bare tag of a possibly qualified one: `INDI:DEAT` → `DEAT`.
+  static String? bareTagOf(String? tag) {
+    if (tag == null) return null;
+    final colon = tag.indexOf(':');
+    return colon < 0 ? tag : tag.substring(colon + 1);
   }
 
-  /// Whether [qualified] names one of [wanted], which are bare tags.
-  static bool _isOneOf(String? qualified, Set<String> wanted) {
-    final bare = bareTagOf(qualified);
+  /// Whether [tag] names one of [wanted], which are bare tags.
+  static bool _isOneOf(String? tag, Set<String> wanted) {
+    final bare = bareTagOf(tag);
     return bare != null && wanted.contains(bare);
   }
 
@@ -158,7 +168,10 @@ final class FactTagIndex {
     _ => const <Element>[],
   };
 
-  /// `fact_INDI:DEAT`, `fact_FAM:_SEPR`. The record part is always letters;
-  /// the tag may begin with an underscore, as webtrees' own extensions do.
-  static final RegExp _factClass = RegExp(r'^fact_([A-Z]+):([_A-Z0-9]+)$');
+  /// `fact_DEAT`, `fact__SEPR`, and the qualified `fact_FAM:DIV` a theme
+  /// might write. The tag may begin with an underscore, as webtrees' own
+  /// extensions do.
+  static final RegExp _factClass = RegExp(
+    r'^fact_(?:[A-Z]+:)?([_A-Z][_A-Z0-9]*)$',
+  );
 }

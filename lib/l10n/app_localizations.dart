@@ -595,6 +595,72 @@ abstract class AppText {
   /// **'Found more than one way they are related.'**
   String get relationshipPaths;
 
+  /// No description provided for @relationshipHow.
+  ///
+  /// In en, this message translates to:
+  /// **'How to look'**
+  String get relationshipHow;
+
+  /// No description provided for @relationshipWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with'**
+  String get relationshipWith;
+
+  /// No description provided for @relationshipClosest.
+  ///
+  /// In en, this message translates to:
+  /// **'Closest'**
+  String get relationshipClosest;
+
+  /// No description provided for @relationshipFatherSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Father’s side'**
+  String get relationshipFatherSide;
+
+  /// No description provided for @relationshipMotherSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Mother’s side'**
+  String get relationshipMotherSide;
+
+  /// No description provided for @relationshipThroughSpouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Through a spouse'**
+  String get relationshipThroughSpouse;
+
+  /// No description provided for @relationshipNoneThisWay.
+  ///
+  /// In en, this message translates to:
+  /// **'No link this way.'**
+  String get relationshipNoneThisWay;
+
+  /// No description provided for @relationshipBloodOnlyToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood relatives only'**
+  String get relationshipBloodOnlyToggle;
+
+  /// No description provided for @relationshipAnyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Any relationship'**
+  String get relationshipAnyLink;
+
+  /// No description provided for @relationshipSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 step} other{{count} steps}}'**
+  String relationshipSteps(int count);
+
+  /// No description provided for @relationshipOtherWays.
+  ///
+  /// In en, this message translates to:
+  /// **'Other ways they are related'**
+  String get relationshipOtherWays;
+
   /// No description provided for @chartView.
   ///
   /// In en, this message translates to:
@@ -618,6 +684,120 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'Compact'**
   String get chartViewCompact;
+
+  /// No description provided for @chartOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart options'**
+  String get chartOptions;
+
+  /// No description provided for @chartGenerations.
+  ///
+  /// In en, this message translates to:
+  /// **'Generations'**
+  String get chartGenerations;
+
+  /// No description provided for @chartGenerationsSite.
+  ///
+  /// In en, this message translates to:
+  /// **'As the site sets it'**
+  String get chartGenerationsSite;
+
+  /// No description provided for @chartShowPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get chartShowPhotos;
+
+  /// No description provided for @chartShowDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Dates'**
+  String get chartShowDates;
+
+  /// No description provided for @chartColourBySex.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour by sex'**
+  String get chartColourBySex;
+
+  /// No description provided for @chartFitToName.
+  ///
+  /// In en, this message translates to:
+  /// **'Boxes fit the name'**
+  String get chartFitToName;
+
+  /// No description provided for @chartWhoToShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Who to show'**
+  String get chartWhoToShow;
+
+  /// No description provided for @chartShowEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone'**
+  String get chartShowEveryone;
+
+  /// No description provided for @chartShowMen.
+  ///
+  /// In en, this message translates to:
+  /// **'Male line'**
+  String get chartShowMen;
+
+  /// No description provided for @chartShowWomen.
+  ///
+  /// In en, this message translates to:
+  /// **'Female line'**
+  String get chartShowWomen;
+
+  /// No description provided for @chartLineNote.
+  ///
+  /// In en, this message translates to:
+  /// **'A line is followed through the people on it, so hiding one sex hides everyone reached through them.'**
+  String get chartLineNote;
+
+  /// No description provided for @chartShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get chartShare;
+
+  /// No description provided for @chartShareImage.
+  ///
+  /// In en, this message translates to:
+  /// **'As an image'**
+  String get chartShareImage;
+
+  /// No description provided for @chartSharePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'As a PDF'**
+  String get chartSharePdf;
+
+  /// No description provided for @chartSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing…'**
+  String get chartSharing;
+
+  /// No description provided for @chartShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The chart could not be saved.'**
+  String get chartShareFailed;
+
+  /// No description provided for @chartShareSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} — {chart}'**
+  String chartShareSubject(String name, String chart);
+
+  /// No description provided for @chartTooBigToShare.
+  ///
+  /// In en, this message translates to:
+  /// **'This chart is too large to save as one picture.'**
+  String get chartTooBigToShare;
 
   /// No description provided for @openThisPerson.
   ///

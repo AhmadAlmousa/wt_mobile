@@ -6,6 +6,7 @@ import '../../domain/charts.dart';
 import '../../domain/records.dart';
 import 'chart_box.dart';
 import 'dom.dart';
+import 'fact_tags.dart';
 
 /// Reads the structure out of the charts a webtrees site draws.
 ///
@@ -42,8 +43,13 @@ final class ChartParser {
 
   /// Reads a descendants chart: the subject, their families, their children.
   DescendantNode parseDescendants(String fragment) {
+    final root = html.parseFragment(fragment);
     final level = _topLevel(fragment, 'descendants chart');
-    final node = _descendantFrom(level, '1');
+    // What this site calls a divorce, learned from the fact blocks inside its
+    // own chart boxes. Each family's caption runs its labels together into
+    // one sentence, so the dictionary is the only way to read one out of it
+    // without knowing the language the sentence is in.
+    final node = _descendantFrom(level, '1', FactTagIndex.from(root));
     if (node == null) {
       throw ParseFailure(
         parser: 'descendants chart',
@@ -326,15 +332,30 @@ final class ChartParser {
   /// digits, because webtrees builds it by joining integers rather than
   /// formatting a number. It is rebuilt here from the nesting, which says the
   /// same thing.
-  DescendantNode? _descendantFrom(List<Element> level, String number) {
+  DescendantNode? _descendantFrom(
+    List<Element> level,
+    String number,
+    FactTagIndex tags,
+  ) {
     Element? boxRow;
     final families = <DescendantFamily>[];
     String? pendingLabel;
 
+    // webtrees numbers a person's children across *all* their families —
+    // `$child_number` is declared before the family loop in its own template
+    // and never reset — so a second marriage continues the count rather than
+    // starting it again. Numbering per family gave two children `1.1`.
+    var born = 0;
+
     for (final element in level) {
       if (element.id.startsWith('fam-')) {
         families.add(
-          _descendantFamily(element, label: pendingLabel, number: number),
+          _descendantFamily(
+            element,
+            label: pendingLabel,
+            nextNumber: () => '$number.${++born}',
+            tags: tags,
+          ),
         );
         pendingLabel = null;
         continue;
@@ -364,7 +385,8 @@ final class ChartParser {
   /// the children — the one chart box here that is nobody's subtree.
   DescendantFamily _descendantFamily(
     Element block, {
-    required String number,
+    required String Function() nextNumber,
+    required FactTagIndex tags,
     String? label,
   }) {
     PersonRef? spouse;
@@ -375,10 +397,7 @@ final class ChartParser {
         spouse ??= personFromChartBox(element);
         continue;
       }
-      final child = _descendantFrom(
-        _nestedLevel(element),
-        '$number.${children.length + 1}',
-      );
+      final child = _descendantFrom(_nestedLevel(element), nextNumber(), tags);
       if (child != null) children.add(child);
     }
 
@@ -386,6 +405,11 @@ final class ChartParser {
       xref: block.id.replaceFirst('fam-', ''),
       spouse: spouse,
       label: label,
+      // The caption webtrees writes above a family runs its marriage, its
+      // divorce and its child count together with no markup between them —
+      // so the question is whether any of this site's divorce labels appears
+      // in it, which the dictionary can answer and a word list cannot.
+      endedInDivorce: tags.mentionsDivorce(label),
       children: children,
     );
   }

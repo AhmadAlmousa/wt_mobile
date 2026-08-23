@@ -279,6 +279,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
                     session: widget.session,
                     records: _records,
                     charts: _charts,
+                    settings: widget.settings,
                     tree: tree,
                     xref: xref,
                     kind: kind,

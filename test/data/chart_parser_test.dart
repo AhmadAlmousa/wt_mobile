@@ -112,21 +112,46 @@ void main() {
         chart = const ChartParser().parseDescendants(fragment);
       });
 
-      test('reads the person, their family and their children', () {
+      test('reads the person, their families and their children', () {
         expect(chart.person.xref, 'X42');
-        expect(chart.families.single.xref, 'F2');
-        expect(chart.families.single.spouse?.xref, 'X50');
-        expect(chart.families.single.children.map((n) => n.person.xref), [
+        expect(chart.families.map((f) => f.xref), ['F2', 'F4']);
+        expect(chart.families.first.spouse?.xref, 'X50');
+        expect(chart.families.first.children.map((n) => n.person.xref), [
           'X60',
           'X61',
         ]);
       });
 
+      test('keeps a second marriage’s children under that marriage', () {
+        // Merging them would put a child under the wrong mother, which is not
+        // a crowded chart but a false one.
+        expect(chart.families.last.spouse?.xref, 'X51');
+        expect(chart.families.last.children.map((n) => n.person.xref), [
+          'X62',
+        ]);
+      });
+
       test('goes on down the generations', () {
-        final son = chart.families.single.children.first;
+        final son = chart.families.first.children.first;
         expect(son.families.single.spouse?.xref, 'X70');
         expect(son.families.single.children.single.person.xref, 'X80');
-        expect(chart.everyone.length, 4);
+        expect(chart.everyone.length, 5);
+      });
+
+      test('tells which marriage ended in a divorce', () {
+        // The caption is one sentence with no markup between its parts, so
+        // the only way to read a divorce out of it is against the vocabulary
+        // this site's own chart boxes taught the app.
+        expect(chart.families.first.endedInDivorce, isFalse);
+        expect(chart.families.last.endedInDivorce, isTrue);
+      });
+
+      test('claims no divorce when the page named no tags', () {
+        // Strip the fact blocks and the dictionary is empty — which has to
+        // read as silence, not as a marriage that held.
+        final mute = fragment.replaceAll(RegExp(r'fact_[_A-Z]+'), 'fact');
+        final read = const ChartParser().parseDescendants(mute);
+        expect(read.families.last.endedInDivorce, isFalse);
       });
 
       test('numbers people the way the site itself numbered them', () {
@@ -137,15 +162,15 @@ void main() {
       });
 
       test('knows which generation a person is in', () {
-        final son = chart.families.single.children.first;
+        final son = chart.families.first.children.first;
         expect(chart.depth, 1);
         expect(son.depth, 2);
         expect(son.families.single.children.single.depth, 3);
       });
 
       test('keeps the site’s own summary of each family', () {
-        expect(chart.families.single.label, contains('الزواج'));
-        expect(chart.families.single.label, contains('١٩٢٥'));
+        expect(chart.families.first.label, contains('الزواج'));
+        expect(chart.families.first.label, contains('١٩٢٥'));
       });
 
       test('does not mistake a spouse for a descendant', () {

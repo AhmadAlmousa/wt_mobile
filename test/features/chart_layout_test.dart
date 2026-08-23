@@ -210,6 +210,150 @@ void main() {
     });
   });
 
+  group('a man with two wives', () {
+    late ChartLayout layout;
+    const metrics = ChartMetrics();
+
+    setUp(() {
+      layout = layoutDescendants(
+        descendant(
+          'X1',
+          families: [
+            DescendantFamily(
+              xref: 'F1',
+              spouse: person('W1', sex: Sex.female),
+              children: [
+                descendant('A1', number: '1.1'),
+                descendant('A2', number: '1.2'),
+              ],
+            ),
+            DescendantFamily(
+              xref: 'F2',
+              spouse: person('W2', sex: Sex.female),
+              endedInDivorce: true,
+              children: [descendant('B1', number: '1.3')],
+            ),
+          ],
+        ),
+      );
+    });
+
+    double centreOf(String xref) =>
+        layout.people
+            .firstWhere((placement) => placement.person.xref == xref)
+            .topLeft
+            .dx +
+        metrics.boxWidth / 2;
+
+    /// Where the line into [child] comes down from.
+    Offset descentInto(String xref) {
+      final centre = centreOf(xref);
+      return layout.edges
+          .where((edge) => edge.kind == EdgeKind.descent)
+          .firstWhere((edge) => (edge.to.dx - centre).abs() < 0.01)
+          .from;
+    }
+
+    test('hangs each family’s children from that family’s own couple', () {
+      // The whole point. A parent centred over *all* of their children puts a
+      // child under the wrong mother, which is not a crowded chart but a
+      // false one.
+      final firstMarriage = descentInto('A1');
+      expect(descentInto('A2'), firstMarriage);
+
+      final secondMarriage = descentInto('B1');
+      expect(secondMarriage, isNot(firstMarriage));
+
+      // And each line comes down from between the couple it belongs to.
+      expect(
+        firstMarriage.dx,
+        closeTo((centreOf('X1') + centreOf('W1')) / 2, metrics.boxWidth / 2),
+      );
+      expect(
+        secondMarriage.dx,
+        closeTo((centreOf('W1') + centreOf('W2')) / 2, metrics.boxWidth / 2),
+      );
+    });
+
+    test('centres each block of children under its own link', () {
+      expect(
+        (centreOf('A1') + centreOf('A2')) / 2,
+        closeTo(descentInto('A1').dx, 0.01),
+      );
+      expect(centreOf('B1'), closeTo(descentInto('B1').dx, 0.01));
+    });
+
+    test('keeps the two sets of children apart and in order', () {
+      expect(centreOf('A1'), lessThan(centreOf('A2')));
+      expect(centreOf('A2'), lessThan(centreOf('B1')));
+      expect(overlapsIn(layout), isEmpty);
+    });
+
+    test('draws the marriage that ended differently from the one that did not',
+        () {
+      final couples = layout.edges.where((edge) => edge.isCouple).toList();
+      expect(couples.map((edge) => edge.kind), [
+        EdgeKind.marriage,
+        EdgeKind.divorce,
+      ]);
+    });
+
+    test('joins each spouse to the box actually beside them', () {
+      // A slot pushed along to reach its children is more than one couple gap
+      // from the box before it, and a line drawn at a fixed distance would
+      // float in the space between.
+      for (final edge in layout.edges.where((edge) => edge.isCouple)) {
+        final leftEdges = layout.people.map(
+          (placement) => placement.topLeft.dx + metrics.boxWidth,
+        );
+        expect(leftEdges, contains(closeTo(edge.from.dx, 0.01)));
+      }
+    });
+  });
+
+  group('a woman with children by two husbands', () {
+    test('keeps each husband’s children under him', () {
+      final layout = layoutDescendants(
+        descendant(
+          'M1',
+          families: [
+            DescendantFamily(
+              xref: 'F1',
+              spouse: person('H1', sex: Sex.male),
+              children: [descendant('C1', number: '1.1')],
+            ),
+            DescendantFamily(
+              xref: 'F2',
+              spouse: person('H2', sex: Sex.male),
+              children: [
+                descendant('C2', number: '1.2'),
+                descendant('C3', number: '1.3'),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      Offset descentInto(String xref) {
+        const metrics = ChartMetrics();
+        final centre =
+            layout.people
+                .firstWhere((placement) => placement.person.xref == xref)
+                .topLeft
+                .dx +
+            metrics.boxWidth / 2;
+        return layout.edges
+            .where((edge) => edge.kind == EdgeKind.descent)
+            .firstWhere((edge) => (edge.to.dx - centre).abs() < 0.01)
+            .from;
+      }
+
+      expect(descentInto('C2'), descentInto('C3'));
+      expect(descentInto('C1'), isNot(descentInto('C2')));
+      expect(overlapsIn(layout), isEmpty);
+    });
+  });
+
   group('an hourglass', () {
     late ChartLayout layout;
 

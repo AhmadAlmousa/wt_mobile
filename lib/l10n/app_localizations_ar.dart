@@ -283,6 +283,50 @@ class AppTextAr extends AppText {
   String get relationshipPaths => 'هناك أكثر من صلة قرابة بينهما.';
 
   @override
+  String get relationshipHow => 'طريقة البحث';
+
+  @override
+  String get relationshipWith => 'المقارنة مع';
+
+  @override
+  String get relationshipClosest => 'الأقرب';
+
+  @override
+  String get relationshipFatherSide => 'من جهة الأب';
+
+  @override
+  String get relationshipMotherSide => 'من جهة الأم';
+
+  @override
+  String get relationshipThroughSpouse => 'عن طريق الزواج';
+
+  @override
+  String get relationshipNoneThisWay => 'لا صلة من هذه الجهة.';
+
+  @override
+  String get relationshipBloodOnlyToggle => 'الأقارب بالدم فقط';
+
+  @override
+  String get relationshipAnyLink => 'أي صلة';
+
+  @override
+  String relationshipSteps(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count خطوة',
+      many: '$count خطوة',
+      few: '$count خطوات',
+      two: 'خطوتان',
+      one: 'خطوة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get relationshipOtherWays => 'صلات أخرى بينهما';
+
+  @override
   String get chartView => 'طريقة الرسم';
 
   @override
@@ -293,6 +337,66 @@ class AppTextAr extends AppText {
 
   @override
   String get chartViewCompact => 'مدمجة';
+
+  @override
+  String get chartOptions => 'خيارات الرسم';
+
+  @override
+  String get chartGenerations => 'الأجيال';
+
+  @override
+  String get chartGenerationsSite => 'كما يضبطها الموقع';
+
+  @override
+  String get chartShowPhotos => 'الصور';
+
+  @override
+  String get chartShowDates => 'التواريخ';
+
+  @override
+  String get chartColourBySex => 'التلوين حسب الجنس';
+
+  @override
+  String get chartFitToName => 'اتّساع المربّع للاسم';
+
+  @override
+  String get chartWhoToShow => 'من يُعرض';
+
+  @override
+  String get chartShowEveryone => 'الجميع';
+
+  @override
+  String get chartShowMen => 'خط الذكور';
+
+  @override
+  String get chartShowWomen => 'خط الإناث';
+
+  @override
+  String get chartLineNote =>
+      'يُتتبَّع الخط عبر الأشخاص الذين عليه، فإخفاء أحد الجنسين يُخفي كل من يُوصل إليه عن طريقهم.';
+
+  @override
+  String get chartShare => 'مشاركة';
+
+  @override
+  String get chartShareImage => 'كصورة';
+
+  @override
+  String get chartSharePdf => 'كملف PDF';
+
+  @override
+  String get chartSharing => 'جارٍ التحضير…';
+
+  @override
+  String get chartShareFailed => 'تعذّر حفظ الرسم.';
+
+  @override
+  String chartShareSubject(String name, String chart) {
+    return '$name — $chart';
+  }
+
+  @override
+  String get chartTooBigToShare => 'هذا الرسم أكبر من أن يُحفظ في صورة واحدة.';
 
   @override
   String get openThisPerson => 'فتح صفحة الشخص';

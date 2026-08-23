@@ -283,6 +283,47 @@ class AppTextEn extends AppText {
   String get relationshipPaths => 'Found more than one way they are related.';
 
   @override
+  String get relationshipHow => 'How to look';
+
+  @override
+  String get relationshipWith => 'Compared with';
+
+  @override
+  String get relationshipClosest => 'Closest';
+
+  @override
+  String get relationshipFatherSide => 'Father’s side';
+
+  @override
+  String get relationshipMotherSide => 'Mother’s side';
+
+  @override
+  String get relationshipThroughSpouse => 'Through a spouse';
+
+  @override
+  String get relationshipNoneThisWay => 'No link this way.';
+
+  @override
+  String get relationshipBloodOnlyToggle => 'Blood relatives only';
+
+  @override
+  String get relationshipAnyLink => 'Any relationship';
+
+  @override
+  String relationshipSteps(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count steps',
+      one: '1 step',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get relationshipOtherWays => 'Other ways they are related';
+
+  @override
   String get chartView => 'How to draw it';
 
   @override
@@ -293,6 +334,67 @@ class AppTextEn extends AppText {
 
   @override
   String get chartViewCompact => 'Compact';
+
+  @override
+  String get chartOptions => 'Chart options';
+
+  @override
+  String get chartGenerations => 'Generations';
+
+  @override
+  String get chartGenerationsSite => 'As the site sets it';
+
+  @override
+  String get chartShowPhotos => 'Photos';
+
+  @override
+  String get chartShowDates => 'Dates';
+
+  @override
+  String get chartColourBySex => 'Colour by sex';
+
+  @override
+  String get chartFitToName => 'Boxes fit the name';
+
+  @override
+  String get chartWhoToShow => 'Who to show';
+
+  @override
+  String get chartShowEveryone => 'Everyone';
+
+  @override
+  String get chartShowMen => 'Male line';
+
+  @override
+  String get chartShowWomen => 'Female line';
+
+  @override
+  String get chartLineNote =>
+      'A line is followed through the people on it, so hiding one sex hides everyone reached through them.';
+
+  @override
+  String get chartShare => 'Share';
+
+  @override
+  String get chartShareImage => 'As an image';
+
+  @override
+  String get chartSharePdf => 'As a PDF';
+
+  @override
+  String get chartSharing => 'Preparing…';
+
+  @override
+  String get chartShareFailed => 'The chart could not be saved.';
+
+  @override
+  String chartShareSubject(String name, String chart) {
+    return '$name — $chart';
+  }
+
+  @override
+  String get chartTooBigToShare =>
+      'This chart is too large to save as one picture.';
 
   @override
   String get openThisPerson => 'Open this person';

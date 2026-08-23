@@ -57,7 +57,7 @@ bool deathRecordedIn(Element box, {String? lifespan}) {
   var sawATaggedFact = false;
 
   for (final fact in facts?.querySelectorAll('*') ?? const <Element>[]) {
-    final tag = FactTagIndex.bareTagOf(FactTagIndex.qualifiedTagOf(fact));
+    final tag = FactTagIndex.bareTagOf(FactTagIndex.tagOf(fact));
     if (tag == null) continue;
     if (deathTags.contains(tag)) return true;
     sawATaggedFact = true;

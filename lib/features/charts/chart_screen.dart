@@ -1,7 +1,10 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
 import '../../data/session_manager.dart';
+import '../../data/settings_store.dart';
 import '../../data/stock/charts_repository.dart';
 import '../../data/stock/records_repository.dart';
 import '../../domain/charts.dart';
@@ -11,7 +14,10 @@ import '../shared/chart_header_title.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import 'chart_canvas.dart';
+import 'chart_export.dart';
 import 'chart_layout.dart';
+import 'chart_options.dart';
+import 'chart_options_sheet.dart';
 import 'fan_canvas.dart';
 import 'fan_layout.dart';
 
@@ -26,6 +32,7 @@ class ChartScreen extends StatefulWidget {
     required this.session,
     required this.records,
     required this.charts,
+    required this.settings,
     required this.tree,
     required this.xref,
     required this.kind,
@@ -37,6 +44,7 @@ class ChartScreen extends StatefulWidget {
   final SessionManager session;
   final RecordsRepository records;
   final ChartsRepository charts;
+  final SettingsStore settings;
   final String tree;
   final String xref;
   final ChartKind kind;
@@ -51,14 +59,6 @@ class ChartScreen extends StatefulWidget {
   State<ChartScreen> createState() => _ChartScreenState();
 }
 
-/// The ways one chart can be drawn.
-///
-/// Not different charts: webtrees offers an ancestors chart, a fan chart and
-/// a compact chart, and all three describe the same people. Fetching the
-/// shape once and drawing it three ways is both less work for the site and
-/// less waiting for the reader.
-enum ChartView { tree, circle, compact }
-
 class _ChartScreenState extends State<ChartScreen> {
   late Future<ChartData> _chart;
 
@@ -68,18 +68,41 @@ class _ChartScreenState extends State<ChartScreen> {
   /// the person while a redraw is in flight.
   PersonRef? _subject;
 
-  ChartView _view = ChartView.tree;
+  /// Lets the chart be captured whole, at its natural size, rather than
+  /// photographed through the window it is being looked at.
+  final GlobalKey _capture = GlobalKey();
+
+  /// How many generations the chart on screen was fetched with, so a change
+  /// to that one option costs a request and the rest do not.
+  int? _fetchedGenerations;
 
   @override
   void initState() {
     super.initState();
+    _fetchedGenerations = widget.settings.chartOptions.generations;
+    widget.settings.addListener(_onSettingsChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    widget.settings.removeListener(_onSettingsChanged);
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(ChartScreen old) {
     super.didUpdateWidget(old);
     if (old.xref != widget.xref || old.kind != widget.kind) _load();
+  }
+
+  /// Only a change of depth reaches the server; everything else is a redraw
+  /// of a shape the app already has.
+  void _onSettingsChanged() {
+    final asked = widget.settings.chartOptions.generations;
+    if (asked == _fetchedGenerations) return;
+    _fetchedGenerations = asked;
+    _load();
   }
 
   void _load() {
@@ -107,13 +130,19 @@ class _ChartScreenState extends State<ChartScreen> {
         ancestorsUrl: up,
         descendantsUrl: down,
         subject: subject,
+        generations: _fetchedGenerations,
       );
     }
 
     final url = person.charts[widget.kind];
     if (url == null) throw const NotFound();
 
-    return widget.charts.chart(widget.kind, url, subject: subject);
+    return widget.charts.chart(
+      widget.kind,
+      url,
+      subject: subject,
+      generations: _fetchedGenerations,
+    );
   }
 
   @override
@@ -128,30 +157,21 @@ class _ChartScreenState extends State<ChartScreen> {
           records: widget.records,
         ),
         actions: [
-          // Only an ancestor chart has other shapes to take: a fan is a
-          // pedigree bent round a circle, and there is no such thing as a
-          // fan of descendants.
-          if (widget.kind == ChartKind.ancestors)
-            PopupMenuButton<ChartView>(
-              icon: const Icon(Icons.donut_small_outlined),
-              tooltip: text.chartView,
-              initialValue: _view,
-              onSelected: (view) => setState(() => _view = view),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: ChartView.tree,
-                  child: Text(text.chartViewTree),
-                ),
-                PopupMenuItem(
-                  value: ChartView.circle,
-                  child: Text(text.chartViewCircle),
-                ),
-                PopupMenuItem(
-                  value: ChartView.compact,
-                  child: Text(text.chartViewCompact),
-                ),
-              ],
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: text.chartOptions,
+            onPressed: () => ChartOptionsSheet.show(
+              context,
+              widget.settings,
+              // Only an ancestors chart has other shapes to take.
+              offersShape: widget.kind == ChartKind.ancestors,
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            tooltip: text.chartShare,
+            onPressed: _share,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: text.reload,
@@ -159,8 +179,21 @@ class _ChartScreenState extends State<ChartScreen> {
           ),
         ],
       ),
+      // Rebuilt whenever the reader changes how charts are drawn, so a switch
+      // thrown in the sheet is answered by the chart behind it.
       body: SafeArea(
-        child: FutureBuilder<ChartData>(
+        child: ListenableBuilder(
+          listenable: widget.settings,
+          builder: (context, _) => _body(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context) {
+    final text = AppText.of(context);
+
+    return FutureBuilder<ChartData>(
           future: _chart,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -197,25 +230,30 @@ class _ChartScreenState extends State<ChartScreen> {
 
             final ancestors = chart.ancestors;
             if (ancestors != null &&
-                _view == ChartView.circle &&
+                _options.shape == ChartShape.circle &&
                 widget.kind == ChartKind.ancestors) {
               return FanCanvas(
-                layout: layoutFan(ancestors),
+                layout: layoutFan(
+                  ancestorsShowing(ancestors, _options.show),
+                ),
                 onTapPerson: _onTapPerson,
               );
             }
 
-            return ChartCanvas(
-              layout: _layoutFor(chart, context),
-              records: widget.records,
-              compact: _view == ChartView.compact,
-              onTapPerson: _onTapPerson,
+            return RepaintBoundary(
+              key: _capture,
+              child: ChartCanvas(
+                layout: _layoutFor(chart, context),
+                records: widget.records,
+                options: _options,
+                onTapPerson: _onTapPerson,
+              ),
             );
-          },
-        ),
-      ),
+      },
     );
   }
+
+  ChartOptions get _options => widget.settings.chartOptions;
 
   ChartLayout _layoutFor(ChartData chart, BuildContext context) {
     // A compact chart trades the photographs for smaller boxes, which is what
@@ -226,18 +264,39 @@ class _ChartScreenState extends State<ChartScreen> {
       generationGap: 28,
       siblingGap: 8,
     );
-    final metrics = _view == ChartView.compact ? compact : const ChartMetrics();
+    final metrics = _options.shape == ChartShape.compact
+        ? compact
+        : const ChartMetrics();
+    final widthOf = _options.fitToName
+        ? _measurer(context, metrics)
+        : null;
 
-    final ancestors = chart.ancestors;
-    final descendants = chart.descendants;
+    // Hiding a sex cuts every branch reached through it, which is what a
+    // reader asking for the male line means — see [ShowPeople].
+    final ancestors = chart.ancestors == null
+        ? null
+        : ancestorsShowing(chart.ancestors!, _options.show);
+    final descendants = chart.descendants == null
+        ? null
+        : descendantsShowing(chart.descendants!, _options.show);
+
     final layout = switch (chart.kind) {
       ChartKind.hourglass => layoutHourglass(
         ancestors!,
         descendants!,
         metrics: metrics,
+        widthOf: widthOf,
       ),
-      ChartKind.ancestors => layoutAncestors(ancestors!, metrics: metrics),
-      _ => layoutDescendants(descendants!, metrics: metrics),
+      ChartKind.ancestors => layoutAncestors(
+        ancestors!,
+        metrics: metrics,
+        widthOf: widthOf,
+      ),
+      _ => layoutDescendants(
+        descendants!,
+        metrics: metrics,
+        widthOf: widthOf,
+      ),
     };
 
     // Arabic reads the other way, and so does its chart: generations march
@@ -245,6 +304,113 @@ class _ChartScreenState extends State<ChartScreen> {
     return Directionality.of(context) == TextDirection.rtl
         ? layout.mirrored()
         : layout;
+  }
+
+  /// A box wide enough for the name in it.
+  ///
+  /// Measured here rather than in `chart_layout.dart`, which is deliberately
+  /// free of widgets: only the interface knows the font, and only the layout
+  /// knows what to do with the answer.
+  ///
+  /// Clamped at both ends. Too narrow and a chart becomes a column of stubs;
+  /// too wide and one long name pushes a whole generation off the screen —
+  /// so a name past the limit is still cut, as it was before.
+  BoxWidth _measurer(BuildContext context, ChartMetrics metrics) {
+    final style = Theme.of(context).textTheme.labelMedium;
+    final direction = Directionality.of(context);
+    final photo = _options.showPhotos ? 48.0 : 0.0;
+    final widest = metrics.boxWidth * 1.9;
+
+    return (person) {
+      final painter = TextPainter(
+        text: TextSpan(text: person.name, style: style),
+        textDirection: direction,
+        maxLines: 1,
+      )..layout();
+
+      return (painter.width + photo + 24).clamp(
+        metrics.boxWidth * 0.7,
+        widest,
+      );
+    };
+  }
+
+  /// Offers the chart as a picture or as a page.
+  ///
+  /// The sheet asks which; the chart itself is captured at its natural size
+  /// from the boundary around it, so what is shared is the whole family and
+  /// not the part of it the reader happened to be looking at.
+  Future<void> _share() async {
+    final text = AppText.of(context);
+    final chosen = await showModalBottomSheet<ChartFormat>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: Text(text.chartShareImage),
+              onTap: () => Navigator.of(sheet).pop(ChartFormat.image),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: Text(text.chartSharePdf),
+              onTap: () => Navigator.of(sheet).pop(ChartFormat.pdf),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final title = text.chartShareSubject(
+      _subject?.name ?? widget.xref,
+      chartTitle(widget.kind, text),
+    );
+    // A large chart takes a moment to draw at full size, and a share sheet
+    // that appears out of nowhere seconds later is worse than being told.
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(text.chartSharing),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      await shareChart(
+        boundary: _capture,
+        format: chosen,
+        title: title,
+        origin: _shareOrigin(),
+      );
+    } on ChartExportFailed catch (problem) {
+      developer.log('Sharing the chart failed: $problem', name: _log);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            problem.isTooLarge
+                ? text.chartTooBigToShare
+                : text.chartShareFailed,
+          ),
+        ),
+      );
+    } on Exception catch (problem) {
+      developer.log('Sharing the chart failed: $problem', name: _log);
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(text.chartShareFailed)));
+    }
+  }
+
+  /// Where an iPad anchors its share sheet. Harmless everywhere else.
+  Rect? _shareOrigin() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   /// Asks what to do with the person just tapped.
@@ -293,6 +459,8 @@ class _ChartScreenState extends State<ChartScreen> {
     );
   }
 }
+
+const String _log = 'webtrees.charts';
 
 /// What to call a chart, in the reader's language.
 ///

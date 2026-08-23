@@ -295,9 +295,10 @@ void main() {
         subject: subject,
       );
 
-      expect(chart.descendants?.families.single.children, hasLength(2));
+      expect(chart.descendants?.families.first.children, hasLength(2));
+      expect(chart.descendants?.families.last.children, hasLength(1));
       expect(chart.ancestors, isNull);
-      expect(chart.size, 4);
+      expect(chart.size, 5);
     });
 
     test('a refusal is reported, not drawn as an empty chart', () async {
@@ -351,5 +352,158 @@ void main() {
         expect(server.routes, isEmpty);
       },
     );
+  });
+
+  group('asking for a different depth', () {
+    test('replaces the generations the site put in its own link', () {
+      // The route ends `{kind}-{style}-{generations}/{xref}`, and webtrees
+      // reads that segment straight off the route with `isBetween(2, 63)` —
+      // no tree preference narrows it — so this is a request the server
+      // means to answer rather than a trick played on it.
+      expect(
+        ChartsRepository.withGenerations(
+          '/tree/main/ancestors-tree-4/X42',
+          7,
+        ),
+        '/tree/main/ancestors-tree-7/X42',
+      );
+      expect(
+        ChartsRepository.withGenerations(
+          '/tree/main/descendants-tree-3/X42',
+          10,
+        ),
+        '/tree/main/descendants-tree-10/X42',
+      );
+    });
+
+    test('works on an ugly URL too', () {
+      // The two URL styles differ only in how the slashes are written, and
+      // the segment itself appears verbatim in both.
+      expect(
+        ChartsRepository.withGenerations(
+          '/index.php?route=%2Ftree%2Fmain%2Fancestors-tree-4%2FX42',
+          6,
+        ),
+        '/index.php?route=%2Ftree%2Fmain%2Fancestors-tree-6%2FX42',
+      );
+    });
+
+    test('leaves the drawing style the administrator chose alone', () {
+      expect(
+        ChartsRepository.withGenerations(
+          '/tree/main/ancestors-individuals-4/X42',
+          5,
+        ),
+        '/tree/main/ancestors-individuals-5/X42',
+      );
+    });
+
+    test('keeps the site’s own number when nothing was asked for', () {
+      expect(
+        ChartsRepository.withGenerations(
+          '/tree/main/ancestors-tree-4/X42',
+          null,
+        ),
+        '/tree/main/ancestors-tree-4/X42',
+      );
+    });
+
+    test('leaves an address it does not recognise exactly as it was', () {
+      // A site whose links look different keeps the number its administrator
+      // chose, which is the right answer rather than a failure.
+      const odd = '/tree/main/some-other-chart/X42';
+      expect(ChartsRepository.withGenerations(odd, 8), odd);
+    });
+
+    test('asks the server for the depth the reader chose', () async {
+      serve({
+        ...site(),
+        '/tree/main/ancestors-tree-6/X42': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'chart_ancestors.html')),
+      });
+
+      await charts.chart(
+        ChartKind.ancestors,
+        '/tree/main/ancestors-tree-4/X42',
+        subject: subject,
+        generations: 6,
+      );
+
+      expect(server.routes, contains('/tree/main/ancestors-tree-6/X42'));
+    });
+  });
+
+  group('asking the relationship question differently', () {
+    /// The site's own link, with its preference baked in: blood lines only.
+    const offered = '/tree/main/relationships-1-99/X42';
+
+    test('leaves the site’s own setting alone by default', () async {
+      serve({
+        ...site(),
+        '/tree/main/relationships-1-99/X42/X43': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
+      });
+
+      await charts.relationship(offered, from: 'X42', to: 'X43');
+
+      expect(server.routes, contains('/tree/main/relationships-1-99/X42/X43'));
+    });
+
+    test('can ask for any relationship on a blood-only site', () async {
+      // The handler reads `ancestors` straight off the route; the tree's
+      // preference only fills in the form on the page it does not send. This
+      // is the only way a link through a marriage is ever found.
+      serve({
+        ...site(),
+        '/tree/main/relationships-0-99/X42/X43': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
+      });
+
+      await charts.relationship(
+        offered,
+        from: 'X42',
+        to: 'X43',
+        bloodLinesOnly: false,
+      );
+
+      expect(server.routes, contains('/tree/main/relationships-0-99/X42/X43'));
+    });
+
+    test('can ask for blood lines only on a site that allows anything',
+        () async {
+      serve({
+        ...site(),
+        '/tree/main/relationships-1-99/X42/X43': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
+      });
+
+      await charts.relationship(
+        '/tree/main/relationships-0-99/X42',
+        from: 'X42',
+        to: 'X43',
+        bloodLinesOnly: true,
+      );
+
+      expect(server.routes, contains('/tree/main/relationships-1-99/X42/X43'));
+    });
+
+    test('never touches the recursion beside it', () async {
+      // That one *is* clamped by the tree, and it is what stops a deep search
+      // costing the server a minute.
+      serve({
+        ...site(),
+        '/tree/main/relationships-0-3/X42/X43': (_) =>
+            Canned(200, body: fixture('v2_2_6', 'relationship_sibling.html')),
+      });
+
+      await charts.relationship(
+        '/tree/main/relationships-1-3/X42',
+        from: 'X42',
+        to: 'X43',
+        bloodLinesOnly: false,
+      );
+
+      expect(server.routes, contains('/tree/main/relationships-0-3/X42/X43'));
+    });
   });
 }

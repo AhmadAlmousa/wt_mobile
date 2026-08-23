@@ -274,11 +274,8 @@ void main() {
         // The dictionary comes from the chart boxes on this very page, so it
         // is this site's own Arabic that maps onto GEDCOM — nothing here
         // knows the English word for a marriage.
-        expect(families[1].facts.single.tag, 'FAM:MARR');
-        expect(
-          families.last.facts.map((fact) => fact.tag),
-          ['FAM:MARR', 'FAM:DIV'],
-        );
+        expect(families[1].facts.single.tag, 'MARR');
+        expect(families.last.facts.map((fact) => fact.tag), ['MARR', 'DIV']);
       });
 
       test('tells which marriage ended in divorce', () {

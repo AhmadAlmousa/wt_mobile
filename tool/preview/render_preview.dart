@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
-import 'package:webtrees_mobile/features/charts/chart_screen.dart';
 
 import '../../test/support/fake_webtrees.dart';
 import '../../test/support/test_app.dart';
@@ -121,8 +120,9 @@ Future<void> main() async {
     required ThemeMode theme,
     int steps = 0,
     double scroll = 0,
+    Size surface = const Size(1080, 2340),
   }) async {
-    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.physicalSize = surface;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -174,7 +174,7 @@ Future<void> main() async {
     }
     // The charts are opened from the person rather than from the account
     // screen, so these steps rejoin the walk at step 3.
-    if ((steps >= 6 && steps <= 10) || steps == 12) {
+    if ((steps >= 6 && steps <= 10) || steps == 12 || steps == 13) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
@@ -193,6 +193,11 @@ Future<void> main() async {
       );
       await tester.pumpAndSettle();
     }
+    // The sheet where every question about how a chart is drawn is asked.
+    if (steps == 13) {
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+    }
     // Statistics belong to the tree rather than to anybody in it, so they
     // are reached from the tree screen.
     if (steps == 11) {
@@ -209,11 +214,18 @@ Future<void> main() async {
       await tester.pumpAndSettle();
     }
     // The fan is the ancestors chart bent round a circle: same fetch, same
-    // people, a different way of looking at them.
+    // people, a different way of looking at them. Chosen in the options
+    // sheet, which is where every question about how a chart is drawn lives.
     if (steps == 8) {
-      await tester.tap(find.byIcon(Icons.donut_small_outlined));
+      await tester.tap(find.byIcon(Icons.tune));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(PopupMenuItem<ChartView>).at(1));
+      // Found by its icon rather than its label: the labels are translated
+      // and this walk runs in both languages.
+      await tester.tap(find.byIcon(Icons.donut_small_outlined).hitTestable());
+      await tester.pumpAndSettle();
+      // Dismissed through the barrier: the sheet's own button is below the
+      // fold on a surface this size.
+      await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
     }
 
@@ -304,6 +316,31 @@ Future<void> main() async {
           locale: locale,
           theme: theme,
           steps: 5,
+        );
+      });
+
+      // A chart wider than a phone opens at a legible scale rather than
+      // squeezed to fit, so a phone-sized picture of one shows a corner of
+      // it. This shot is the whole family, which is what a reviewer needs to
+      // see: whose children hang under whom, and which marriage ended.
+      testWidgets('descendants chart, whole $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-descendants-whole-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 7,
+          surface: const Size(2600, 1400),
+        );
+      });
+
+      testWidgets('chart options $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'chart-options-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 13,
         );
       });
 

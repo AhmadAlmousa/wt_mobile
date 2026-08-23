@@ -153,6 +153,7 @@ final class DescendantFamily {
     required this.xref,
     this.spouse,
     this.label,
+    this.endedInDivorce = false,
     List<DescendantNode> children = const [],
   }) : children = List.unmodifiable(children);
 
@@ -163,6 +164,15 @@ final class DescendantFamily {
 
   /// webtrees' own summary of the family — "Marriage 1925 — 2 children".
   final String? label;
+
+  /// Whether this couple separated, which a chart draws rather than writes.
+  ///
+  /// Read from [label] against the site's own vocabulary — the caption is
+  /// built from the same `Fact::label()` that names the tags inside every
+  /// chart box, so the two can be matched without the app knowing the word
+  /// for a divorce. False where the page never said, which is not the same
+  /// as a marriage that held.
+  final bool endedInDivorce;
 
   final List<DescendantNode> children;
 }

@@ -17,10 +17,11 @@ import '../../data/stock/fact_tags.dart';
 
 /// The icon standing for the fact [tag] names.
 ///
-/// [tag] is either qualified (`INDI:DEAT`) or bare (`DEAT`). A tag this table
-/// does not know, and a fact whose tag was never discovered, both get the
-/// neutral default — which is why that default has to read as "an event"
-/// rather than as anything in particular.
+/// [tag] is bare (`DEAT`), which is what webtrees writes, or qualified
+/// (`INDI:DEAT`), which a theme might. A tag this table does not know, and a
+/// fact whose tag was never discovered, both get the neutral default — which
+/// is why that default has to read as "an event" rather than as anything in
+/// particular.
 IconData iconForFact(String? tag) {
   final bare = FactTagIndex.bareTagOf(tag);
   return _icons[bare] ?? Icons.event_outlined;

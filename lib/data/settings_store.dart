@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/dates.dart';
+import '../features/charts/chart_options.dart';
 
 /// The reader's choice of theme and language.
 ///
@@ -21,6 +22,7 @@ class SettingsStore extends ChangeNotifier {
   static const String _themeKey = 'settings.themeMode';
   static const String _localeKey = 'settings.locale';
   static const String _calendarKey = 'settings.calendarView';
+  static const String _chartKey = 'settings.chart';
 
   /// The languages the app is translated into.
   ///
@@ -46,6 +48,14 @@ class SettingsStore extends ChangeNotifier {
   CalendarView _calendarView = CalendarView.both;
   CalendarView get calendarView => _calendarView;
 
+  /// How the reader has asked for their charts to be drawn.
+  ///
+  /// Kept here rather than on a chart screen because the same answers apply
+  /// to every chart and are worth keeping between them: somebody who turned
+  /// the photographs off did not mean "on this pedigree only".
+  ChartOptions _chartOptions = const ChartOptions();
+  ChartOptions get chartOptions => _chartOptions;
+
   /// Reads the stored choices. Safe to call before `runApp`.
   ///
   /// A device with no working preference store is not a failure worth
@@ -66,6 +76,7 @@ class SettingsStore extends ChangeNotifier {
         (view) => view.name == calendar,
         orElse: () => CalendarView.both,
       );
+      _chartOptions = _chartOptionsFrom(await _preferences.getString(_chartKey));
     } on Exception catch (problem) {
       developer.log(
         'Could not read settings: $problem',
@@ -95,6 +106,56 @@ class SettingsStore extends ChangeNotifier {
     _calendarView = view;
     notifyListeners();
     await _write(_calendarKey, view.name);
+  }
+
+  Future<void> setChartOptions(ChartOptions options) async {
+    if (options == _chartOptions) return;
+    _chartOptions = options;
+    notifyListeners();
+    await _write(_chartKey, _chartOptionsTo(options));
+  }
+
+  /// Chart options as one stored line.
+  ///
+  /// Written by hand rather than as JSON because it is six answers, and a
+  /// stored value that cannot be read back — an option renamed, a file from
+  /// an older build — has to fall back to the defaults rather than throw on
+  /// a screen that has not been drawn yet.
+  static String _chartOptionsTo(ChartOptions options) => [
+    options.generations ?? '',
+    options.shape.name,
+    options.showPhotos,
+    options.showDates,
+    options.colourBySex,
+    options.fitToName,
+    options.show.name,
+  ].join('|');
+
+  static ChartOptions _chartOptionsFrom(String? stored) {
+    final parts = stored?.split('|') ?? const [];
+    if (parts.length != 7) return const ChartOptions();
+
+    bool flag(int at, {required bool fallback}) => switch (parts[at]) {
+      'true' => true,
+      'false' => false,
+      _ => fallback,
+    };
+
+    return ChartOptions(
+      generations: int.tryParse(parts[0]),
+      shape: ChartShape.values.firstWhere(
+        (option) => option.name == parts[1],
+        orElse: () => ChartShape.tree,
+      ),
+      showPhotos: flag(2, fallback: true),
+      showDates: flag(3, fallback: true),
+      colourBySex: flag(4, fallback: true),
+      fitToName: flag(5, fallback: false),
+      show: ShowPeople.values.firstWhere(
+        (option) => option.name == parts[6],
+        orElse: () => ShowPeople.everyone,
+      ),
+    );
   }
 
   /// The locale the interface will actually use, given the device's own.

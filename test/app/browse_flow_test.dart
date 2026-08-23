@@ -112,6 +112,9 @@ void main() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    // The same two people, asked for without the blood-lines limit.
+    '/tree/main/relationships-0-3/X42/X43': (_) =>
+        Canned(200, body: fixture('relationship_sibling.html')),
     '/tree/main/timeline-10': (_) =>
         Canned(200, body: fixture('timeline.html')),
     '/module/statistics_chart/Chart/main': (_) => const Canned(
@@ -381,9 +384,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(FanCanvas), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.donut_small_outlined));
+    // Every question about how a chart is drawn is asked in one place.
+    await tester.tap(find.byIcon(Icons.tune));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Circle'));
+    await tester.tap(find.text('Circle').hitTestable());
+    await tester.pumpAndSettle();
+    // Dismissed through the barrier: the sheet's own button is below the
+    // fold on a surface this size.
+    await tester.tapAt(const Offset(8, 8));
     await tester.pumpAndSettle();
 
     // The same fetch, the same people, a different way of looking at them.
@@ -438,6 +446,61 @@ void main() {
     expect(find.text('القرابة: أخت'), findsOne);
     expect(find.text('أخت'), findsOne);
     expect(server.routes, contains('/tree/main/relationships-1-3/X42/X43'));
+  });
+
+  testWidgets('offers the ways of asking, and says which have no answer', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Relationship'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'نورة');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('نورة الموسى').last);
+    await tester.pumpAndSettle();
+
+    // A sister is reached through neither parent nor a marriage, so those
+    // ways have nothing to say — and are shown saying so rather than hidden.
+    ChoiceChip way(String label) =>
+        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
+
+    expect(way('Closest').selected, isTrue);
+    expect(way('Closest').onSelected, isNotNull);
+    for (final absent in const [
+      'Father’s side',
+      'Mother’s side',
+      'Through a spouse',
+    ]) {
+      expect(way(absent).onSelected, isNull, reason: absent);
+    }
+  });
+
+  testWidgets('can ask a blood-only site for any relationship', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Relationship'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'نورة');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('نورة الموسى').last);
+    await tester.pumpAndSettle();
+
+    // This site's own link says blood lines only, and webtrees reads that
+    // number straight off the route — so the switch is a real request rather
+    // than a note about a setting the reader cannot change.
+    expect(find.text('Blood relatives only'), findsOne);
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Any relationship'), findsOne);
+    expect(server.routes, contains('/tree/main/relationships-0-3/X42/X43'));
   });
 
   testWidgets('walks from a chart to the person tapped on it', (tester) async {

@@ -7,7 +7,9 @@
 /// layout for Arabic is one flag rather than a second stylesheet.
 ///
 /// Deliberately free of widgets. Where a box lands is arithmetic, and
-/// arithmetic can be tested without pumping a frame.
+/// arithmetic can be tested without pumping a frame. A box's *width* may
+/// depend on the name inside it, which only the interface can measure — so
+/// that arrives as a function rather than as a dependency on a font.
 library;
 
 import 'dart:ui' show Offset, Size;
@@ -24,6 +26,23 @@ enum ChartFlow {
 
   /// Descendants: generations march down the page.
   downwards,
+}
+
+/// What a line between two boxes means.
+enum EdgeKind {
+  /// One generation to the next.
+  descent,
+
+  /// A couple, drawn side by side.
+  marriage,
+
+  /// A couple whose marriage ended — a divorce, an annulment, a separation.
+  ///
+  /// Worth distinguishing because it changes how the family reads: the
+  /// children still belong to both parents, and the parents no longer belong
+  /// to each other. webtrees says so in words the app cannot translate; a
+  /// chart says it in the line.
+  divorce,
 }
 
 /// How big the pieces of a chart are drawn.
@@ -50,6 +69,13 @@ final class ChartMetrics {
   final double coupleGap;
 }
 
+/// How wide one person's box is drawn.
+///
+/// The default answers the same for everybody, which is what makes a chart of
+/// even columns; a measurer that reads the name gives boxes that hold their
+/// names instead. Either way the arithmetic below is the same.
+typedef BoxWidth = double Function(PersonRef person);
+
 /// One person, placed.
 @immutable
 final class ChartPlacement {
@@ -57,12 +83,18 @@ final class ChartPlacement {
     required this.person,
     required this.topLeft,
     required this.generation,
+    required this.width,
     this.isSubject = false,
     this.isSpouse = false,
   });
 
   final PersonRef person;
   final Offset topLeft;
+
+  /// How wide this box is drawn. Per person rather than per chart, because a
+  /// reader may ask for boxes that hold their names — and this family's names
+  /// run from three characters to thirty.
+  final double width;
 
   /// Counting from the person the chart was drawn for, who is generation 0.
   final int generation;
@@ -72,6 +104,9 @@ final class ChartPlacement {
 
   /// Married into the family rather than descended through it.
   final bool isSpouse;
+
+  double get right => topLeft.dx + width;
+  double get centreX => topLeft.dx + width / 2;
 }
 
 /// A line joining two boxes.
@@ -84,14 +119,16 @@ final class ChartEdge {
   const ChartEdge({
     required this.from,
     required this.to,
-    this.isCouple = false,
+    this.kind = EdgeKind.descent,
   });
 
   final Offset from;
   final Offset to;
 
-  /// A marriage rather than a descent.
-  final bool isCouple;
+  final EdgeKind kind;
+
+  /// A marriage rather than a descent, however it ended.
+  bool get isCouple => kind != EdgeKind.descent;
 }
 
 /// Everything needed to draw a chart, and how large a canvas it needs.
@@ -115,6 +152,15 @@ final class ChartLayout {
   /// turns its corner.
   final ChartFlow flow;
 
+  /// Where the person the chart was drawn for ended up, which is where a
+  /// viewer too small to hold the whole chart should open.
+  ChartPlacement? get subject {
+    for (final placement in people) {
+      if (placement.isSubject) return placement;
+    }
+    return people.isEmpty ? null : people.first;
+  }
+
   /// The same layout with every x mirrored, for a right-to-left interface.
   ///
   /// Mirroring the finished arithmetic rather than the algorithm keeps one
@@ -129,9 +175,10 @@ final class ChartLayout {
         ChartPlacement(
           person: placement.person,
           topLeft: Offset(
-            size.width - placement.topLeft.dx - metrics.boxWidth,
+            size.width - placement.topLeft.dx - placement.width,
             placement.topLeft.dy,
           ),
+          width: placement.width,
           generation: placement.generation,
           isSubject: placement.isSubject,
           isSpouse: placement.isSpouse,
@@ -142,7 +189,7 @@ final class ChartLayout {
         ChartEdge(
           from: Offset(size.width - edge.from.dx, edge.from.dy),
           to: Offset(size.width - edge.to.dx, edge.to.dy),
-          isCouple: edge.isCouple,
+          kind: edge.kind,
         ),
     ],
   );
@@ -157,11 +204,36 @@ final class ChartLayout {
 ChartLayout layoutAncestors(
   AncestorNode root, {
   ChartMetrics metrics = const ChartMetrics(),
+  BoxWidth? widthOf,
 }) {
+  final width = widthOf ?? (_) => metrics.boxWidth;
   final people = <ChartPlacement>[];
   final edges = <ChartEdge>[];
   var nextRow = 0;
   var deepest = 0;
+
+  // Each generation is a column, and a column is as wide as its widest name.
+  // Ragged columns would cost the pedigree the one thing it is good at:
+  // being read straight down a generation.
+  final columnWidth = <int, double>{};
+  void measure(AncestorNode node, int generation) {
+    final here = width(node.person);
+    final widest = columnWidth[generation] ?? 0;
+    if (here > widest) columnWidth[generation] = here;
+    for (final parent in node.parents) {
+      measure(parent, generation + 1);
+    }
+  }
+
+  measure(root, 0);
+
+  double columnLeft(int generation) {
+    var x = 0.0;
+    for (var at = 0; at < generation; at++) {
+      x += (columnWidth[at] ?? metrics.boxWidth) + metrics.generationGap;
+    }
+    return x;
+  }
 
   /// Places [node] and every ancestor above it, answering where its own box
   /// ended up. Answering rather than looking the box up again matters: a
@@ -169,7 +241,7 @@ ChartLayout layoutAncestors(
   /// search by name or identifier would find the wrong one of them.
   double place(AncestorNode node, int generation) {
     deepest = generation > deepest ? generation : deepest;
-    final x = generation * (metrics.boxWidth + metrics.generationGap);
+    final x = columnLeft(generation);
 
     final parentCentres = [
       for (final parent in node.parents) place(parent, generation + 1),
@@ -188,6 +260,7 @@ ChartLayout layoutAncestors(
       ChartPlacement(
         person: node.person,
         topLeft: Offset(x, centreY - metrics.boxHeight / 2),
+        width: columnWidth[generation] ?? metrics.boxWidth,
         generation: generation,
         isSubject: generation == 0,
       ),
@@ -196,11 +269,8 @@ ChartLayout layoutAncestors(
     for (final parentCentre in parentCentres) {
       edges.add(
         ChartEdge(
-          from: Offset(x + metrics.boxWidth, centreY),
-          to: Offset(
-            x + metrics.boxWidth + metrics.generationGap,
-            parentCentre,
-          ),
+          from: Offset(x + (columnWidth[generation] ?? metrics.boxWidth), centreY),
+          to: Offset(columnLeft(generation + 1), parentCentre),
         ),
       );
     }
@@ -215,7 +285,7 @@ ChartLayout layoutAncestors(
     people: people,
     edges: edges,
     size: Size(
-      (deepest + 1) * metrics.boxWidth + deepest * metrics.generationGap,
+      columnLeft(deepest) + (columnWidth[deepest] ?? metrics.boxWidth),
       nextRow * (metrics.boxHeight + metrics.siblingGap) - metrics.siblingGap,
     ),
   );
@@ -223,14 +293,23 @@ ChartLayout layoutAncestors(
 
 /// Lays a descendant chart out with generations running downwards.
 ///
-/// Each couple is drawn as a pair with their children centred beneath them,
-/// so it is clear which marriage a child belongs to — the one thing a merged
-/// list of children cannot say. Widths accumulate as the tree is walked, so
-/// two large families never land on top of each other.
+/// The one thing this has to get right is *which* marriage a child belongs
+/// to. A man with two wives has two sets of children, and a layout that
+/// centres him over all of them puts a child under the wrong mother — which
+/// is not a crowded chart but a false one. So each family's children are laid
+/// out as a contiguous block, and the couple strip above them is built so
+/// that each family's line hangs over its own block.
+///
+/// Children are placed first because a parent is drawn over the family they
+/// turned out to have, not the other way round. The strip then adapts: a slot
+/// is pushed along when its family's children demand it, and never allowed to
+/// land on the slot before it.
 ChartLayout layoutDescendants(
   DescendantNode root, {
   ChartMetrics metrics = const ChartMetrics(),
+  BoxWidth? widthOf,
 }) {
+  final width = widthOf ?? (_) => metrics.boxWidth;
   final people = <ChartPlacement>[];
   final edges = <ChartEdge>[];
 
@@ -244,60 +323,83 @@ ChartLayout layoutDescendants(
   double place(DescendantNode node, int generation) {
     deepest = generation > deepest ? generation : deepest;
     final y = generation * (metrics.boxHeight + metrics.generationGap);
+    final own = width(node.person);
 
-    // Children first: a parent is placed over the family it turned out to
-    // have, not the other way round.
-    final childCentres = <double>[];
+    // Each family's children, laid out one family at a time so a block is
+    // contiguous and in the order the site gave — and the middle of each
+    // block, which is where that family's line has to hang from.
+    final centresPerFamily = <List<double>>[];
+    final wanted = <double?>[];
     for (final family in node.families) {
-      for (final child in family.children) {
-        childCentres.add(place(child, generation + 1));
-      }
+      final centres = [
+        for (final child in family.children) place(child, generation + 1),
+      ];
+      centresPerFamily.add(centres);
+      wanted.add(centres.isEmpty ? null : (centres.first + centres.last) / 2);
     }
 
-    // The person, plus one box for each spouse, drawn side by side.
-    final unit =
-        metrics.boxWidth +
-        node.families.length * (metrics.coupleGap + metrics.boxWidth);
+    // A lone family with no recorded spouse hangs its children from under the
+    // person themselves; there is no couple gap to hang them from.
+    final hangsFromTheMiddle =
+        node.families.length <= 1 &&
+        (node.families.isEmpty || node.families.single.spouse == null);
 
-    final start = filled[generation] ?? 0;
-    var left = childCentres.isEmpty
-        ? start
-        : (childCentres.first + childCentres.last) / 2 - unit / 2;
-    // Never overlap somebody already placed in this generation.
-    if (left < start) left = start;
+    var left = filled[generation] ?? 0;
+    final first = wanted.isEmpty ? null : wanted.first;
+    if (first != null) {
+      final target = hangsFromTheMiddle
+          ? first - own / 2
+          : first - metrics.coupleGap / 2 - own;
+      // Never over somebody already placed in this generation.
+      if (target > left) left = target;
+    }
 
     people.add(
       ChartPlacement(
         person: node.person,
         topLeft: Offset(left, y),
+        width: own,
         generation: generation,
         isSubject: generation == 0,
       ),
     );
 
-    var spouseLeft = left + metrics.boxWidth + metrics.coupleGap;
-    var childIndex = 0;
-    for (final family in node.families) {
+    var previousRight = left + own;
+    for (var index = 0; index < node.families.length; index++) {
+      final family = node.families[index];
+      final want = wanted[index];
+
+      // The slot this family occupies: after the box before it, and far
+      // enough along that the gap in front of it sits over its own children.
+      var slot = previousRight + metrics.coupleGap;
+      if (want != null && !hangsFromTheMiddle) {
+        final overItsChildren = want + metrics.coupleGap / 2;
+        if (overItsChildren > slot) slot = overItsChildren;
+      }
+
       final spouse = family.spouse;
+      final spouseWidth = spouse == null ? metrics.boxWidth : width(spouse);
       if (spouse != null) {
         people.add(
           ChartPlacement(
             person: spouse,
-            topLeft: Offset(spouseLeft, y),
+            topLeft: Offset(slot, y),
+            width: spouseWidth,
             generation: generation,
             isSpouse: true,
           ),
         );
-        // A short line between the two, so a spouse is never mistaken for
-        // another child standing in the same row.
+        // A line between the two, so a spouse is never mistaken for another
+        // child standing in the same row — drawn from the box actually beside
+        // them, which is not always one couple gap away once a family has
+        // been pushed along to reach its children.
         edges.add(
           ChartEdge(
-            from: Offset(
-              spouseLeft - metrics.coupleGap,
-              y + metrics.boxHeight / 2,
-            ),
-            to: Offset(spouseLeft, y + metrics.boxHeight / 2),
-            isCouple: true,
+            from: Offset(previousRight, y + metrics.boxHeight / 2),
+            to: Offset(slot, y + metrics.boxHeight / 2),
+            kind: family.endedInDivorce
+                ? EdgeKind.divorce
+                : EdgeKind.marriage,
           ),
         );
       }
@@ -305,27 +407,23 @@ ChartLayout layoutDescendants(
       // The line to the children hangs from between the couple, whether or
       // not the tree records the other parent.
       final from = Offset(
-        spouse == null
-            ? left + metrics.boxWidth / 2
-            : spouseLeft - metrics.coupleGap / 2,
+        hangsFromTheMiddle ? left + own / 2 : slot - metrics.coupleGap / 2,
         y + metrics.boxHeight,
       );
-      for (var i = 0; i < family.children.length; i++) {
+      for (final centre in centresPerFamily[index]) {
         edges.add(
           ChartEdge(
             from: from,
-            to: Offset(
-              childCentres[childIndex++],
-              y + metrics.boxHeight + metrics.generationGap,
-            ),
+            to: Offset(centre, y + metrics.boxHeight + metrics.generationGap),
           ),
         );
       }
-      spouseLeft += metrics.boxWidth + metrics.coupleGap;
+
+      previousRight = slot + spouseWidth;
     }
 
-    filled[generation] = left + unit + metrics.siblingGap;
-    return left + metrics.boxWidth / 2;
+    filled[generation] = previousRight + metrics.siblingGap;
+    return left + own / 2;
   }
 
   place(root, 0);
@@ -353,7 +451,9 @@ ChartLayout layoutDescendants(
 ChartLayout layoutAncestorsUpwards(
   AncestorNode root, {
   ChartMetrics metrics = const ChartMetrics(),
+  BoxWidth? widthOf,
 }) {
+  final width = widthOf ?? (_) => metrics.boxWidth;
   final people = <ChartPlacement>[];
   final edges = <ChartEdge>[];
   final filled = <int, double>{};
@@ -363,6 +463,7 @@ ChartLayout layoutAncestorsUpwards(
     final y =
         (generations - 1 - generation) *
         (metrics.boxHeight + metrics.generationGap);
+    final own = width(node.person);
 
     final parentCentres = [
       for (final parent in node.parents) place(parent, generation + 1),
@@ -371,13 +472,14 @@ ChartLayout layoutAncestorsUpwards(
     final start = filled[generation] ?? 0;
     var left = parentCentres.isEmpty
         ? start
-        : (parentCentres.first + parentCentres.last) / 2 - metrics.boxWidth / 2;
+        : (parentCentres.first + parentCentres.last) / 2 - own / 2;
     if (left < start) left = start;
 
     people.add(
       ChartPlacement(
         person: node.person,
         topLeft: Offset(left, y),
+        width: own,
         generation: generation,
         isSubject: generation == 0,
       ),
@@ -386,14 +488,14 @@ ChartLayout layoutAncestorsUpwards(
     for (final parentCentre in parentCentres) {
       edges.add(
         ChartEdge(
-          from: Offset(left + metrics.boxWidth / 2, y),
+          from: Offset(left + own / 2, y),
           to: Offset(parentCentre, y - metrics.generationGap),
         ),
       );
     }
 
-    filled[generation] = left + metrics.boxWidth + metrics.siblingGap;
-    return left + metrics.boxWidth / 2;
+    filled[generation] = left + own + metrics.siblingGap;
+    return left + own / 2;
   }
 
   place(root, 0);
@@ -423,9 +525,18 @@ ChartLayout layoutHourglass(
   AncestorNode ancestors,
   DescendantNode descendants, {
   ChartMetrics metrics = const ChartMetrics(),
+  BoxWidth? widthOf,
 }) {
-  final above = layoutAncestorsUpwards(ancestors, metrics: metrics);
-  final below = layoutDescendants(descendants, metrics: metrics);
+  final above = layoutAncestorsUpwards(
+    ancestors,
+    metrics: metrics,
+    widthOf: widthOf,
+  );
+  final below = layoutDescendants(
+    descendants,
+    metrics: metrics,
+    widthOf: widthOf,
+  );
 
   final subjectAbove = above.people.firstWhere((person) => person.isSubject);
   final subjectBelow = below.people.firstWhere((person) => person.isSubject);
@@ -440,6 +551,7 @@ ChartLayout layoutHourglass(
         ChartPlacement(
           person: placement.person,
           topLeft: placement.topLeft + shift,
+          width: placement.width,
           generation: placement.generation,
           isSpouse: placement.isSpouse,
         ),
@@ -450,7 +562,7 @@ ChartLayout layoutHourglass(
       ChartEdge(
         from: edge.from + shift,
         to: edge.to + shift,
-        isCouple: edge.isCouple,
+        kind: edge.kind,
       ),
   ];
 
@@ -467,6 +579,7 @@ ChartLayout layoutHourglass(
       ChartPlacement(
         person: placement.person,
         topLeft: placement.topLeft + nudge,
+        width: placement.width,
         generation: placement.generation,
         isSubject: placement.isSubject,
         isSpouse: placement.isSpouse,
@@ -482,16 +595,11 @@ ChartLayout layoutHourglass(
         ChartEdge(
           from: edge.from + nudge,
           to: edge.to + nudge,
-          isCouple: edge.isCouple,
+          kind: edge.kind,
         ),
     ],
     size: Size(
-      placed.fold(
-        0.0,
-        (widest, p) => p.topLeft.dx + metrics.boxWidth > widest
-            ? p.topLeft.dx + metrics.boxWidth
-            : widest,
-      ),
+      placed.fold(0.0, (widest, p) => p.right > widest ? p.right : widest),
       placed.fold(
         0.0,
         (tallest, p) => p.topLeft.dy + metrics.boxHeight > tallest

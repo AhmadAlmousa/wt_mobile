@@ -35,12 +35,19 @@ final class ChartsRepository {
     required String ancestorsUrl,
     required String descendantsUrl,
     required PersonRef subject,
+    int? generations,
   }) async {
-    final up = await chart(ChartKind.ancestors, ancestorsUrl, subject: subject);
+    final up = await chart(
+      ChartKind.ancestors,
+      ancestorsUrl,
+      subject: subject,
+      generations: generations,
+    );
     final down = await chart(
       ChartKind.descendants,
       descendantsUrl,
       subject: subject,
+      generations: generations,
     );
 
     return ChartData(
@@ -52,10 +59,14 @@ final class ChartsRepository {
   }
 
   /// Reads one chart for [subject], at the URL the site gave for it.
+  ///
+  /// [generations] replaces the number the site's own link carries — see
+  /// [withGenerations]. Null asks for exactly what was offered.
   Future<ChartData> chart(
     ChartKind kind,
     String url, {
     required PersonRef subject,
+    int? generations,
   }) async {
     // The hourglass is stitched from the other two rather than fetched.
     if (kind != ChartKind.ancestors && kind != ChartKind.descendants) {
@@ -66,7 +77,10 @@ final class ChartsRepository {
       );
     }
 
-    final body = await _fragment(url, probe: 'drawing the ${kind.name} chart');
+    final body = await _fragment(
+      withGenerations(url, generations),
+      probe: 'drawing the ${kind.name} chart',
+    );
 
     return switch (kind) {
       ChartKind.ancestors => ChartData(
@@ -84,20 +98,32 @@ final class ChartsRepository {
 
   /// Reads how two people are related, along the site's own path between them.
   ///
-  /// This is the one address the app *edits* rather than uses as it arrived.
   /// A relationship route ends `relationships-{ancestors}-{recursion}/{xref}`
   /// and takes an optional second xref after it, and the page only ever links
-  /// to one person at a time — so the second is put there by the app. Every
-  /// other part of the URL, the two settings included, is left exactly as the
-  /// site wrote it.
+  /// to one person at a time — so the second is put there by the app.
+  ///
+  /// [bloodLinesOnly] replaces the first of those two numbers. It is worth
+  /// changing because the handler reads it **straight off the route**:
+  /// `Validator::attributes(...)->integer('ancestors')`, with the tree's
+  /// own `RELATIONSHIP_ANCESTORS` preference used only to fill in the form on
+  /// the page it does not send. So a site set to search blood lines only —
+  /// which this project's own target is — can still be asked "any
+  /// relationship", and that is the only way a link through a marriage can be
+  /// found at all.
+  ///
+  /// Null leaves the site's own setting alone. The recursion beside it is
+  /// never touched: that one *is* clamped, by `min(recursion,
+  /// max_recursion)`, and it is what stops a deep search costing the server a
+  /// minute.
   Future<List<RelationshipPath>> relationship(
     String url, {
     required String from,
     required String to,
+    bool? bloodLinesOnly,
   }) async {
     final route = _client.url.routeOf(url);
     final shape = RegExp(
-      r'^(.*/relationships-[^/]+/)[^/]+(?:/[^/]+)?$',
+      r'^(.*/relationships-)(\d+)(-\d+/)[^/]+(?:/[^/]+)?$',
     ).firstMatch(route);
     if (shape == null) {
       throw ParseFailure(
@@ -107,8 +133,14 @@ final class ChartsRepository {
       );
     }
 
+    final ancestors = switch (bloodLinesOnly) {
+      null => shape.group(2)!,
+      true => '1',
+      false => '0',
+    };
+
     final body = await _fragment(
-      '${shape.group(1)}$from/$to',
+      '${shape.group(1)}$ancestors${shape.group(3)}$from/$to',
       probe: 'reading how $from and $to are related',
     );
     return _parser.parseRelationships(body, from: from);
@@ -148,6 +180,36 @@ final class ChartsRepository {
     final body = await _fragment(url, probe: 'reading the timeline');
     return _parser.parseTimeline(body);
   }
+
+  /// [url] with its generations count replaced.
+  ///
+  /// An ancestors or descendants route ends
+  /// `{kind}-{style}-{generations}/{xref}`, and webtrees reads that segment
+  /// straight off the route — `isBetween(2, 63)`, with no tree preference
+  /// narrowing it — so asking for a different depth is a legitimate request
+  /// rather than a trick. Everything else in the address, the drawing style
+  /// the administrator chose included, is left exactly as the site wrote it.
+  ///
+  /// Rewritten in the address itself rather than in the decoded route,
+  /// because the two URL styles differ only in how the *slashes* are written:
+  /// `ancestors-tree-4` appears verbatim in both `/tree/main/ancestors-tree-4/X42`
+  /// and `index.php?route=%2Ftree%2Fmain%2Fancestors-tree-4%2FX42`, so one
+  /// rule serves both and nothing else in the address is disturbed.
+  ///
+  /// Answers [url] unchanged when [generations] is null or the address is not
+  /// that shape: a site whose links look different keeps the number its
+  /// administrator chose, which is the right answer rather than a failure.
+  static String withGenerations(String url, int? generations) {
+    if (generations == null) return url;
+    return url.replaceFirstMapped(
+      _generationsSegment,
+      (match) => '${match.group(1)}$generations',
+    );
+  }
+
+  static final RegExp _generationsSegment = RegExp(
+    r'((?:ancestors|descendants|pedigree|hourglass)-[A-Za-z0-9_]+-)\d+',
+  );
 
   /// Whether a site's own settings keep this chart to blood relations.
   ///

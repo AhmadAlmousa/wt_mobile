@@ -117,10 +117,57 @@
   "relationshipChoose": "Choose someone else",
   "relationshipBloodOnly": "This site searches blood relations only, so two people linked by a marriage show no link.",
   "relationshipPaths": "Found more than one way they are related.",
+  "relationshipHow": "How to look",
+  "relationshipWith": "Compared with",
+  "relationshipClosest": "Closest",
+  "relationshipFatherSide": "Father’s side",
+  "relationshipMotherSide": "Mother’s side",
+  "relationshipThroughSpouse": "Through a spouse",
+  "relationshipNoneThisWay": "No link this way.",
+  "relationshipBloodOnlyToggle": "Blood relatives only",
+  "relationshipAnyLink": "Any relationship",
+  "relationshipSteps": "{count, plural, =1{1 step} other{{count} steps}}",
+  "@relationshipSteps": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "relationshipOtherWays": "Other ways they are related",
   "chartView": "How to draw it",
   "chartViewTree": "Tree",
   "chartViewCircle": "Circle",
   "chartViewCompact": "Compact",
+  "chartOptions": "Chart options",
+  "chartGenerations": "Generations",
+  "chartGenerationsSite": "As the site sets it",
+  "chartShowPhotos": "Photos",
+  "chartShowDates": "Dates",
+  "chartColourBySex": "Colour by sex",
+  "chartFitToName": "Boxes fit the name",
+  "chartWhoToShow": "Who to show",
+  "chartShowEveryone": "Everyone",
+  "chartShowMen": "Male line",
+  "chartShowWomen": "Female line",
+  "chartLineNote": "A line is followed through the people on it, so hiding one sex hides everyone reached through them.",
+  "chartShare": "Share",
+  "chartShareImage": "As an image",
+  "chartSharePdf": "As a PDF",
+  "chartSharing": "Preparing…",
+  "chartShareFailed": "The chart could not be saved.",
+  "chartShareSubject": "{name} — {chart}",
+  "@chartShareSubject": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "chart": {
+        "type": "String"
+      }
+    }
+  },
+  "chartTooBigToShare": "This chart is too large to save as one picture.",
   "openThisPerson": "Open this person",
   "chartFromHere": "Draw the chart from here",
   "chartFailed": "This chart could not be drawn.",

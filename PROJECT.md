@@ -297,10 +297,19 @@ anonymous `/my-account`.
   value). Read `a.menu-myrecord[href]` from any page of that tree.
 - **Every fact webtrees renders inside a chart box names its own GEDCOM tag.**
   `Fact::summary()` emits
-  `<div class="fact_INDI:DEAT"><span class="label">…</span>: …</div>`, and
+  `<div class="fact_DEAT"><span class="label">…</span>: …</div>`, and
   `chart-box.phtml` prints a run of those into `.wt-chart-box-facts` (the
   person's birth and death) and into the hidden `.wt-chart-box-zoom-dropdown`
   beside it (*everything*, their spouse families' facts included).
+
+  The tag in that class is **bare**. `summary()` builds it from the fact's own
+  `$tag` property — the word off the GEDCOM line — not from `Fact::tag()`,
+  which qualifies it with the record type. So a divorce is `fact_DIV`, never
+  `fact_FAM:DIV`. The captured 2.2.6 chart fixtures had this right and a first
+  reading of the 2.3 template got it wrong; nothing is lost by the bare form,
+  since a death is only ever an individual's and a divorce only ever a
+  family's. `FactTagIndex` accepts a qualified class too, for a theme that
+  writes one.
 
   This is the only structural statement a stock site makes about what kind of
   event a row is. Every label on a record page — the facts table, the family
@@ -311,7 +320,16 @@ anonymous `/my-account`.
   same page. That is what makes "is this person dead", "did this marriage end
   in divorce" and "which icon does this row get" answerable in Arabic.
 
-  **Read from the upstream templates, not yet from a captured page** — see §9.
+  **Confirmed against `tree.almou.sa` (2.2.6) on 2026-08-23.** The live check
+  reads the subject's own sex and lifespan out of their chart box, types all
+  13 of their relatives, finds the 2 the tree records as dead, and recovers
+  `BIRT` from the fact block — which is also what settled the class form.
+
+  It also showed the honest limit: **the dictionary only learns the tags a
+  page's chart boxes actually rendered.** A living person's box has no `DEAT`,
+  and a *relative's* death appears in the facts table under its own label
+  (`وفاة الأب` — "death of the father"), which no box ever printed. Those rows
+  keep the neutral icon, which is the right answer rather than a wrong one.
 - **A person's own sex, lifespan and death come from the relatives tab, not
   from their page.** They appear in their own family tables as a chart box
   like anybody else, and that box carries `wt-chart-box-{m,f,u}`, the
@@ -326,6 +344,35 @@ webtrees draws twelve charts, and the app cannot show any of them as they
 arrive: they are HTML for a wide screen, positioned with floats, background
 images and a reading direction baked into the stylesheet. What the app takes
 is the **shape** — who descends from whom — and draws it again.
+
+- **The generations count is in the route and is not clamped by the tree.**
+  An ancestors or descendants route ends `{kind}-{style}-{generations}/{xref}`
+  and the handler reads that segment with
+  `isBetween(MINIMUM_GENERATIONS, MAXIMUM_GENERATIONS)` — 2 to 63 — with no
+  tree preference narrowing it. So asking for a different depth is a request
+  the server means to answer. Rewritten in the *address* rather than in the
+  decoded route: the two URL styles differ only in how the slashes are
+  written, and `ancestors-tree-4` appears verbatim in both.
+- **A d'Aboville number runs across all of a person's families.** webtrees
+  declares `$child_number` before its family loop and never resets it, so a
+  second marriage continues the count. Numbering per family gave two children
+  `1.1` (§7, bug 26).
+- **A relationship's "ancestors" setting is in the route and is *not* clamped
+  by the tree.** `relationships-{ancestors}-{recursion}/{xref}{/xref2}`, and
+  the handler reads the first number with
+  `Validator::attributes(...)->integer('ancestors')`. `RELATIONSHIP_ANCESTORS`
+  is only used to fill in the form on the page webtrees does not send. So a
+  site set to blood lines only — which `tree.almou.sa` is — can still be asked
+  "any relationship", and that is the only way a link through a marriage is
+  ever found. The **recursion** beside it *is* clamped, by
+  `min($recursion, $max_recursion)`, and is left alone: it is what stops a
+  deep search costing the server a minute.
+- **There is no server-side "mother's side".** webtrees offers exactly the one
+  choice above. But it answers with *every* path it found, and a path's first
+  step says which of the subject's own relatives it leaves through — so
+  matching that against the parents and spouses the record already names sorts
+  the answers into the ways a person actually asks the question. Structural,
+  so it works the same in both languages.
 
 - **A site states which charts it runs, per person.** Every link webtrees makes
   to a chart carries a class naming it: `menu-chart-ancestry`,
@@ -476,6 +523,14 @@ style, and any widget calling `copyWith(fontWeight:)` would silently ignore it.
 
 ### Platform
 
+- **Gradle's heap must fit the machine.** The Flutter template writes
+  `org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G` into
+  `android/gradle.properties`. This machine has 5G of RAM, so the daemon was
+  killed by the kernel partway through `assembleRelease` — which Gradle
+  reports as "build daemon disappeared unexpectedly", a message that reads
+  like a crash and is really a heap it was never going to be given. Sized down
+  to 2G; a project this small has never come close to needing more.
+
 **No CORS headers → Flutter Web cannot work.** Mobile and desktop only.
 `local_auth` has no Linux support, so the biometric gate degrades to an open
 gate on desktop — the sign-in screen now says so in as many words, rather than
@@ -585,8 +640,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **6e** | Timeline — a life against a scale of years | ✅ |
 | **6f** | Lifespans — several lives compared against one scale | ⬜ |
 | **7a** | Identity — who a person is, seen before it is read | ✅ |
-| **7b** | Charts — grouping, marital status, controls, export | 🚧 |
-| **7c** | Relationships — the path drawn, and the ways through it | ⬜ |
+| **7b** | Charts — grouping, marital status, controls, export | ✅ |
+| **7c** | Relationships — the path drawn, and the ways through it | ✅ |
 | **v2** | Offline sync · editing · moderation · PHP module | ⬜ |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -982,6 +1037,119 @@ this phase is about is exactly the one a single family cannot exercise.
 Released as **0.9.0**. **419 tests** green (400 → 419), analyzer clean.
 
 ---
+### 2026-08-23 — Phase 7b: what a chart is for, and who decides
+
+**A chart was putting children under the wrong mother.** `layoutDescendants`
+centred a parent over *all* of their children regardless of which marriage
+each came from, so a man with two wives got one undifferentiated row beneath a
+couple half of them did not belong to. Not a crowded chart — a false one, and
+the sort of falsehood a family notices.
+
+Each family's children are now laid out as a contiguous block, and the couple
+strip above them is built so that each family's line hangs over its own block:
+a slot is pushed along when its children demand it, and never allowed to land
+on the slot before it. The reverse case — a woman with children by two
+husbands — falls out of the same rule.
+
+**A marriage and a divorce were drawn identically.** They are not the same
+thing, and a chart is where the difference belongs: the children still belong
+to both parents, and the parents no longer belong to each other. A parted
+couple gets the mark genealogists have used on paper for a century — two
+strokes across a break in the line — drawn *next to the spouse* rather than
+halfway along, because a family pushed sideways to reach its own children can
+be a long way from the person it belongs to.
+
+Reading it needed no new vocabulary: the caption webtrees writes above a family
+runs the marriage, the divorce and the child count together as one sentence
+with no markup between them, and `FactTagIndex` (§3) already knew what this
+site calls each of those.
+
+**The reader decides how a chart is drawn.** Depth, shape, photographs, dates,
+colour by sex, boxes that fit their names, and which line to follow — all in
+one sheet, all kept between charts, and only the depth costs a request. Hiding
+a sex cuts the branch rather than the box: everyone above a mother is reached
+through her, so a pedigree showing only men is the paternal line, which is the
+view an Arab family tree is usually drawn in.
+
+**Fitting the whole chart is not always the right opening.** Six generations
+scaled to a phone is a picture of a tree rather than a tree anybody can read.
+The viewport fits the chart while its smallest text stays above nine logical
+pixels, and otherwise opens at that scale with the subject centred — which
+also fixed a long-standing bug where an unfitted Arabic chart opened against
+the wrong edge.
+
+**A chart can be shared.** The whole chart, at twice its logical size, from a
+boundary *outside* the viewport — a picture of the window would be a picture
+of whatever happened to be on screen. PDF is the same picture on a page shaped
+to fit it, with nothing typeset, which keeps Arabic shaping out of a library
+that would have to reimplement it. Three new dependencies, named and reasoned
+in `pubspec.yaml`.
+
+**`graphview` was considered and rejected.** It offers Buchheim–Walker and
+Sugiyama layouts for generic graphs; these charts are not generic graphs. A
+couple is two boxes with their children hanging from *between* them, and
+`ChartLayout.mirrored()` — the single most important property of these charts
+— has no counterpart in it. Everything asked for was reachable inside the
+existing layout, and the per-family placement above is a change the package
+could not have made.
+
+Two bugs, both about fixtures (§7, 26 and 27).
+
+Built as **0.10.0**. **450 tests** green (419 → 450), analyzer clean. Committed
+together with 7c below, which is why the released version jumps 0.9.0 → 0.11.0:
+0.10.0 was built and exercised on this machine but never tagged.
+
+---
+
+### 2026-08-23 — Phase 7c: the question a family tree is really for
+
+"How are we related?" is the question this app exists to answer, and the
+answer was a list of names. A reader had to hold the order in their head and
+work out which way it ran.
+
+**It is a path, so it is drawn as one.** A spine down the page, each link
+named on a rung of it, the far end flagged. The words on the rungs stay the
+site's own — `father`, `أخ أكبر` — because composing them here would mean
+inventing kinship terms in two languages, and Arabic distinguishes an older
+brother from a younger one where English has no word at all.
+
+**And it can be asked four ways.** Closest, father's side, mother's side,
+through a spouse. webtrees has no idea what any of those mean — it offers one
+setting, and it is a tree preference rather than a question the reader is
+asked. But it answers with *every* path it found, and a path's **first step**
+says which of the subject's own relatives it leaves through. Matched against
+the parents and spouses the record already names, that sorts the answers into
+the ways a person actually asks. Nothing reads a kinship word, so it works the
+same in both languages.
+
+A side with no path is shown disabled, not hidden. "There is no link on your
+mother's side" is an answer; a missing button is not.
+
+**The blood-lines switch turned out to be real.** The app had been *reporting*
+that setting — the reason two people in one tree can come back unrelated — as
+something the reader could only be told about. It is in the route, and
+webtrees reads it straight off the route, so it is a request rather than a
+report (§3). Which also means a link through a marriage can now be found at
+all on a site configured the way this project's own target is.
+
+The search result the reader picks carries no sex, so the person they chose
+was drawn grey at the top of a screen that drew them pink further down. The
+header now prefers whichever chart box a path reached them through.
+
+**The release build had been failing on this machine, and it was not the
+code.** The Flutter template asks Gradle for `-Xmx8G` with 4G of metaspace;
+this machine has 5G of RAM in total, so the daemon was being killed by the
+kernel partway through `assembleRelease`. Gradle reports that as "build daemon
+disappeared unexpectedly", which reads like a crash and is really a heap it
+was never going to be given.
+
+Released as **0.11.0**. **464 tests** green (450 → 464), analyzer clean, and
+`tool/live_check.dart` run against `tree.almou.sa` — which is what turned the
+whole of 7a from a careful reading of a template into a fact (§3). It grew a
+section of its own for it: sex, lifespan, death, how many relatives carry each,
+and how many facts the dictionary could name.
+
+---
 
 ## 7. Bugs found, and what they taught
 
@@ -1013,6 +1181,16 @@ Released as **0.9.0**. **419 tests** green (400 → 419), analyzer clean.
 | 23 | Every statistics chart was dropped: one *options* argument is JavaScript, not JSON | **Live markup** |
 | 24 | A stacked bar drew as empty surface — a coloured box has no height of its own | **Rendered preview** |
 | 25 | Chart buttons appeared in the site's menu order, and skipped their own rule | **Rendered preview** |
+| 26 | d'Aboville numbers restarted at each family, so two children were `1.1` | **A richer fixture** |
+| 27 | `fact_INDI:DEAT` was read out of the 2.3 template; the class is bare, `fact_DEAT` | **A captured fixture** |
+
+Bugs 26 and 27 are the same lesson from two directions. 26 only appeared once
+the fixtures held a second marriage — a fixture that reproduces exactly what
+the parser expects proves nothing, which is what `test/fixtures/README.md`
+had been warning about since the beginning. 27 was the reverse: the *captured*
+2.2.6 markup had `fact_BIRT` all along, and a first reading of the 2.3
+template invented a qualified form that webtrees has never emitted. Read the
+capture before believing the template.
 
 Bugs 3–4 and 6 were found by unit tests; **5 was invisible to them** — keep
 `tool/live_check.dart` current and run it after transport changes. Bugs 14–16
@@ -1337,15 +1515,17 @@ dart run tool/probe.dart --url tree.almou.sa --user NAME
 WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user mobile
 #   --search TERM     what to look for   --language TAG   what to render in
 
-flutter test          # 419 tests
+flutter test          # 464 tests
 flutter analyze       # must stay clean
 flutter run -d linux  # web is not viable — no CORS
 
 # Render real screens to build/preview/*.png, in both languages and themes.
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
-# ancestors, descendants, fan and hourglass charts, a relationship, and the
-# site's statistics, a relationship and a timeline.
+# ancestors, descendants, fan and hourglass charts, the chart options sheet,
+# a relationship, a timeline and the site's statistics. One shot is rendered
+# on a wide surface — a chart that will not fit a phone legibly opens showing
+# a corner of itself, and reviewing the layout needs the whole family.
 # Not collected by `flutter test`: it writes files and asserts nothing.
 flutter test tool/preview/render_preview.dart --update-goldens
 
@@ -1382,18 +1562,13 @@ Both tools read the password from the terminal with echo disabled, or from
    Needs an instance that runs those modules and holds media. This is a gap in
    the *data* available, not in the code — but it is the largest untested
    surface the app now has.
-2. **The chart-box fact blocks have not been seen from a real server either.**
-   `FactTagIndex` (§3) — and with it the death ribbon, the fact icons and the
-   per-family divorce mark — reads `.wt-chart-box-facts` and
-   `.wt-chart-box-zoom-dropdown`, both transcribed from `chart-box.phtml`
-   rather than captured. `tool/live_check.dart` against `tree.almou.sa` is
-   what would settle it, and needs a password.
-
-   Every reader of the index degrades on its own: an empty index means "this
-   page said nothing", so a site that renders no fact blocks loses the icons
-   and the divorce mark, and death falls back to whether the rendered lifespan
-   has a year after its dash. Nothing fails, and nothing is claimed that was
-   not read — but the difference between the two paths is currently unmeasured.
+2. **A divorce has never been seen from a real server.** Sex, death and the
+   tag dictionary were all confirmed against `tree.almou.sa` on 2026-08-23
+   (§3), but that tree records no divorce on any record the live check
+   reached, so the per-family divorce mark and the parted couple line rest on
+   fixtures alone. Both degrade to silence where the page says nothing, which
+   is the same behaviour as a marriage that held — so a site that *does*
+   record one would be the first proof either way.
 3. **A photograph can only be shown at thumbnail size.** The media tab signs
    its URLs at 100 pixels, and the signature covers those dimensions, so the
    app cannot ask for a bigger copy — the full image lives behind the media
