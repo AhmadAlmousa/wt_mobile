@@ -370,6 +370,33 @@ anonymous `/my-account`.
   relationship names are translated. Role is therefore derived structurally:
   spouses render before any marriage-fact row, children after, and the family
   is a birth family or the person's own according to which block holds them.
+- **The divider is a marriage, so a family that records none has no divider.**
+  A father and a son both render `<tr class="wt-sex-m">` around a chart box,
+  and the `<th>` between them is translated — so a family with children, no
+  marriage recorded and no second spouse recorded looks exactly like a couple
+  followed by children. A real record is that shape (§7, bug 50).
+  **The caption is what says otherwise.** webtrees titles each family table
+  with the *other* spouse: `الأسرة مع X` (*Family with X*) for one of the
+  subject's own, `أسرة الأب مع X` (*Father's family with X*) for a parent's
+  other family, and `X + Y` — `Family::fullName()`, with `… …` for a spouse
+  the tree does not record — where the subject is a spouse of one of them.
+  Only a **birth** family names nobody (*Parents and siblings*), and that is
+  also the only table whose first two rows are reliably the couple. Both
+  wordings are translated, so nothing reads them: a row is a spouse when its
+  own rendered name appears in the caption, which is language-neutral.
+  A page also settles its own ambiguities: a step-family hangs off a parent or
+  a spouse, and that person's marriage is stated in another table on the same
+  page, so who is half of a couple is known before the undivided tables are
+  read.
+- **A child row prints the gap since the previous child's birth, and that is
+  an exact end-of-couple marker.** `family.phtml` starts `$prev` empty and
+  fills it from the *marriage*, so in a family that records none the first
+  child can never carry `div.wt-date-difference` — and a row that does carry
+  one proves the row above it is a child. Same code in both versions. It is
+  the one rung of the ladder that needs no caption and no other table, and it
+  is what separates a lone father from a father and a mother when nothing else
+  can. It needs two children with birth dates; where the tree has none, the
+  leading pair is a guess, and §9 #7 says so.
 - **The tree's title is only on its own page.** `<h1 class="wt-site-title">`
   in the default layout. The menu that carries titles is rendered only when a
   site allows switching trees, and a site with one tree does not — so for the
@@ -910,23 +937,36 @@ the parser behind it stays, fixtures and all, and stays tested.
 | `access` | account, admin, tree count, role, own record | the real tree | ✅ |
 | `individual` | name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, family events, dates in both calendars | the real tree | ✅ |
 | `individuals` | same result count for the same query; enumeration | the real tree | ✅ |
-| `notes`, `sources` | how many of each a record carries, and which hang off a fact | both labs | ✅ |
-| `media` | how many items, which are on a fact, and the bytes of every thumbnail | both labs | ✅ |
-| `family` | each family's membership by xref — kind, spouses, children | both labs | ✅ |
-| `ancestors`, `descendants` | how many people, how many generations, and **the shape**: who sits at which Sosa or d'Aboville number | both labs | ✅ |
-| `relationship` | how many paths, the site's own phrase for the whole relationship, and each step's word and person | both labs | ✅ |
-| `timeline` | which events, in what order | both labs | ✅ |
-| `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | both labs | ❌ **read from the page** |
+| `notes`, `sources` | how many of each a record carries, and which hang off a fact | both labs — the real site runs neither tab | ✅ |
+| `media` | how many items, which are on a fact, and the bytes of every thumbnail | both labs — this account can see none of the real tree's 86 | ✅ |
+| `family` | each family's membership by xref — kind, spouses, children | the real tree | ✅ |
+| `ancestors`, `descendants` | how many people, how many generations, and **the shape**: who sits at which Sosa or d'Aboville number | the real tree | ✅ |
+| `relationship` | how many paths, the site's own phrase for the whole relationship, and each step's word and person | the real tree | ✅ |
+| `timeline` | which events, in what order | the real tree | ✅ |
+| `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | the real tree | ❌ **read from the page** |
 
-Three of those were cleared against **`tree.almou.sa` itself** — the real
-1,463-person tree with the module installed — and the two records that
-disagreed there are bugs 36 and 37, both fixed. The rest are cleared against
-**both labs on both webtrees versions**, fourteen records each, which is the
-strongest evidence available for them today: the target site runs neither
-notes, sources nor media, so no real server has ever published one of those to
-either transport, and the diffs for a family's membership, a chart's shape, a
-path and a timeline were written this session and have never been run against
-1,463 people. Running them there is the next thing worth doing.
+All of them have now been run against **`tree.almou.sa`** — the real
+1,463-person tree with the module installed — as well as against both labs on
+both webtrees versions. What the real tree adds, capability by capability: a
+family's membership by xref, a nine-person descendant chart with its
+d'Aboville numbering, a seven-person pedigree with its Sosa numbering, a path,
+a timeline, and the statistics total. It found one disagreement, on a name
+(§7, bug 48), which is the fourth time a real record has told the two
+transports apart and the fourth time one of them was simply right.
+
+One caveat the table cannot carry: **`tree.almou.sa` runs module 1.0.1** and
+this repository is at **1.1.1**, so the real-tree evidence for `relationship`
+and `timeline` is evidence about the *previous* module. Both differ there
+exactly as this session's fixes predict — the bare kinship word, and a
+timeline event without its calendar conversion — and both agree on the labs,
+which run the code here. The same goes for the two module fixes the real tree
+itself produced (§7, bugs 48 and 49): a name and a burial, both corrected
+here, neither deployed there. **Updating the instance is the one outstanding
+action, and it is not something this machine can do.**
+
+Two capabilities are cleared on labs alone and cannot be more than that here:
+`notes` and `sources` — `tree.almou.sa` runs neither tab module — and `media`,
+which it runs no tab for and shows this account none of its 86 objects.
 
 Clearing them cost three fixes, all found the first time the two were asked
 the same question (§7, bugs 45–47): the module's relationship description was
@@ -1900,6 +1940,95 @@ webtrees versions: fourteen records walked, no differences, every capability
 diff green. Nine capabilities move to ✅ in §5 and `statistics` moves to a
 deliberate ❌.
 
+**Then the real tree, which found the thing fourteen invented people could
+not.** Every new diff holds against 1,463 real records — family membership,
+the descendants chart across nine people and three generations, the notes and
+citations and media counts, the statistics total of ١٬٤٦٣, the search counts —
+and one disagreed. A woman whose record carries a married name as a **subtag**
+of her only name: `getAllNames()` answers a row per name *form* rather than
+per name, so the module reported `جواد حسن محمد` as a second name where the
+page shows it as a field inside the name block, labelled *الإسم ما بعد
+الزواج*. That is bug 37's fix overshooting in the opposite direction, and it
+is the third time this project has learnt that a name in webtrees is not one
+thing (§7, bug 48). The lab now has a person with a married name, and the
+module counts `1 NAME` lines rather than name rows.
+
+The other two differences the real tree reported are **not** faults: the
+module installed there is 1.0.1, so it answers the relationship and the
+timeline the way they were answered before this session's fixes. That is the
+check doing its job — `capabilities.module` states a version and a client must
+not assume the module it is talking to is the module it was written against.
+They close when `tree.almou.sa` is updated to 1.1.1.
+
+**And then the walk, which is where the shapes are.** One record is a
+witness; forty are a survey, and forty real ones turned up two more classes
+neither lab could produce.
+
+A man the tree records a **burial** for and no death: dead to every chart box
+on the website, living to the module, because `deceased` asked for a `DEAT`
+fact where `Gedcom::DEATH_EVENTS` is `DEAT`, `BURI`, `CREM` (§7, bug 49).
+
+And a family with children, no marriage recorded and **no second spouse
+recorded at all** — whose eldest son the HTML parser read as the second
+spouse, because the divider between a couple and its children *is* the
+marriage row and there was none. Nothing in the rows says otherwise: a father
+and a son both render `wt-sex-m`, and the `<th>` between them is a translated
+relationship name (§7, bug 50).
+
+The caption does say, and it took three attempts to read it correctly —
+each attempt caught by a different record, one lab and two real:
+
+- `X + Y` **lists** the couple, with `… …` for a spouse the tree does not
+  record. A row named there is a spouse; the rest are children.
+- *Family with X* and *Father's family with X* **name the other one** and
+  leave the subject or their parent understood — so where one of those names
+  somebody, the couple really is the leading pair.
+- Only a birth family names nobody, and that is the one table whose first two
+  rows were always reliably the parents.
+- Underneath all three: **children never precede the couple**, so one row
+  known to be a spouse makes every row above it one too. That is what pulls a
+  father into a couple when only the mother was recognised.
+- And the rung that needs no caption at all: a child row prints the gap since
+  its elder sibling's birth, `$prev` is empty until a marriage fills it, so
+  the first child of an unmarried couple never carries one — and a row that
+  does proves the row above it is a child. That is what tells a lone father
+  from a father and a mother, which two real records and one lab record each
+  needed a different answer to.
+
+A page also settles its own ambiguities — a step-family hangs off a parent or
+a spouse whose marriage is stated in another table — but only what a table
+*states* may be learnt from, never what a positional guess produced, and never
+the subject themselves: they are a spouse in their own family and a child in
+the one they were born into, so their marriage says nothing about which row
+they occupy here.
+
+**A fourth finding is about the lab rather than the tree.** Building a record
+for bug 50 meant hiding a spouse, and hiding a spouse did nothing:
+`canShowRecord()` returns true for everybody before it reads a restriction
+unless `HIDE_LIVE_PEOPLE` is `'1'`, which the lab had never set. So privacy
+had been switched off there for its whole life, and every privacy claim this
+project has written down had been resting on a tree that applied none of them
+(§7, bug 51). It is on now, with the two visibility levels open, so that one
+`RESN confidential` bites and nothing else does — and `canShowName()` is
+demonstrably true where `canShow()` is false, which is the case api_eval §9
+predicted and nothing had ever exercised.
+
+Every rung was found by a record that broke the rung before it: a real
+step-family, a lab birth family, a real birth family with two parents, and a
+real one with a lone father. The ladder is in `_FamilyRows.statedCouple`, and
+`PROJECT.md` §9 #7 carries what is left — a lone parent whose children the
+tree records no dates for, where the leading pair is still a guess and still
+wrong by one. The module answers that correctly, which is the argument for it
+in a sentence.
+
+Released as **0.16.1** with the module at **1.1.1**. **548 tests** green
+(543 → 548), analyzer clean, both labs walked in full through both transports
+with no differences, and the real tree walked **sixty records** deep: one
+difference left, on one field, and it is `deceased` on the buried man —
+because `tree.almou.sa` runs module 1.0.1 and the fix is here. The
+relationship wording differs there for the same reason. Neither is a fault;
+both close when the instance is updated.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -1954,6 +2083,46 @@ deliberate ❌.
 | 45 | The module's relationship `description` was the bare kinship word — `أب` — where the page writes the site's own `Relationship: %s`, so the two transports headlined the same path differently | **The capability diff, on its first run** |
 | 46 | The module's timeline had dropped the calendar conversion *and* the couple: `١٩٧٤` where the page says `١٩٧٤ (١٣٩٤)`, and two marriages with nothing to tell them apart | **The capability diff, on its first run** |
 | 47 | The app preferred the module for statistics, which answers four sections where the page publishes seventeen — and the diagnostics screen, whose job is to say which transport answered, said "Module" for a capability the module was about to be taken off | **The capability diff, on its first run** |
+
+| 48 | The module answered a second name for a woman who has one. `getAllNames()` adds a row for every `ROMN`, `FONE` and `_XXX` **subtag** as well as for each `NAME` line, so a `2 _MARNM` under her only name read as an alternate name — which webtrees renders as a *field inside* the name block and never as a name | **The real tree, on the first record with a married name** |
+
+| 49 | The module called a buried man living. `deceased` asked for a `DEAT` fact; `Gedcom::DEATH_EVENTS` is `DEAT`, `BURI`, `CREM`, and a chart box prints a tag for whichever it finds — so the page mourned him and the module did not | **The real tree, walking 40 records** |
+| 50 | A family with children, no marriage recorded and **no wife recorded at all** had its eldest son read as the second spouse. Nothing in the rows says which is which — a father and a son both render `wt-sex-m`, and the `<th>` beside them is a translated relationship name | **The real tree, walking 40 records** |
+| 51 | The lab had privacy **switched off** for its whole life: `canShowRecord()` returns true for everybody before it examines anything unless `HIDE_LIVE_PEOPLE` is `'1'`, so a `1 RESN confidential` in the GEDCOM did nothing and no privacy rule had ever been exercised | Found while building a record for bug 50 |
+
+50 is the interesting one, because the markup genuinely does not say. The
+divider that separates a couple from its children is the marriage row, and a
+family that records no marriage has none. What does say — sometimes — is the
+**caption**: webtrees titles a family *Family with X*, *Father's family with
+X*, or `X + Y`, and every one of those names the other spouse. A birth family
+is the exception, and it names nobody — which is also the only case where the
+old rule was reliably right, because there the first two rows really are the
+parents.
+
+So the parser reads a page's families in two passes: the ones stating a
+marriage settle themselves, and what they settle — *this person is half of a
+couple* — is then available to the ones that do not. A step-family hangs off a
+parent or a spouse, and the page has already drawn that person's marriage
+elsewhere. The subject's own row joins the couple only where the caption named
+somebody, which is what separates *Family with X* from *Parents and siblings*;
+the lab caught the first version of that rule making a man the spouse of his
+own father.
+
+51 is bug 35 again, and worth the same sentence: a lab setting quietly made a
+whole dimension untestable. Every privacy claim this project has written down
+— *a hidden record is absent, not empty*, *a name may be visible where details
+are not* — was resting on a tree where `canShow()` returned true before it read
+anything. With privacy on and only one restricted person, both transports
+agree, and `canShowName()` really is true where `canShow()` is false.
+
+48 is bug 37 overshooting. That fix moved the module off
+`GedcomRecord::alternateName()` — too narrow, it answers only for a name in a
+different script — and onto `getAllNames()`, which turns out to be too wide in
+the other direction: it holds a row per name *form*, not per name. The page
+counts `span.NAME` inside the names accordion, which is one per `NAME` line,
+and the module now counts `1 NAME` lines in the record's own GEDCOM to match.
+Neither transport had ever met the case, because no fixture and no lab had a
+married name in it; the lab has one now, and reverting the guard turns it red.
 
 Bugs 44–47 are what happens when the two transports are asked the same
 question about the capabilities nobody had compared yet. Three are the
@@ -2394,14 +2563,14 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # state — with coverage reported beside them, because a transport can be
 # right and still say less (§9 #23).
 
-flutter test          # 543 tests
+flutter test          # 548 tests
 flutter analyze       # must stay clean
 dart format lib test tool   # CI fails if this changes anything
 
 # Pictures of the parts a person judges rather than asserts on: avatars with
 # and without the mourning ribbon, a person in a list, a parted couple, the
 # message panels — each in both directions and both themes. Tagged, so the
-# other 529 can run without them and a red golden is never confused for a
+# other 534 can run without them and a red golden is never confused for a
 # wrong value.
 flutter test --tags golden
 flutter test --exclude-tags golden
@@ -2418,7 +2587,10 @@ find server -name '*.php' -print0 | xargs -0 -n1 php -l
 # into each, and a synthetic Arabic tree in which every person is invented —
 # notes, a citation, and two media files drawn by the installer: a JPEG
 # photograph, and a PNG scan that webtrees 2.3 refuses to thumbnail at all
-# (§7, bug 44). Both are why the media path has ever run.
+# (§7, bug 44). Both are why the media path has ever run. Privacy is **on**
+# there, with one `RESN confidential` person, which it silently was not until
+# bug 51; and the tree holds a family with no marriage and no second spouse,
+# which is the shape bug 50 came from.
 # Requires: php8.4-cli php8.4-{sqlite3,mbstring,intl,gd,xml,curl,zip} composer
 tool/lab/setup.sh 2.2.6 8622
 tool/lab/setup.sh main  8623
@@ -2531,6 +2703,15 @@ Both tools read the password from the terminal with echo disabled, or from
    parsers, which read them correctly, including a chart box carrying a whole
    facts dropdown no fixture has. Sanitized real captures in `test/fixtures/`
    are still the right next step.
+   **And sometimes the markup simply does not say.** A family with no marriage
+   recorded has no divider between its couple and its children, and a father
+   and a son render identically (§7, bug 50). The caption resolves every shape
+   met so far (§3) and one it cannot: a *birth* family — whose caption names
+   nobody — with one parent recorded or visible and no marriage. There the
+   leading pair is still a guess, and it would be wrong by one. The module
+   answers correctly, so this is a limitation of the floor rather than a
+   defect the app can fix, and it is written down because the next real tree
+   is where it will turn up.
 8. **Cookie `Domain` mismatch** when a site is reached via a hostname other than
    its configured `base_url` (LAN IP, Tailscale). The app adopts the canonical
    base from the 308 and warns when it differs from what was typed.
@@ -2634,6 +2815,16 @@ Both tools read the password from the terminal with echo disabled, or from
    is a manager's view, a tree with pending edits, notes/sources/media tabs
    (this site runs none of the three), or a photograph — this account can see
    none, though the tree reports 86.
+   **Every capability has now been diffed against it** (§5), one record at a
+   time and then sixty at a time, which found four more disagreements: a
+   married name that is a subtag rather than a name (§7, bug 48), a burial the
+   module did not count as a death (49), and two families whose couple the
+   HTML could not state (50). Three were the module's and one the parser's,
+   and all are fixed here. Two differences remain on the instance and are not
+   faults: it runs module **1.0.1**, so its relationship wording and its
+   timeline dates are the ones this session fixed. *Updating the module there
+   is the one outstanding action*, and it is not something this machine can
+   do.
    Two things remain true regardless: running two transports doubles the
    meaningful test surface for as long as both exist, which is forever; and no
    capability is cleared until its endpoint has passed live against real data

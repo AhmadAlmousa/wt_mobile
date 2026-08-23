@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace WebtreesMobileApi\Presenters;
 
+use Fisharebest\Webtrees\Gedcom;
 use Fisharebest\Webtrees\Individual;
 use Fisharebest\Webtrees\MediaFile;
 use WebtreesMobileApi\Compat\Compat;
 use WebtreesMobileApi\Compat\CompatInterface;
+
+use function preg_match_all;
 
 /**
  * A person as they appear in a list: enough to draw a row and open them.
@@ -64,10 +67,16 @@ final class PersonPresenter
      * that. The contract the app documents is "the tree said so", because the
      * HTML path reads a death fact out of a chart box and can never know
      * anything else. False therefore means "nothing said so", not "alive".
+     *
+     * **All three death events, not just `DEAT`.** `Gedcom::DEATH_EVENTS` is
+     * `DEAT`, `BURI`, `CREM` in both versions, and it is what a chart box
+     * prints a tag for — so a man whose tree records his burial and no death
+     * was mourned on one transport and living on the other (`PROJECT.md` §7,
+     * bug 49). A burial is not an inference.
      */
     private function isDeceased(Individual $individual): bool
     {
-        return $individual->facts(['DEAT'])->isNotEmpty();
+        return $individual->facts(Gedcom::DEATH_EVENTS)->isNotEmpty();
     }
 
     /**
@@ -81,12 +90,28 @@ final class PersonPresenter
      * with an unknown given name — where the HTML path read the second line
      * from the names accordion and this read null.
      *
-     * The accordion's reading is the right one: it is what the tree actually
-     * records, and it is what the two transports have to agree on.
+     * **Nor every row of `getAllNames()`**, which is wider than it looks, and
+     * the same real tree said so a second time.
+     * `GedcomRecord::extractNamesFromFacts()` adds a row for every `ROMN`,
+     * `FONE` and `_XXX` *subtag* of a name as well as for each `NAME` line —
+     * so a woman with one name and a `2 _MARNM` under it has two rows, and
+     * this answered a "second name" the website never shows as one. webtrees
+     * renders those subtags as **fields inside** the name block
+     * (`الإسم ما بعد الزواج: …`) and gives a `span.NAME` only to a name line,
+     * which is exactly what the HTML transport counts.
+     *
+     * So the guard is the number of `NAME` lines. Counted off the record's
+     * own GEDCOM because that names no access level and is identical in both
+     * webtrees versions; the rows themselves still come from `getAllNames()`,
+     * which is what applies the placeholders and the privacy.
      */
     private function alternateName(Individual $individual): string|null
     {
         if (!$individual->canShowName()) {
+            return null;
+        }
+
+        if (preg_match_all('/^1 NAME /m', $individual->gedcom()) < 2) {
             return null;
         }
 

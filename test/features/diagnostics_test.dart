@@ -28,7 +28,7 @@ WebtreesInstance _site({
 ModuleCapabilities _module({Set<String> features = const {}}) =>
     ModuleCapabilities(
       apiVersion: kModuleApiVersion,
-      moduleVersion: '1.1.0',
+      moduleVersion: '1.1.1',
       webtreesVersion: '2.3.0-dev',
       features: features,
       languages: const {'ar', 'en-GB'},

@@ -1266,3 +1266,91 @@ A manager's or an editor's view, and a tree with pending edits: unchanged from
 against fourteen invented people and never against 1,463 real ones, which is
 exactly the gap that produced §16's two disagreements. The real tree is where
 they go next.
+
+
+---
+
+## 18. What forty real records said that fourteen invented ones could not
+
+**Added 2026-08-23, after every capability was diffed against `tree.almou.sa`.**
+§17 cleared nine capabilities on two labs and ended by naming the gap: the
+diffs had met fourteen invented people and never 1,463 real ones. They have
+now, and the walk found four more things — one in the module, one in the
+client, one in webtrees' data model, and one in the lab itself.
+
+### A burial is a death
+
+`deceased` asked webtrees for a `DEAT` fact. `Gedcom::DEATH_EVENTS` is
+`DEAT`, `BURI`, `CREM`, and a chart box prints a tag for whichever it finds —
+so a man whose tree records his burial and no death was mourned on the website
+and living in the module. §4's advice to avoid `Individual::isDead()` (it
+*infers* death from age) was right and incomplete: the alternative is not one
+tag, it is the set webtrees itself calls a death.
+
+### A name is not one thing, and this is the third time
+
+§4 recommends `getAllNames()` for structured names, and it is right about
+what it holds — but it holds a row per name **form**, not per name:
+`extractNamesFromFacts()` adds one for every `ROMN`, `FONE` and `_XXX` subtag
+as well as for each `NAME` line. A woman with one name and a `2 _MARNM` under
+it therefore has two rows, and the module answered the second as an alternate
+name for somebody the website shows one name for. The count of `1 NAME` lines
+is the guard.
+
+The sequence is worth keeping: `alternateName()` was too narrow (same-script
+names invisible), `getAllNames()` too wide (subtags counted as names), and the
+answer is the one webtrees renders — a `span.NAME` per name *line*.
+
+### The markup does not always say who the couple is
+
+This is the client's half, and it is the sharpest limit found in the stock
+transport so far. webtrees separates a family's couple from its children with
+the **marriage row**, and a family that records no marriage has none. A father
+and a son both render `<tr class="wt-sex-m">` around a chart box; the `<th>`
+between them is a translated relationship name. So a family with children, no
+marriage and no second spouse recorded is genuinely ambiguous in HTML — and a
+real record is exactly that, and had its eldest son read as a spouse.
+
+What resolves it is the **caption**, in two shapes that mean different things:
+
+| Caption | Means | Read as |
+|---|---|---|
+| `X + Y` (`Family::fullName()`) | lists both spouses, `… …` where one is not recorded | a named row is a spouse; the rest are children |
+| *Family with X*, *Father's family with X* | names the **other** spouse only | the couple is the leading pair |
+| *Parents and siblings* | names nobody | fall back to the leading pair |
+
+with one structural fact underneath all three: **children never precede the
+couple**, so a row known to be a spouse makes every row above it a spouse too.
+And a page settles its own ambiguities — a step-family hangs off a parent or a
+spouse whose marriage is stated in another table — provided only *stated*
+couples are learnt from, and never the subject, who is a spouse in one family
+and a child in another.
+
+The rung that needs no caption is the best of them, and it comes from reading
+`family.phtml` rather than from theorising: a child row prints the gap since
+the previous child's birth, and `$prev` is empty until a marriage fills it —
+so the first child of an unmarried couple can never carry one, and a row that
+does **proves** the row above it is a child. Same code in 2.2.6 and 2.3.
+
+One shape is still genuinely unreadable: a lone parent, no marriage, and
+children the tree records no birth dates for. The module answers it correctly,
+which is a fair summary of what this whole document argues. Every rung above
+was added because a record broke the one before it — a real step-family, a lab
+birth family, a real birth family with two parents, a real one with a lone
+father. Four records, four rules, and the honest reading is that a fifth shape
+exists and has not been met yet.
+
+### The lab had privacy switched off
+
+Building a record for the case above meant hiding a spouse, and hiding one did
+nothing. `canShowRecord()` returns true for everybody before it reads a
+restriction unless `HIDE_LIVE_PEOPLE` is `'1'`, and no lab had ever set it. So
+§9's privacy reasoning — *a hidden record is absent, not empty*, *a name may
+be visible where details are not* — had never once been executed. It is on
+now, with a single `RESN confidential` person, and both halves hold:
+`canShow()` false, `canShowName()` true, and the two transports agree.
+
+That is bug 35's lesson for the third time, and the generalisation is worth
+stating plainly: **a lab proves nothing about a feature it has switched off**,
+and the switch is easy to leave alone precisely because nothing fails when it
+is wrong.

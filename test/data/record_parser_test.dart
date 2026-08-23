@@ -417,6 +417,165 @@ void main() {
     });
   }
 
+  group('a family with no marriage row', () {
+    // Captured shape rather than an invented one: a real record has a
+    // step-family with children, no marriage recorded and no wife recorded at
+    // all. Both rows are `wt-sex-m` and the `<th>` beside them is a
+    // translated relationship name, so nothing in the rows themselves says
+    // which is the father and which the son (PROJECT.md §7, bug 50).
+    /// A family table. Each person is `(xref, name, isSubject, printsGap)` —
+    /// the last being the gap since the previous child's birth, which
+    /// webtrees prints inside a child's `<th>` and which the *first* child of
+    /// an unmarried couple never carries.
+    String table(
+      String caption,
+      List<(String, String, bool, bool)> people, {
+      bool married = false,
+    }) {
+      final rows = [
+        for (final (xref, name, selected, gap) in people)
+          '''
+          <tr class="wt-sex-m">
+            <th scope="row">
+              ${gap ? '<div class="wt-date-difference collapse small">٢ سنتان</div>' : ''}
+              دور${selected ? '<span class="icon-selected"></span>' : ''}
+            </th>
+            <td>
+              <div class="wt-chart-box" data-wt-chart-xref="$xref">
+                <div class="wt-chart-box-name">$name</div>
+              </div>
+            </td>
+          </tr>''',
+      ].join();
+      // webtrees emits the couple, then any marriage, then the children — so
+      // a marriage row is the divider, and it goes after the people here.
+      final marriage = married
+          ? '<tr><th><span class="label">زواج</span></th>'
+                '<td><span class="field">١٩٤١</span></td></tr>'
+          : '';
+
+      return '''
+        <div class="wt-tab-relatives">
+          <table>
+            <caption><a href="/tree/main/family/F7">$caption</a></caption>
+            <tbody>$rows$marriage</tbody>
+          </table>
+        </div>''';
+    }
+
+    test('the caption names the couple, so the rest are children', () {
+      // Seen from the other wife, webtrees titles the family with
+      // `Family::fullName()` — the couple, joined, with the missing spouse as
+      // an ellipsis.
+      final families = const RecordParser().parseRelatives(
+        table('عبد الله الموسى + … …', const [
+          ('X42', 'عبد الله الموسى', false, false),
+          ('X66', 'طلال الموسى', false, false),
+          ('X67', 'نوف الموسى', false, true),
+        ]),
+        xref: 'X50',
+      );
+
+      expect(families.single.spouses.map((p) => p.xref), ['X42']);
+      expect(families.single.children.map((p) => p.xref), ['X66', 'X67']);
+    });
+
+    test('a spouse the page named elsewhere is a spouse here', () {
+      // Seen from a child, the caption is *Father's family with an unknown
+      // person* and names nobody at all. The father is still known: the birth
+      // family above states his marriage, which makes him half of a couple.
+      const birthFamily = '''
+        <div class="wt-tab-relatives">
+          <table>
+            <caption><a href="/tree/main/family/F2">الوالدين والأشقاء</a></caption>
+            <tbody>
+              <tr class="wt-sex-m"><th scope="row">أب</th><td>
+                <div class="wt-chart-box" data-wt-chart-xref="X42">
+                  <div class="wt-chart-box-name">عبد الله الموسى</div></div></td></tr>
+              <tr class="wt-sex-f"><th scope="row">أم</th><td>
+                <div class="wt-chart-box" data-wt-chart-xref="X50">
+                  <div class="wt-chart-box-name">سارة العنزي</div></div></td></tr>
+              <tr><th scope="row"><span class="label">زواج</span></th>
+                  <td><span class="field">١٩٢٥</span></td></tr>
+              <tr class="wt-sex-m"><th scope="row">أنا<span class="icon-selected"></span></th><td>
+                <div class="wt-chart-box" data-wt-chart-xref="X64">
+                  <div class="wt-chart-box-name">راشد الموسى</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>''';
+      final page =
+          birthFamily +
+          table('أسرة الأب مع فرد مجهول', const [
+            ('X42', 'عبد الله الموسى', false, false),
+            ('X66', 'طلال الموسى', false, false),
+            ('X67', 'نوف الموسى', false, true),
+          ]);
+
+      final families = const RecordParser().parseRelatives(page, xref: 'X64');
+
+      expect(families.last.spouses.map((p) => p.xref), ['X42']);
+      expect(families.last.children.map((p) => p.xref), ['X66', 'X67']);
+    });
+
+    test('the child of a lone parent is not that parent’s spouse', () {
+      // The same family from the other side: seen from one of the children,
+      // it is the family they were born into, and its caption names nobody.
+      // The father is still known — the page draws his other marriages with
+      // their dates — but the subject must not join him, which is the version
+      // of this rule the lab caught going the wrong way.
+      final page =
+          table('أسرة الأب مع منيرة الصائغ', const [
+            ('X42', 'عبد الله الموسى', false, false),
+            ('X51', 'منيرة الصائغ', false, false),
+          ], married: true) +
+          table('الوالدين والأشقاء', const [
+            ('X42', 'عبد الله الموسى', false, false),
+            ('X66', 'طلال الموسى', true, false),
+            ('X67', 'نوف الموسى', false, true),
+          ]);
+
+      final families = const RecordParser().parseRelatives(page, xref: 'X66');
+
+      expect(families.last.spouses.map((p) => p.xref), ['X42']);
+      expect(families.last.children.map((p) => p.xref), ['X66', 'X67']);
+      expect(families.last.kind, FamilyKind.parents);
+    });
+
+    test('a lone parent whose children carry no dates is still a guess', () {
+      // The end of the ladder, and worth stating rather than hiding: with no
+      // marriage, a caption naming nobody, and children the tree records no
+      // birth date for, the markup says nothing at all — so the leading pair
+      // is the answer, and here it is wrong by one. The module answers this
+      // correctly, which is the argument for it in one test.
+      final families = const RecordParser().parseRelatives(
+        table('الوالدين والأشقاء', const [
+          ('X42', 'عبد الله الموسى', false, false),
+          ('X66', 'طلال الموسى', true, false),
+          ('X67', 'نوف الموسى', false, false),
+        ]),
+        xref: 'X66',
+      );
+
+      expect(families.single.spouses.map((p) => p.xref), ['X42', 'X66']);
+    });
+
+    test('a couple with nothing to go on is still the leading pair', () {
+      // A birth family names nobody in its caption, and there the old rule is
+      // the right one: webtrees emits the husband and the wife first.
+      final families = const RecordParser().parseRelatives(
+        table('الوالدين والأشقاء', const [
+          ('X42', 'عبد الله الموسى', false, false),
+          ('X50', 'سارة العنزي', false, false),
+          ('X64', 'راشد الموسى', true, false),
+        ]),
+        xref: 'X64',
+      );
+
+      expect(families.single.spouses.map((p) => p.xref), ['X42', 'X50']);
+      expect(families.single.children.map((p) => p.xref), ['X64']);
+    });
+  });
+
   group('across versions', () {
     test('both produce the same record', () {
       // The versions differ in markup but describe the same person. Anything

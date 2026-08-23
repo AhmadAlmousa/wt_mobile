@@ -396,7 +396,7 @@ void main() {
           module: module,
           capabilities: ModuleCapabilities(
             apiVersion: 1,
-            moduleVersion: '1.1.0',
+            moduleVersion: '1.1.1',
             webtreesVersion: '2.2.6',
             features: const {Capability.statistics, Capability.individual},
             languages: const {},

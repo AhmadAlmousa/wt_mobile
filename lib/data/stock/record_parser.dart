@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html;
 import 'package:meta/meta.dart';
@@ -580,6 +582,10 @@ final class RecordParser {
     final index = tags ?? FactTagIndex.from(document);
     final families = <FamilyGroup>[];
 
+    // Two passes, because a family whose couple the markup does not state can
+    // often be settled by a family that does. See [_splitFamily].
+    final parsed = <(String, Element?, _FamilyRows)>[];
+
     for (final table in document.querySelectorAll('table')) {
       final caption = table.querySelector('caption a[href]');
       final familyXref = xrefIn(caption?.attributes['href'], 'family');
@@ -587,7 +593,44 @@ final class RecordParser {
       // the "date differences" toggle.
       if (familyXref == null) continue;
 
-      final (spouses, children, facts) = _splitFamily(table, index);
+      parsed.add((familyXref, caption, _splitFamily(table, index)));
+    }
+
+    // Everyone this page has shown to be half of a couple — **except the
+    // person whose page it is.** They are a spouse in their own family and a
+    // child in the one they were born into, so knowing they married says
+    // nothing about which row they occupy here. Everybody else it does:
+    // a step-family hangs off one of the subject's parents or spouses, and
+    // that person's own marriage is stated in another table on this page.
+    //
+    // Grown to a fixed point, because a table settled by its caption teaches
+    // the next one — and only *stated* couples are added, never the ones a
+    // positional guess produced, or a guess would propagate.
+    final knownSpouses = <String>{};
+    for (var pass = 0; pass < parsed.length; pass++) {
+      var learned = false;
+
+      for (final (_, caption, rows) in parsed) {
+        final couple = rows.statedCouple(
+          caption: textOf(caption),
+          knownSpouses: knownSpouses,
+        );
+        for (final person in couple ?? const <PersonRef>[]) {
+          if (person.xref != xref && knownSpouses.add(person.xref)) {
+            learned = true;
+          }
+        }
+      }
+
+      if (!learned) break;
+    }
+
+    for (final (familyXref, caption, rows) in parsed) {
+      final (spouses, children) = rows.settle(
+        caption: textOf(caption),
+        knownSpouses: knownSpouses,
+      );
+
       families.add(
         FamilyGroup(
           xref: familyXref,
@@ -595,30 +638,36 @@ final class RecordParser {
           kind: _kindOf(xref, spouses, children),
           spouses: spouses,
           children: children,
-          facts: facts,
+          facts: rows.facts,
           // Read from this family's own rows, so a person married twice is
           // divorced from one of them and not from the other.
-          endedInDivorce: facts.any((fact) => index.isDivorce(fact.label)),
+          endedInDivorce: rows.facts.any((fact) => index.isDivorce(fact.label)),
         ),
       );
     }
     return families;
   }
 
-  /// Splits a family table into its couple and its children.
+  /// Splits a family table into the rows before its marriage and the rows
+  /// after it, without deciding which are the couple.
   ///
   /// The template emits spouses, then marriage facts, then children. The fact
-  /// rows carry no chart box, which makes them a reliable divider; when a
-  /// family records no marriage at all there is no divider, and the leading
-  /// pair of people are the couple.
-  (List<PersonRef>, List<PersonRef>, List<FactEntry>) _splitFamily(
-    Element table,
-    FactTagIndex index,
-  ) {
-    final spouses = <PersonRef>[];
-    final children = <PersonRef>[];
+  /// rows carry no chart box, which makes them a reliable divider — and where
+  /// there is one, this is the whole answer.
+  ///
+  /// Where there is none, nothing on the rows themselves says which is which:
+  /// a husband row and a son row both carry only `wt-sex-m`, and the `<th>`
+  /// beside them is a translated relationship name. A real tree found that
+  /// out — a family with children, no marriage recorded and no wife recorded
+  /// at all, whose eldest son was read as the second spouse (`PROJECT.md` §7,
+  /// bug 50). [_FamilyRows.settle] is where that is resolved.
+  _FamilyRows _splitFamily(Element table, FactTagIndex index) {
+    final before = <PersonRef>[];
+    final after = <PersonRef>[];
     final facts = <FactEntry>[];
-    var seenDivider = false;
+    var sawDivider = false;
+    String? subject;
+    int? firstGap;
 
     for (final row in table.querySelectorAll('tr')) {
       final box = row.querySelector('.wt-chart-box[data-wt-chart-xref]');
@@ -629,21 +678,37 @@ final class RecordParser {
         // costs nothing.
         final fact = _familyFact(row, index);
         if (fact != null) facts.add(fact);
-        if (row.querySelector('.field') != null) seenDivider = true;
+        if (row.querySelector('.field') != null) sawDivider = true;
         continue;
       }
 
       final person = personFromChartBox(box);
       if (person == null) continue;
 
-      if (!seenDivider && spouses.length < 2) {
-        spouses.add(person);
-      } else {
-        seenDivider = true;
-        children.add(person);
+      // webtrees marks the person whose page this is, in whichever row they
+      // occupy — the one piece of role information the markup does give.
+      if (row.querySelector('.icon-selected') != null) subject = person.xref;
+
+      // And one more, which is worth as much: the gap a child row prints
+      // between its own birth and the previous one. `$prev` starts empty and
+      // is filled from the marriage — so in a family with no marriage the
+      // *first* child can never carry it, and a row that does proves the row
+      // above it is a child. Identical in both versions.
+      if (!sawDivider && row.querySelector('.wt-date-difference') != null) {
+        firstGap ??= before.length;
       }
+
+      (sawDivider ? after : before).add(person);
     }
-    return (spouses, children, facts);
+
+    return _FamilyRows(
+      before: before,
+      after: after,
+      facts: facts,
+      sawDivider: sawDivider,
+      subject: subject,
+      firstGap: firstGap,
+    );
   }
 
   /// A marriage or divorce row of a family table.
@@ -688,6 +753,155 @@ final class RecordParser {
     }
     // Step-families list neither the viewer as spouse nor as child.
     return FamilyKind.step;
+  }
+}
+
+/// One family table, read but not yet interpreted.
+///
+/// [before] and [after] are the people either side of the marriage row. With
+/// a divider they are the couple and the children outright; without one
+/// everybody is in [before] and [settle] has to work out where the couple
+/// ends.
+class _FamilyRows {
+  _FamilyRows({
+    required this.before,
+    required this.after,
+    required this.facts,
+    required this.sawDivider,
+    required this.subject,
+    required this.firstGap,
+  });
+
+  final List<PersonRef> before;
+  final List<PersonRef> after;
+  final List<FactEntry> facts;
+
+  /// Whether a marriage or divorce row separated the couple from the children.
+  final bool sawDivider;
+
+  /// The person whose page this is, if they appear in this family at all.
+  final String? subject;
+
+  /// The first row printing the gap since the previous child's birth, if any.
+  ///
+  /// Only a child ever carries it, and never the first of them where no
+  /// marriage was recorded — so the row above it is a child too, and the
+  /// couple ends before that. The one exact answer available to a table the
+  /// caption says nothing useful about.
+  final int? firstGap;
+
+  /// The couple and the children.
+  ///
+  /// Three questions are asked of an undivided table, in order, and the first
+  /// that answers wins:
+  ///
+  /// 1. **Does the caption name them?** Every caption on the relatives tab
+  ///    names the other spouse — *Family with X*, *Father's family with X*,
+  ///    *X + Y* — except a birth family's, which names nobody. A row whose
+  ///    rendered name appears there is half of this couple.
+  /// 2. **Has the page already said so?** A step-family hangs off one of the
+  ///    subject's parents or one of their spouses, and both are couples the
+  ///    page draws elsewhere with their marriage stated. So a person shown to
+  ///    be a spouse in one table is a spouse in this one.
+  /// 3. **Failing both, the leading pair.** Which is what this always used to
+  ///    do, and is right for a birth family — the one caption that names
+  ///    nobody is also the one whose first two rows are reliably the parents.
+  ///
+  /// The subject's own row joins the couple when **rule 1** found somebody:
+  /// their own family is captioned with their spouse's name and not with
+  /// theirs, so the other half of the couple is them. Where the caption named
+  /// nobody they are a child — which is exactly the family they were born
+  /// into, and the lab caught the version of this that got it backwards.
+  (List<PersonRef>, List<PersonRef>) settle({
+    required String? caption,
+    required Set<String> knownSpouses,
+  }) {
+    if (sawDivider) return (before, after);
+
+    final spouses = statedCouple(caption: caption, knownSpouses: knownSpouses);
+
+    if (spouses == null) {
+      // Nothing said, so the leading pair, as this always used to do — except
+      // where a child printed the gap since its elder sibling's birth, which
+      // puts the couple's end one row earlier than the guess would.
+      final couple = firstGap == null ? 2 : math.min(2, firstGap! - 1);
+
+      return (before.take(couple).toList(), before.skip(couple).toList());
+    }
+
+    return (
+      spouses,
+      [
+        for (final person in before)
+          if (!spouses.contains(person)) person,
+      ],
+    );
+  }
+
+  /// The couple this table *states*, or null where it does not say.
+  ///
+  /// Null is the important half: it is what keeps a guess from being repeated
+  /// back to the page as though the page had said it.
+  ///
+  /// The captions come in two shapes, and they mean different things. `X + Y`
+  /// — `Family::fullName()`, used where the subject is a spouse of one of
+  /// them — **lists** the couple, with `… …` standing in for a spouse the
+  /// tree does not record. *Family with X* and *Father's family with X*
+  /// **name the other one**, leaving the subject or the subject's parent to
+  /// be understood; so where one of those names somebody, the couple is the
+  /// leading pair after all. Only a birth family names nobody.
+  ///
+  /// Whatever the shape, one thing is always true and does the rest of the
+  /// work: **children never precede the couple.** So a row known to be a
+  /// spouse makes every row above it a spouse too — which is how a mother
+  /// recognised in the middle of her own family drags the father in with her.
+  ///
+  /// The last distinction is the subject's own presence. A caption naming
+  /// nobody around a table holding the subject is the family they were born
+  /// into, where the leading pair has always been right; the same caption
+  /// without them is a parent's other family, whose second spouse the tree
+  /// may simply not record.
+  List<PersonRef>? statedCouple({
+    required String? caption,
+    required Set<String> knownSpouses,
+  }) {
+    if (sawDivider) return before;
+
+    final named = [
+      for (final person in before)
+        if (caption != null && caption.contains(person.name)) person,
+    ];
+
+    if (named.isNotEmpty && (caption?.contains(' + ') ?? false) == false) {
+      // A caption naming one half of the couple, so the other half is the row
+      // beside it — the subject in their own family, a parent in a parent's.
+      return before.take(2).toList();
+    }
+
+    if (named.isEmpty && subject != null) {
+      // A caption that names nobody, around a table the subject is in, is the
+      // family they were born into — and there the leading pair really is the
+      // couple, however few of them the page recognises. Answering from a
+      // half-recognised couple instead would cut it short and make the mother
+      // one of her own children.
+      return null;
+    }
+
+    final matched = named.isNotEmpty
+        ? named
+        : [
+            for (final person in before)
+              if (person.xref != subject && knownSpouses.contains(person.xref))
+                person,
+          ];
+
+    if (matched.isEmpty) return null;
+
+    // Children never precede the couple, so everything above the last spouse
+    // recognised is a spouse too — and nothing below it is, because a family
+    // this page did not name a second spouse for has not got one it can show.
+    final last = before.lastIndexWhere(matched.contains);
+    return before.take(last + 1).take(2).toList();
   }
 }
 

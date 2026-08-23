@@ -135,6 +135,15 @@ Two consequences worth knowing:
   timeline event's `summary` carries the calendar conversion (`1974 (1394)`,
   not `1974`) and, for a marriage or a divorce, the couple it belongs to,
   without which a person's two marriages are two identical rows.
+  **1.1.1** stopped reporting an `alternateName` for a name that has none.
+  `getAllNames()` adds a row for every `ROMN`, `FONE` and `_XXX` subtag as
+  well as for each `NAME` line, so a woman with one name and a `2 _MARNM`
+  under it had two rows — and webtrees shows that subtag as a *field inside*
+  the name block, never as a second name. The guard is the number of `NAME`
+  lines in the record. The same version made `deceased` read all of
+  `Gedcom::DEATH_EVENTS` — `DEAT`, `BURI`, `CREM` — because a man whose tree
+  records his burial and no death was answered as living, while every chart
+  box on the website mourned him.
 
 ## Known upstream defects a client will meet
 

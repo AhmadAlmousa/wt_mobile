@@ -129,6 +129,23 @@ $tree->setPreference('RELATIONSHIP_ANCESTORS', '1');
 $tree->setPreference('RELATIONSHIP_RECURSION', '3');
 $tree->setPreference('SHOW_RELATIVES_EVENTS', 'INDI:BIRT,INDI:DEAT,FAM:MARR');
 
+// Privacy **on**, which it silently was not: `canShowRecord()` returns true
+// for everybody before it looks at anything else unless `HIDE_LIVE_PEOPLE` is
+// '1', so a `1 RESN confidential` in the GEDCOM did nothing and no privacy
+// rule of any kind had ever been exercised here. That is bug 35's shape a
+// second time — a lab setting that quietly made a whole dimension untestable.
+//
+// The two levels below are then set to `Public` so that *only* the explicit
+// restriction bites: this tree is full of invented people with no death
+// recorded, and hiding the living would empty it. What is wanted is one
+// person the reader may not see, not a different tree.
+$tree->setPreference('HIDE_LIVE_PEOPLE', '1');
+// '2' rather than a class constant: it is `Auth::PRIV_PRIVATE` in 2.2.6 and
+// `AccessLevel::Public` in 2.3 — the same stored value under two names, and
+// naming either would tie this installer to one version.
+$tree->setPreference('SHOW_DEAD_PEOPLE', '2');
+$tree->setPreference('SHOW_LIVING_NAMES', '2');
+
 // 'access' is Role::Member in 2.3 and UserInterface::ROLE_MEMBER in 2.2 — the
 // same historic database value in both.
 $tree->setUserPreference($member, UserInterface::PREF_TREE_ROLE, 'access');
