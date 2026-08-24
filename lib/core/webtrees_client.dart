@@ -13,7 +13,7 @@ import 'webtrees_url.dart';
 /// Kept in step with `version:` in `pubspec.yaml`. It reaches every webtrees
 /// log this app writes to, so a build that misreports itself makes those logs
 /// misleading to the person reading them.
-const String kAppVersion = '0.17.0';
+const String kAppVersion = '0.18.0';
 
 /// The User-Agent this app identifies itself with.
 ///

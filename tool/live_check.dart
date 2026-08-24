@@ -980,6 +980,7 @@ Future<void> main(List<String> args) async {
         };
         var births = 0;
         var differed = 0;
+        var ages = 0;
         for (final person in byJson.people) {
           final other = overlap[person.xref];
           if (other == null) continue;
@@ -993,6 +994,11 @@ Future<void> main(List<String> args) async {
               'module=${person.birthYear}@${person.birthPlace}',
             );
           }
+          // Not a difference. An age is arithmetic on days and a rendered
+          // page states none, so the floor answering null here is the floor
+          // saying less rather than saying something else — the shape §9 #23
+          // is about, reported so it stays visible.
+          if (person.age != null) ages++;
         }
         report(
           'search: birth year and place',
@@ -1002,6 +1008,11 @@ Future<void> main(List<String> args) async {
           ok: differed == 0,
         );
         if (differed > 0) failures += differed;
+        report(
+          'search: age',
+          '$ages of $births stated by the module, 0 by the page '
+              '(coverage, not a disagreement)',
+        );
 
         // The thing no stock route can do at all.
         final listed = await module.search(tree.name, '');

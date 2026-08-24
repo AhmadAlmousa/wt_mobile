@@ -220,6 +220,18 @@ class AppTextEn extends AppText {
   String get filterSexUnknown => 'Not recorded';
 
   @override
+  String get filterAge => 'Age';
+
+  @override
+  String filterAgeRange(String from, String to) {
+    return '$from–$to';
+  }
+
+  @override
+  String get filterAgeNote =>
+      'How old each person is, or was when they died. Nobody the tree records neither a birth nor an age for is hidden by this.';
+
+  @override
   String get filterBorn => 'Year of birth';
 
   @override

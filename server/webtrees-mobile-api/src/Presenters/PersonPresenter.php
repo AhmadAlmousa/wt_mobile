@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WebtreesMobileApi\Presenters;
 
+use Fisharebest\Webtrees\Age;
 use Fisharebest\Webtrees\Date;
 use Fisharebest\Webtrees\Gedcom;
 use Fisharebest\Webtrees\Individual;
@@ -11,8 +12,10 @@ use Fisharebest\Webtrees\MediaFile;
 use WebtreesMobileApi\Compat\Compat;
 use WebtreesMobileApi\Compat\CompatInterface;
 
+use function date;
 use function preg_match_all;
 use function strip_tags;
+use function strtoupper;
 
 /**
  * A person as they appear in a list: enough to draw a row and open them.
@@ -57,6 +60,7 @@ final class PersonPresenter
             'lifespan'      => $this->lifespan($individual),
             'birthYear'     => $this->year($individual->getBirthDate()),
             'deathYear'     => $this->year($individual->getDeathDate()),
+            'age'           => $this->age($individual),
             'birthPlace'    => $this->birthPlace($individual),
             'thumbnail'     => $this->thumbnailUrl($individual),
             'private'       => !$individual->canShow(),
@@ -87,6 +91,75 @@ final class PersonPresenter
         $year = $date->minimumDate()->year();
 
         return $year === 0 ? null : $year;
+    }
+
+
+    /**
+     * How old this person is, or was when they died.
+     *
+     * One number for two questions, because a reader asking "show me the
+     * people in their forties" means the living *and* the dead and does not
+     * want to say so twice. Which one it is, is `deceased`.
+     *
+     * **This is the one figure here that is calendar-proof.** A year is
+     * written in whichever calendar the record keeps it in — a Hijri birth
+     * and a Gregorian death sit side by side in the same lifespan on this
+     * project's own tree — so subtracting one printed year from another is
+     * arithmetic on two different things. `Age` works on Julian days, and it
+     * is webtrees' own class: the same one the individual list prints in its
+     * *Age* column.
+     *
+     * Null wherever the site would print nothing: no birth date, a death
+     * this tree records without a date, a date range too vague for `Age` to
+     * accept (`BEF`/`AFT`), or a negative answer, which means the record
+     * disagrees with itself and is not a fact about anybody's age.
+     *
+     * **Also null for somebody webtrees would not believe is alive.** A tree
+     * this old is full of people born in 1850 with no death recorded, and
+     * measuring those to today answers 176 — true arithmetic, no fact about
+     * anyone, and enough to stretch a filter's scale past every real age in
+     * the tree. `isDead()` is webtrees' own test for exactly that, tree
+     * preference (`MAX_ALIVE_AGE`) and all, so the rule here is: measure to a
+     * recorded death, or to today for somebody the site would still call
+     * living, and otherwise say nothing.
+     *
+     * That is deliberately *not* the rule behind `deceased`, which is the
+     * narrower "the tree recorded a death event" and drives the mourning
+     * ribbon. The two answer different questions and the HTML transport can
+     * only ever answer the narrow one.
+     *
+     * Two things about the number itself. `ageYears()` exists in 2.2.6 and
+     * 2.3 alike, and the two can differ by a year on a date recorded as a
+     * *range*, because 2.3 answers the maximum plausible age where 2.2.6
+     * answered a single computed one. And `ageDifference()` performs "all
+     * calculations using the calendar of the first date" — so a Hijri birth
+     * is counted in Hijri years, which run about eleven days short. Both are
+     * webtrees' own answers and both are what the website prints.
+     */
+    private function age(Individual $individual): int|null
+    {
+        $birth = $individual->getBirthDate();
+
+        if (!$birth->isOK()) {
+            return null;
+        }
+
+        if ($this->isDeceased($individual)) {
+            $until = $individual->getDeathDate();
+        } elseif ($individual->isDead()) {
+            return null;
+        } else {
+            // webtrees' own idiom for today, from `lists/individuals-table`.
+            $until = new Date(strtoupper(date('d M Y')));
+        }
+
+        if (!$until->isOK()) {
+            return null;
+        }
+
+        $years = (new Age($birth, $until))->ageYears();
+
+        return $years < 0 ? null : $years;
     }
 
     /**

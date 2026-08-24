@@ -15,7 +15,8 @@
       "private": false,
       "birthYear": 1901,
       "deathYear": 1974,
-      "birthPlace": "الكويت، الكويت"
+      "birthPlace": "الكويت، الكويت",
+      "age": 73
     },
     {
       "xref": "X43",
@@ -28,7 +29,8 @@
       "private": false,
       "birthYear": 1903,
       "deathYear": 1980,
-      "birthPlace": null
+      "birthPlace": null,
+      "age": 77
     }
   ]
 }

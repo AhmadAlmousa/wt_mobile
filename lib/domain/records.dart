@@ -36,6 +36,7 @@ final class PersonRef {
     this.birthYear,
     this.deathYear,
     this.birthPlace,
+    this.age,
   });
 
   /// The record identifier, e.g. `X42`. Unique within a tree.
@@ -86,6 +87,24 @@ final class PersonRef {
 
   /// The year of death, on the same terms as [birthYear].
   final int? deathYear;
+
+  /// How old this person is, or was when they died — [isDeceased] says which.
+  ///
+  /// The one figure here that is **calendar-proof**: it is measured in days
+  /// rather than by subtracting one printed year from another, which on this
+  /// project's own tree would mean subtracting a Gregorian death from a Hijri
+  /// birth. Counted in the years of the calendar the *birth* is recorded in,
+  /// because that is what webtrees counts in and therefore what the website
+  /// prints.
+  ///
+  /// **Only a transport that can compute it states one**, which today means
+  /// the module: a search row on a stock instance carries a name, two printed
+  /// years and a place, and nothing that survives the arithmetic. Null also
+  /// where the tree records no birth, where it records a death with no date,
+  /// and — deliberately — for somebody webtrees itself would no longer call
+  /// living, because measuring a birth in 1850 to today answers 176 and says
+  /// nothing about anybody.
+  final int? age;
 
   /// Where the tree records the birth, in the site's own words.
   ///

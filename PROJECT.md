@@ -35,6 +35,7 @@ are relative to the parent workspace, which is **not** version-controlled.
 | `../webtrees/` | Upstream webtrees source, read-only reference (2.3.0-dev, `2.2.6` tag available); its own clone |
 | `../webtrees-API/` | Third-party API module, **evaluated and rejected** — see §2; its own clone |
 | `api_eval.md` | Design basis for an optional **purpose-built API module** — see §2 |
+| `sync_eval.md` | Whether to keep a local copy of the tree on the device, and in what shape — see §5 phase 10 |
 | `../CLAUDE.md` | Flutter/Dart coding standards for this workspace |
 
 Real genealogy data must stay out of the repository: `.gitignore` excludes
@@ -922,7 +923,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **8c** | What a reader saw: family facts, the mourning ribbon, the whole chart, a PDF drawn as shapes | ✅ |
 | **8d** | The capability ledger: every remaining capability diffed transport against transport, and a lab with a photograph in it | ✅ — nine cleared, `statistics` deliberately not |
 | **9a** | Relationships drawn: a path as a family tree, and the direction each step runs | ✅ |
-| **9b** | Narrowing a page of search results — sex, year of birth, birthplace | ✅ |
+| **9b** | Narrowing a page of search results — sex, age or year of birth, birthplace | ✅ |
+| **10** | A local database: sync the tree, read it offline | ⬜ — evaluated in `sync_eval.md`, recommended, not started |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -959,7 +961,7 @@ the parser behind it stays, fixtures and all, and stays tested.
 |---|---|---|---|
 | `access` | account, admin, tree count, role, own record | the real tree | ✅ |
 | `individual` | name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, family events, dates in both calendars | the real tree | ✅ |
-| `individuals` | same result count for the same query; enumeration; each person's birth year and birthplace | the real tree | ✅ |
+| `individuals` | same result count for the same query; enumeration; each person's birth year and birthplace, and an age where one can be computed | the real tree | ✅ |
 | `notes`, `sources` | how many of each a record carries, and which hang off a fact | both labs — the real site runs neither tab | ✅ |
 | `media` | how many items, which are on a fact, and the bytes of every thumbnail | both labs — this account can see none of the real tree's 86 | ✅ |
 | `family` | each family's membership by xref — kind, spouses, children | the real tree | ✅ |
@@ -984,11 +986,11 @@ exactly as this session's fixes predict — the bare kinship word, and a
 timeline event without its calendar conversion — and both agree on the labs,
 which run the code here. The same goes for the two module fixes the real tree
 itself produced (§7, bugs 48 and 49): a name and a burial, both corrected
-here, neither deployed there. **1.2.0 adds a step's direction**, which 1.0.1
-does not send — so a relationship drawn as a tree there falls back to one flat
-row until the instance is updated, and says so on the screen rather than
-drawing a shape nobody stated. **Updating the instance is the one outstanding
-action, and it is not something this machine can do.**
+here, neither deployed there. **1.2.0 adds a step's direction** and **1.2.1
+adds an age**; a module older than each falls back honestly — a relationship
+tree drawn on one flat row, saying so on the screen, and a filter offering the
+printed years instead of an age. **Updating the instance is the one
+outstanding action, and it is not something this machine can do.**
 
 Two capabilities are cleared on labs alone and cannot be more than that here:
 `notes` and `sources` — `tree.almou.sa` runs neither tab module — and `media`,
@@ -2196,6 +2198,92 @@ labs on both webtrees versions with no differences — including the two new
 comparisons, each step's direction and each search row's birth year and
 birthplace, the latter over seventeen people at a time.
 
+### 2026-08-24 (later) — An age, and why it beats the year it replaces
+
+The birth-year slider was the honest answer to a question the rows could
+answer, and on **this** tree it is close to useless. `عبد الله الموسى` has a
+Hijri birth and a Gregorian death, so his lifespan reads `١٣١٨–١٩٧٤` — and a
+slider built from printed years puts him six hundred years from his own
+grandchildren. That is not an edge case here; it is what a tree kept partly in
+one calendar and partly in another looks like.
+
+An age has no such problem, because an age is measured in **days**.
+`Age::ageYears()` is webtrees' own class — the one the individual list prints
+in its *Age* column — and it works off Julian days, so a Hijri birth and a
+Gregorian death subtract correctly. The module states it; the slider is an age
+wherever a row carries one and falls back to the printed years where none
+does, which is every search against an untouched instance. Only one slider is
+ever shown: they answer the same question and one answers it better.
+
+**One number, two questions.** A reader asking for people in their forties
+means the living and the dead alike, so `age` is age *at death* for somebody
+the tree records one for and age *today* for everybody else — with `deceased`
+saying which. That is the app's own synthesis; webtrees prints them as two
+separate columns.
+
+Two things it took running to find:
+
+- **"Age today" for the long dead is arithmetic, not a fact.** A tree this old
+  is full of people born in 1850 with no death recorded, and measuring those
+  to today answers **176** — enough to stretch the scale past every real age
+  in the tree. `isDead()` is webtrees' own test for exactly that, tree
+  preference (`MAX_ALIVE_AGE`) and all, so an age is stated for a recorded
+  death, or for somebody the site would still call living, and otherwise not
+  at all. The lab's spread went from 56–176 to 56–116 the moment that landed.
+  This is deliberately *not* the rule behind `deceased`, which is the narrower
+  "the tree recorded a death event" and drives the mourning ribbon; the two
+  answer different questions and only the narrow one has an HTML path.
+- **An age is counted in the calendar of the *birth*.**
+  `AbstractCalendarDate::ageDifference()` says so outright — "perform all
+  calculations using the calendar of the first date" — so a Hijri birth is
+  counted in Hijri years, which run about eleven days short. It is what the
+  website prints, so the app agrees with the website, which is the rule. It is
+  also why the number for a Hijri-born man is a couple of years higher than a
+  Gregorian reader expects.
+
+Both webtrees versions answer identically across the whole lab tree, and
+`live_check` now reports age *coverage* beside the birth-year diff rather than
+comparing it: the page states none and the module states fourteen of
+seventeen, which is §9 #23's shape — saying less, not saying otherwise.
+
+### 2026-08-24 (later still) — Whether to keep the tree on the device
+
+Evaluated in **`sync_eval.md`**, at the user's suggestion and in the spirit of
+`api_eval.md`: dump the tree into SQLite, sync it daily, read it offline.
+
+The recommendation is **yes, with one change of shape**. Not a server-built
+`.sqlite` the app downloads — that puts a multi-megabyte build inside one PHP
+request on somebody else's shared host, which is the most likely way the whole
+feature fails, and it fails at install time. Instead the *client* owns the
+database and fills it from paged record requests, which is resumable, needs no
+server-side state, and makes the first sync and the daily delta the same code
+path.
+
+Measured rather than guessed: **6.2 KB per person** through the module's own
+endpoints over eighteen real records, so ~9 MB for 1,463 people as an upper
+bound and ~2 MB over the wire. The `change` table gives an incremental token
+for free, and a re-import deletes those rows — which makes a
+backwards-moving fingerprint the right trigger to resync from scratch.
+
+What the document is most useful for is what it says *cannot* be local:
+relationship **wording** (the path is a graph walk the store could do; the
+Arabic kinship terms are a large piece of webtrees nobody should port twice),
+statistics as the site publishes them, and the media bytes behind a signature.
+And what is genuinely hard is not the sync — it is the **privacy snapshot**,
+because a store is one user's view of the tree, frozen, on a device.
+
+Drift over ObjectBox, for one reason that is not speed: SQLite is a format a
+server *could* write, and ObjectBox's is not, so choosing Drift keeps a door
+open that choosing ObjectBox closes forever.
+
+Nothing was built. Phase 10a in §5 is the first step and it is a single
+handler.
+
+Released as **0.18.0** with the module at **1.2.1**. **604 tests** green
+(595 → 604) plus 14 goldens, analyzer clean, both labs walked through both
+transports on both webtrees versions with no differences, and the age checked
+across the whole lab tree — identical on 2.2.6 and 2.3, person for person.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -2731,7 +2819,7 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # state — with coverage reported beside them, because a transport can be
 # right and still say less (§9 #23).
 
-flutter test          # 595 tests, plus 14 goldens
+flutter test          # 604 tests, plus 14 goldens
 flutter analyze       # must stay clean
 dart format lib test tool   # CI fails if this changes anything
 
@@ -2775,7 +2863,8 @@ flutter run -d linux  # web is not viable — no CORS
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
 # ancestors, descendants, fan and hourglass charts, the chart options sheet,
-# a relationship (both ways it can be drawn), the search filter sheet,
+# a relationship (both ways it can be drawn), the search filter sheet — twice,
+# because a site running the module offers two controls a page cannot —
 # a timeline and the site's statistics. One shot is rendered
 # on a wide surface — a chart that will not fit a phone legibly opens showing
 # a corner of itself, and reviewing the layout needs the whole family.
@@ -3065,7 +3154,9 @@ Both tools read the password from the terminal with echo disabled, or from
    the search screen run over the results already fetched, because everything
    they run on is already in those rows — which is what makes them free. The
    consequence is that "no matches" can mean "none in the first fifty", and
-   the screen says exactly that. Neither transport is asked to filter:
+   the screen says exactly that. **This is the risk a local store closes
+   outright** (`sync_eval.md` §1): with the tree on the device the filters are
+   tree-wide and instant, and the sentence apologising for them goes away. Neither transport is asked to filter:
    `searchIndividualsAdvanced()` could do sex and a place *id* server-side,
    and neither maps onto what a phone can offer without a place index the
    stock floor does not publish. Worth revisiting only if a real tree makes
@@ -3075,7 +3166,20 @@ Both tools read the password from the terminal with echo disabled, or from
    transport, so this appears as a control that is simply absent rather than
    as one that does nothing — but it does mean two instances of the same app
    offer different filters, and only the diagnostics screen explains why.
-25. **The module fixtures are still written from the design.**
+25. **An age is the site's arithmetic, and it carries two surprises.**
+   `Age::ageYears()` works on Julian days, which is what makes it right where
+   subtracting two printed years is wrong — but
+   `AbstractCalendarDate::ageDifference()` performs "all calculations using
+   the calendar of the first date", so a Hijri birth is counted in *Hijri*
+   years and reads about 3% high to a Gregorian reader. And 2.3 answers the
+   maximum plausible age where 2.2.6 answers a single computed one, so the two
+   versions can differ by a year on a date recorded as a range. Both are
+   webtrees' own answers and both are what the website prints, which is the
+   rule this project follows — but a reader comparing the app to a calculator
+   will find neither.
+   Neither has been seen on `tree.almou.sa`; both were confirmed on the labs,
+   where one person has a Hijri birth and a Gregorian death.
+26. **The module fixtures are still written from the design.**
    `test/fixtures/module/` was transcribed from `api_eval.md` §7 rather than
    captured from a server, which is why bug 40 survived everything — and the
    labs can now produce the real thing for a family whose every member is

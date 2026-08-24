@@ -9,6 +9,7 @@ PersonRef person(
   int? born,
   int? died,
   String? place,
+  int? age,
 }) => PersonRef(
   xref: xref,
   name: xref,
@@ -16,6 +17,7 @@ PersonRef person(
   birthYear: born,
   deathYear: died,
   birthPlace: place,
+  age: age,
 );
 
 void main() {
@@ -87,6 +89,38 @@ void main() {
       expect(facets.latestBirth, 1974);
     });
 
+    test('an age is offered where the rows can be asked it', () {
+      final facets = SearchFacets.of([
+        person('A', born: 1901, age: 73),
+        person('B', born: 1955, age: 40),
+      ]);
+
+      expect(facets.offersAges, isTrue);
+      expect(facets.youngest, 40);
+      expect(facets.oldest, 73);
+    });
+
+    // The two answer the same question and an age answers it better: it is
+    // measured in days, so a tree that records a Hijri birth beside a
+    // Gregorian death gets one scale rather than two six hundred years apart.
+    test('and the birth years step aside when it is', () {
+      final withAges = SearchFacets.of([
+        person('A', born: 1318, age: 75),
+        person('B', born: 1955, age: 40),
+      ]);
+      expect(withAges.offersAges, isTrue);
+      expect(withAges.offersYears, isFalse);
+
+      // Nothing states an age on a stock instance, and there the printed
+      // years are the honest answer rather than no answer at all.
+      final withoutAges = SearchFacets.of([
+        person('A', born: 1901),
+        person('B', born: 1955),
+      ]);
+      expect(withoutAges.offersAges, isFalse);
+      expect(withoutAges.offersYears, isTrue);
+    });
+
     test('one year is not a range, and no year is not a slider', () {
       expect(SearchFacets.of([person('A', born: 1901)]).offersYears, isFalse);
       expect(SearchFacets.of([person('A')]).offersYears, isFalse);
@@ -134,6 +168,35 @@ void main() {
     test('a person with no recorded birth survives a year filter', () {
       final filter = const SearchFilter().withYears(1900, 1910);
       expect(filter.applyTo(people).map((p) => p.xref), ['A', 'D']);
+    });
+
+    test('by age, whether it was reached or is still being lived', () {
+      final mixed = [
+        // Two dead men and a living one, and the reader asking for people in
+        // their seventies means all three kinds.
+        person('A', age: 75),
+        person('B', age: 40),
+        person('C', age: 73),
+        person('D'),
+      ];
+      final filter = const SearchFilter().withAges(70, 80);
+
+      expect(filter.applyTo(mixed).map((p) => p.xref), ['A', 'C', 'D']);
+    });
+
+    test('a person the tree states no age for survives an age filter', () {
+      // The same rule as the years: a tree that recorded no birth has not
+      // said this person is outside the range.
+      final filter = const SearchFilter().withAges(0, 10);
+      expect(filter.applyTo([person('A')]).map((p) => p.xref), ['A']);
+    });
+
+    test('an age and a year of birth are different narrowings', () {
+      final filter = const SearchFilter().withAges(1, 2).withYears(3, 4);
+
+      expect(filter.agedFrom, 1);
+      expect(filter.bornFrom, 3);
+      expect(filter.count, 2);
     });
 
     test('by birthplace, exactly as the site wrote it', () {

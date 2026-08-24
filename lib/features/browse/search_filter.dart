@@ -30,6 +30,8 @@ final class SearchFilter {
     this.sexes = const {},
     this.bornFrom,
     this.bornTo,
+    this.agedFrom,
+    this.agedTo,
     this.birthPlace,
   });
 
@@ -47,6 +49,16 @@ final class SearchFilter {
   final int? bornFrom;
   final int? bornTo;
 
+  /// The youngest and oldest to keep, inclusive — see [PersonRef.age].
+  ///
+  /// A separate narrowing from the years rather than a different spelling of
+  /// it: only one of the two is ever *offered*, because only one of them can
+  /// be answered by the rows in hand, but they mean different things and a
+  /// filter that quietly turned one into the other would be lying about which
+  /// question it had asked.
+  final int? agedFrom;
+  final int? agedTo;
+
   /// The birthplace to keep, matched as the site wrote it.
   ///
   /// One of the places the results actually name rather than free text: a
@@ -57,12 +69,18 @@ final class SearchFilter {
   final String? birthPlace;
 
   bool get isEmpty =>
-      sexes.isEmpty && bornFrom == null && bornTo == null && birthPlace == null;
+      sexes.isEmpty &&
+      bornFrom == null &&
+      bornTo == null &&
+      agedFrom == null &&
+      agedTo == null &&
+      birthPlace == null;
 
   /// How many separate narrowings are in force, for a badge on the button.
   int get count =>
       (sexes.isEmpty ? 0 : 1) +
       (bornFrom == null && bornTo == null ? 0 : 1) +
+      (agedFrom == null && agedTo == null ? 0 : 1) +
       (birthPlace == null ? 0 : 1);
 
   /// Whether [person] survives this filter.
@@ -75,6 +93,14 @@ final class SearchFilter {
     if (born != null) {
       if (bornFrom != null && born < bornFrom!) return false;
       if (bornTo != null && born > bornTo!) return false;
+    }
+
+    final age = person.age;
+    // Same rule as the years, and the same reason: a tree that never recorded
+    // a birth has not said this person is outside the range.
+    if (age != null) {
+      if (agedFrom != null && age < agedFrom!) return false;
+      if (agedTo != null && age > agedTo!) return false;
     }
 
     final place = birthPlace;
@@ -91,26 +117,39 @@ final class SearchFilter {
             if (matches(person)) person,
         ];
 
-  SearchFilter withSexes(Set<Sex> sexes) => SearchFilter(
-    sexes: sexes,
-    bornFrom: bornFrom,
-    bornTo: bornTo,
-    birthPlace: birthPlace,
+  SearchFilter withSexes(Set<Sex> sexes) => _with(sexes: sexes);
+
+  SearchFilter withYears(int? from, int? to) =>
+      _with(bornFrom: from, bornTo: to);
+
+  SearchFilter withAges(int? from, int? to) =>
+      _with(agedFrom: from, agedTo: to);
+
+  SearchFilter withBirthPlace(String? place) => _with(birthPlace: place);
+
+  /// The same filter with one narrowing replaced.
+  ///
+  /// Every field is nullable and null is a meaningful value for all of them,
+  /// so this takes each as a sentinel-free *positional* override: what is not
+  /// named is carried over, and what is named replaces — including with null.
+  SearchFilter _with({
+    Set<Sex>? sexes,
+    Object? bornFrom = _keep,
+    Object? bornTo = _keep,
+    Object? agedFrom = _keep,
+    Object? agedTo = _keep,
+    Object? birthPlace = _keep,
+  }) => SearchFilter(
+    sexes: sexes ?? this.sexes,
+    bornFrom: bornFrom == _keep ? this.bornFrom : bornFrom as int?,
+    bornTo: bornTo == _keep ? this.bornTo : bornTo as int?,
+    agedFrom: agedFrom == _keep ? this.agedFrom : agedFrom as int?,
+    agedTo: agedTo == _keep ? this.agedTo : agedTo as int?,
+    birthPlace: birthPlace == _keep ? this.birthPlace : birthPlace as String?,
   );
 
-  SearchFilter withYears(int? from, int? to) => SearchFilter(
-    sexes: sexes,
-    bornFrom: from,
-    bornTo: to,
-    birthPlace: birthPlace,
-  );
-
-  SearchFilter withBirthPlace(String? place) => SearchFilter(
-    sexes: sexes,
-    bornFrom: bornFrom,
-    bornTo: bornTo,
-    birthPlace: place,
-  );
+  /// Says "this one was not passed", which null cannot say here.
+  static const Object _keep = Object();
 
   /// Whether a person born at [recorded] belongs under the chosen [wanted].
   ///
@@ -130,13 +169,21 @@ final class SearchFilter {
       other is SearchFilter &&
       other.bornFrom == bornFrom &&
       other.bornTo == bornTo &&
+      other.agedFrom == agedFrom &&
+      other.agedTo == agedTo &&
       other.birthPlace == birthPlace &&
       other.sexes.length == sexes.length &&
       other.sexes.containsAll(sexes);
 
   @override
-  int get hashCode =>
-      Object.hash(bornFrom, bornTo, birthPlace, Object.hashAllUnordered(sexes));
+  int get hashCode => Object.hash(
+    bornFrom,
+    bornTo,
+    agedFrom,
+    agedTo,
+    birthPlace,
+    Object.hashAllUnordered(sexes),
+  );
 }
 
 /// What the results on screen can actually be filtered by.
@@ -153,6 +200,8 @@ final class SearchFacets {
     required List<String> places,
     required this.earliestBirth,
     required this.latestBirth,
+    required this.youngest,
+    required this.oldest,
   }) : sexes = Set.unmodifiable(sexes),
        places = List.unmodifiable(places);
 
@@ -161,6 +210,8 @@ final class SearchFacets {
     final places = <String>{};
     int? earliest;
     int? latest;
+    int? youngest;
+    int? oldest;
 
     for (final person in people) {
       if (person.sex != Sex.unknown) sexes.add(person.sex);
@@ -171,6 +222,12 @@ final class SearchFacets {
       if (born != null) {
         if (earliest == null || born < earliest) earliest = born;
         if (latest == null || born > latest) latest = born;
+      }
+
+      final age = person.age;
+      if (age != null) {
+        if (youngest == null || age < youngest) youngest = age;
+        if (oldest == null || age > oldest) oldest = age;
       }
     }
 
@@ -183,6 +240,8 @@ final class SearchFacets {
       places: places.toList()..sort(),
       earliestBirth: earliest,
       latestBirth: latest,
+      youngest: youngest,
+      oldest: oldest,
     );
   }
 
@@ -201,16 +260,33 @@ final class SearchFacets {
   final int? earliestBirth;
   final int? latestBirth;
 
+  /// The span of ages the results cover — see [PersonRef.age].
+  final int? youngest;
+  final int? oldest;
+
   bool get offersSex => sexes.isNotEmpty;
   bool get offersPlace => places.isNotEmpty;
 
-  /// Whether there is a *range* of years to slide through. One year, or none,
-  /// is not a slider.
+  /// Whether there is a *range* of ages to slide through.
+  bool get offersAges =>
+      youngest != null && oldest != null && oldest! > youngest!;
+
+  /// Whether there is a *range* of birth years to slide through. One year, or
+  /// none, is not a slider.
+  ///
+  /// Offered only where an age is not, because the two answer the same
+  /// question and an age answers it better: it is measured in days rather
+  /// than by subtracting one printed year from another, so a tree that
+  /// records a Hijri birth beside a Gregorian death — which this project's
+  /// own does — gets one scale instead of two six hundred years apart. The
+  /// years remain the honest answer where nothing states an age, which is
+  /// every search against an untouched instance.
   bool get offersYears =>
+      !offersAges &&
       earliestBirth != null &&
       latestBirth != null &&
       latestBirth! > earliestBirth!;
 
   /// Whether anything at all can be narrowed.
-  bool get isEmpty => !offersSex && !offersPlace && !offersYears;
+  bool get isEmpty => !offersSex && !offersPlace && !offersYears && !offersAges;
 }

@@ -223,6 +223,18 @@ class AppTextAr extends AppText {
   String get filterSexUnknown => 'غير مسجَّل';
 
   @override
+  String get filterAge => 'العمر';
+
+  @override
+  String filterAgeRange(String from, String to) {
+    return '$from–$to';
+  }
+
+  @override
+  String get filterAgeNote =>
+      'كم يبلغ كل شخص من العمر، أو كم بلغ عند وفاته. ولا يُخفي هذا أحدًا لم تسجّل له الشجرة ميلادًا أو عمرًا.';
+
+  @override
   String get filterBorn => 'سنة الميلاد';
 
   @override

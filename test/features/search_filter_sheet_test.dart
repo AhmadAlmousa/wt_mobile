@@ -18,12 +18,14 @@ void main() {
     Sex sex = Sex.unknown,
     int? born,
     String? place,
+    int? age,
   }) => PersonRef(
     xref: xref,
     name: xref,
     sex: sex,
     birthYear: born,
     birthPlace: place,
+    age: age,
   );
 
   Future<void> open(
@@ -54,10 +56,11 @@ void main() {
     person('C'),
   ];
 
-  /// The same people as the module states them.
+  /// The same people as the module states them — with a sex and an age the
+  /// page could not have computed.
   final fromTheModule = [
-    person('A', sex: Sex.male, born: 1901, place: 'الكويت، الكويت'),
-    person('B', sex: Sex.female, born: 1955, place: 'مكة، السعودية'),
+    person('A', sex: Sex.male, born: 1901, place: 'الكويت، الكويت', age: 73),
+    person('B', sex: Sex.female, born: 1955, place: 'مكة، السعودية', age: 40),
     person('C', sex: Sex.female),
   ];
 
@@ -83,6 +86,37 @@ void main() {
     // Offered beside the two, because a tree this old records plenty of
     // people whose sex nobody wrote down.
     expect(find.text('Not recorded'), findsOne);
+  });
+
+  testWidgets('an age takes the place of the years where one is known', (
+    tester,
+  ) async {
+    await open(tester, fromTheModule);
+
+    // Both answer "which generation", and an age answers it in days rather
+    // than by subtracting one printed year from another — so only one slider
+    // is offered, and it is the better one.
+    expect(find.text('Age'), findsOne);
+    expect(find.text('Year of birth'), findsNothing);
+
+    await open(tester, fromThePage);
+    expect(find.text('Age'), findsNothing);
+    expect(find.text('Year of birth'), findsOne);
+  });
+
+  testWidgets('the age slider narrows to the people inside it', (tester) async {
+    await open(tester, fromTheModule);
+
+    final track = tester.getRect(find.byType(RangeSlider));
+    await tester.dragFrom(
+      Offset(track.right - 24, track.center.dy),
+      Offset(-track.width, 0),
+    );
+    await tester.pumpAndSettle();
+
+    // The forty-year-old, and the person the tree states no age for — who is
+    // not somebody outside the range, only somebody it did not say.
+    expect(find.text('Show 2 people'), findsOne);
   });
 
   testWidgets('the button says how many people the choice leaves', (

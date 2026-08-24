@@ -28,6 +28,7 @@ PersonRef personFrom(Map<String, Object?> json) => PersonRef(
   birthYear: intOf(json['birthYear']),
   deathYear: intOf(json['deathYear']),
   birthPlace: stringOf(json['birthPlace']),
+  age: intOf(json['age']),
 );
 
 /// The GEDCOM sex the module states outright.

@@ -463,6 +463,24 @@ abstract class AppText {
   /// **'Not recorded'**
   String get filterSexUnknown;
 
+  /// No description provided for @filterAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Age'**
+  String get filterAge;
+
+  /// The chosen span of ages.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to}'**
+  String filterAgeRange(String from, String to);
+
+  /// No description provided for @filterAgeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'How old each person is, or was when they died. Nobody the tree records neither a birth nor an age for is hidden by this.'**
+  String get filterAgeNote;
+
   /// No description provided for @filterBorn.
   ///
   /// In en, this message translates to:

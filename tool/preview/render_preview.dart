@@ -27,12 +27,67 @@ import '../../test/support/test_app.dart';
 ///
 /// The fixtures are the same ones the parser tests run against, so what these
 /// pictures show is what the parsers actually produce.
-Map<String, Canned Function(Sent)> _browsableSite() {
+///
+/// [withModule] answers the module's capability list and its search endpoint
+/// as well, which is the only way to photograph the controls a stock instance
+/// cannot offer — a sex, and an age. Everything else still comes from the
+/// page, exactly as the capability composer would arrange it.
+Map<String, Canned Function(Sent)> _browsableSite({bool withModule = false}) {
   String fixture(String name) =>
       File('test/fixtures/v2_2_6/$name').readAsStringSync();
 
   return {
     ...workingSite(),
+    if (withModule) ...{
+      '/mobile-api/v1/capabilities': (_) => Canned(
+        200,
+        contentType: 'application/json',
+        body: jsonEncode({
+          'api': 1,
+          'module': '1.2.0',
+          'features': ['individuals'],
+        }),
+      ),
+      '/tree/main/mobile-api/v1/individuals': (_) => Canned(
+        200,
+        contentType: 'application/json',
+        body: jsonEncode({
+          'offset': 0,
+          'limit': 50,
+          'hasMore': false,
+          'people': [
+            _modulePerson(
+              'X42',
+              'عبد الله الموسى',
+              'male',
+              1901,
+              'الكويت، الكويت',
+              73,
+              true,
+            ),
+            _modulePerson(
+              'X43',
+              'نورة الموسى',
+              'female',
+              1903,
+              'مكة، السعودية',
+              77,
+              true,
+            ),
+            _modulePerson(
+              'X80',
+              'خالد الموسى',
+              'male',
+              1955,
+              'الكويت، الكويت',
+              71,
+              false,
+            ),
+            _modulePerson('X81', 'هيا الموسى', 'female', 1990, null, 36, false),
+          ],
+        }),
+      ),
+    },
     '/tree/main/tom-select-individual': (request) => Canned(
       200,
       contentType: 'application/json',
@@ -137,13 +192,14 @@ Future<void> main() async {
     required ThemeMode theme,
     int steps = 0,
     double scroll = 0,
+    bool withModule = false,
     Size surface = const Size(1080, 2340),
   }) async {
     tester.view.physicalSize = surface;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
-    final server = FakeWebtrees(_browsableSite());
+    final server = FakeWebtrees(_browsableSite(withModule: withModule));
     final settings = testSettings(locale: locale, theme: theme);
     final session = sessionManagerFor(server, settings: settings);
     addTearDown(session.dispose);
@@ -478,6 +534,19 @@ Future<void> main() async {
         );
       });
 
+      // The same sheet against a site running the module, which states two
+      // things a page cannot: a sex, and an age.
+      testWidgets('search filter, module $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'search-filter-module-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 16,
+          withModule: true,
+        );
+      });
+
       testWidgets('timeline $tag $mode', (tester) async {
         await capture(
           tester,
@@ -500,6 +569,28 @@ Future<void> main() async {
     }
   }
 }
+
+/// One person as the module presents them.
+Map<String, Object?> _modulePerson(
+  String xref,
+  String name,
+  String sex,
+  int born,
+  String? place,
+  int age,
+  bool deceased,
+) => {
+  'xref': xref,
+  'name': name,
+  'sex': sex,
+  'deceased': deceased,
+  'lifespan': '$born–',
+  'birthYear': born,
+  'birthPlace': place,
+  'age': age,
+  'thumbnail': null,
+  'private': false,
+};
 
 /// A lifespan in the markup `Individual::lifespan()` actually emits.
 ///

@@ -53,16 +53,21 @@ class SearchFilterSheet extends StatefulWidget {
 class _SearchFilterSheetState extends State<SearchFilterSheet> {
   late SearchFilter _filter = widget.filter;
 
-  /// The slider's own position, which is the whole span until it is moved.
+  /// Each slider's own position, which is its whole span until it is moved.
   ///
-  /// Held separately from the filter because "no year filter" and "the year
-  /// filter happens to cover everything" are the same set of people and
-  /// different states: only the first leaves a person with no recorded birth
+  /// Held separately from the filter because "no filter" and "a filter that
+  /// happens to cover everything" are the same set of people and different
+  /// states: only the first leaves a person the tree says nothing about
   /// visible without a rule about it, and only the second counts towards the
   /// badge on the button.
   late RangeValues _years = RangeValues(
     (_filter.bornFrom ?? widget.facets.earliestBirth ?? 0).toDouble(),
     (_filter.bornTo ?? widget.facets.latestBirth ?? 0).toDouble(),
+  );
+
+  late RangeValues _ages = RangeValues(
+    (_filter.agedFrom ?? widget.facets.youngest ?? 0).toDouble(),
+    (_filter.agedTo ?? widget.facets.oldest ?? 0).toDouble(),
   );
 
   @override
@@ -127,6 +132,48 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
                         onSelected: (on) => _toggleSex(sex, on),
                       ),
                   ],
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // How old somebody is, or was — one question a reader asks
+              // and two the data answers. Offered wherever the rows can be
+              // asked it, which today means a site running the module: an
+              // age is arithmetic on days, and a search row from the page
+              // carries two printed years that may not even be in the same
+              // calendar.
+              if (facets.offersAges) ...[
+                _Heading(
+                  text.filterAge,
+                  trailing: ltrRun(
+                    text.filterAgeRange(
+                      '${_ages.start.round()}',
+                      '${_ages.end.round()}',
+                    ),
+                  ),
+                ),
+                RangeSlider(
+                  values: _ages,
+                  min: facets.youngest!.toDouble(),
+                  max: facets.oldest!.toDouble(),
+                  divisions: facets.oldest! - facets.youngest!,
+                  labels: RangeLabels(
+                    '${_ages.start.round()}',
+                    '${_ages.end.round()}',
+                  ),
+                  onChanged: (chosen) => setState(() {
+                    _ages = chosen;
+                    _filter = _filter.withAges(
+                      chosen.start.round(),
+                      chosen.end.round(),
+                    );
+                  }),
+                ),
+                Text(
+                  text.filterAgeNote,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -243,6 +290,10 @@ class _SearchFilterSheetState extends State<SearchFilterSheet> {
     _years = RangeValues(
       (widget.facets.earliestBirth ?? 0).toDouble(),
       (widget.facets.latestBirth ?? 0).toDouble(),
+    );
+    _ages = RangeValues(
+      (widget.facets.youngest ?? 0).toDouble(),
+      (widget.facets.oldest ?? 0).toDouble(),
     );
   });
 

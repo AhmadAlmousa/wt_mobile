@@ -113,6 +113,17 @@ void main() {
         expect(page.people.first.birthPlace, 'الكويت، الكويت');
       });
 
+      // An age is arithmetic on days, which a rendered page cannot be asked
+      // for: it prints two years that may not even be in the same calendar.
+      // So the floor answers nothing here and the module answers a number,
+      // and anything offered on that basis has to survive both — which is
+      // what `SearchFacets` exists to decide.
+      test('states an age only where one can be computed', () async {
+        final page = await build().search('main', 'الموسى');
+
+        expect(page.people.first.age, anyOf(isNull, 73));
+      });
+
       test(
         'a person with no recorded birthplace has none, not an empty one',
         () async {
