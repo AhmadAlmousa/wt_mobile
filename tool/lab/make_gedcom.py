@@ -22,7 +22,15 @@ Deliberately included, each because something in the app depends on it:
   * A relative's death                       - the fact the chart-box tag
                                                dictionary provably cannot learn
 
-Usage:  python3 tool/lab/make_gedcom.py > /path/to/lab.ged
+Usage:  python3 tool/lab/make_gedcom.py [--bulk N] > /path/to/lab.ged
+
+`--bulk N` appends N more invented people in ordinary families, on top of the
+hand-built tree above. Nothing in the app is tested against them and nothing
+should be: they exist to answer the one question a nineteen-person tree cannot,
+which is what a sync of a *real* tree costs — `sync_eval.md` extrapolated
+1,463 people from eighteen, and PROJECT.md §10a is where that extrapolation
+gets measured. Keep it out of the default lab: a check that walks a whole tree
+should walk the small deliberate one.
 """
 
 from __future__ import annotations
@@ -348,6 +356,65 @@ def build() -> None:
     out(0, "TRLR")
 
 
+def bulk(count: int) -> None:
+    """Append `count` invented people, in families of four, as one long line.
+
+    Deliberately dull. Every person carries a name, a sex, a birth and a
+    death, which is what a record costs on the wire; nothing carries a note,
+    a citation or a photograph, because the hand-built tree already holds one
+    of each and the point here is the *count*.
+    """
+    GIVEN_M = ["أحمد", "محمد", "سعد", "فهد", "ناصر", "بدر", "طلال", "زياد"]
+    GIVEN_F = ["نورة", "هيا", "سارة", "منى", "دلال", "ريم", "شهد", "لمى"]
+    SURNAMES = ["الحربي", "القحطاني", "الدوسري", "المطيري", "الشمري", "العتيبي"]
+    PLACE = "الرياض, السعودية"
+
+    made = 0
+    number = 0
+
+    while made < count:
+        number += 1
+        surname = SURNAMES[number % len(SURNAMES)]
+        year = 1900 + number % 60
+        father = f"B{number}A"
+        mother = f"B{number}B"
+        fam = f"BF{number}"
+
+        individual(
+            father, GIVEN_M[number % len(GIVEN_M)], surname, "M",
+            birth=str(year), birth_place=PLACE, death=str(year + 70), fams=[fam],
+        )
+        individual(
+            mother, GIVEN_F[number % len(GIVEN_F)], SURNAMES[(number + 1) % len(SURNAMES)],
+            "F", birth=str(year + 2), birth_place=PLACE, fams=[fam],
+        )
+        made += 2
+
+        children = []
+        for index in range(min(2, count - made)):
+            child = f"B{number}C{index}"
+            individual(
+                child, GIVEN_M[(number + index) % len(GIVEN_M)], surname, "M",
+                birth=str(year + 25 + index), birth_place=PLACE, famc=fam,
+            )
+            children.append(child)
+            made += 1
+
+        family(fam, father, mother, children, marriage=str(year + 22), marriage_place=PLACE)
+
+
 if __name__ == "__main__":
+    extra = 0
+    if len(sys.argv) > 2 and sys.argv[1] == "--bulk":
+        extra = int(sys.argv[2])
+
     build()
+
+    if extra > 0:
+        # The trailer has to stay last.
+        assert LINES[-1] == "0 TRLR"
+        LINES.pop()
+        bulk(extra)
+        out(0, "TRLR")
+
     sys.stdout.write("\n".join(LINES) + "\n")

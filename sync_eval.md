@@ -111,9 +111,14 @@ stores the token. Tomorrow it sends `since=<token>` and gets only what changed.
 Everything that was hard becomes easy: no server-side file, no temp storage,
 no job, no timeout risk (each page is bounded), resumable by construction, and
 the *first* sync and the *daily* sync are the same code path with a different
-parameter. It also reuses `paginateQuery`, which `api_eval.md` §4 already
-established dedupes multi-name rows across the whole cursor and applies
-`canShow()` before counting down the offset.
+parameter.
+
+*Written before it was built: this said the endpoint would reuse
+`paginateQuery`, on `api_eval.md` §4's reading that it dedupes across the whole
+cursor. It does not, and paging it hands the same person over twice — see
+`PROJECT.md` §7, bug 53. The built endpoint walks `individuals` in xref order
+instead, which is an indexed `LIMIT`, `O(1)` in the offset, and duplicate-free
+by construction. Nothing else in this section changed.*
 
 The cost is a client-side write loop instead of a file copy. Against 1,463
 records that is seconds, in an isolate, once.
@@ -272,6 +277,27 @@ Extrapolated to the real tree, **1,463 people**:
 For scale: 9 MB is a third of one of the APKs this project already builds.
 The first sync is a few seconds of network and a few seconds of writing.
 
+**Measured 2026-08-24, once the endpoint existed** (`PROJECT.md` §6, Phase
+10a), against a lab rebuilt with 1,450 more invented people:
+
+| | Extrapolated above | Measured on 1,469 |
+|---|---|---|
+| Requests at `limit=200` | 8 | **8** |
+| Full walk | a few seconds | **6.8 s**, 4.6 ms/person |
+| On the wire | ~9 MB upper bound | **4.69 MB**, 3.2 KB/person |
+| Peak memory, one page | not considered | under **16 MB** |
+| A page at a deep offset | `O(offset)` | **flat** — 0.26 s at 0 and at 1,400 |
+
+Three notes on reading that table. The 3.2 KB is a **floor**, not a
+correction: the bulk people carry a name, a sex, a birth and a death, where
+the eighteen measured above each have notes, a citation and two photographs at
+6.2 KB — so a real tree sits between them and 4.7–9 MB is the honest bracket.
+The flat deep-offset cost is not `paginateQuery` behaving better than §3
+expected; it is the built endpoint ordering by xref instead, which makes paging
+an indexed SQL `LIMIT` (see §3). And the gzip figure from this tree is
+worthless — 1,450 people drawn from eight given names compress absurdly well —
+so **~2 MB over the wire remains an estimate.**
+
 **Where it stops being free.** A 100,000-person tree is ~600 MB at the same
 rate, which is not a phone-sized artefact. If "works against any webtrees
 instance" is to keep meaning something, the design needs a ceiling: sync a
@@ -390,7 +416,7 @@ Each phase is useful on its own and none of them requires the next.
 
 | | Phase | What it delivers |
 |---|---|---|
-| **10a** | `GET …/records?offset=&limit=&since=` in the module; a `token` derived from `MAX(change_id)` and the tree's counts | The wire, testable with `curl` before any client work |
+| **10a** ✅ | `GET …/records?offset=&limit=&since=` in the module; a `token` derived from `MAX(change_id)` and the tree's counts | The wire, testable with `curl` before any client work — **built, module 1.3.0**, and it answered the question below: 8 requests, 6.8 s, 4.69 MB, 16 MB of memory |
 | **10b** | Drift schema, a `LocalRecordsTransport`, and the sync loop in an isolate | The store fills. Nothing reads it yet |
 | **10c** | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | Instant person and search — and **tree-wide filters**, which closes §9 #24 |
 | **10d** | Charts and timeline computed from the store | Nine of eleven capabilities local |
@@ -401,6 +427,15 @@ Each phase is useful on its own and none of them requires the next.
 it can be verified against both labs the same afternoon, and it answers the
 only question the rest depends on: does a real server hand over 1,463 records
 in eight requests without falling over.
+
+*Done, 2026-08-24, and the answer is yes.* Two things it changed about the
+rest of this document. The machinery it sits on was **not** quite the
+machinery §3 named — paging `SearchService` hands the same person over twice
+(`PROJECT.md` §7, bug 53), so the walk orders by xref and §8's deep-offset
+worry goes away with it. And a delta is bigger than a changed record: a
+payload names a person's family, so renaming one man restates his whole
+household, which is why the endpoint expands every change two hops through
+`LinkedRecordService`. **10b is next, and nothing in it is blocked.**
 
 ---
 
@@ -432,3 +467,12 @@ sound for size, weaker for time, and silent about what a shared host does when
 asked for 200 records in one request. Phase 10a exists to answer exactly that,
 and until it has, every number in §8 should be read as an argument rather than
 as evidence.
+
+*Updated 2026-08-24.* Phase 10a has now answered it **on a lab**: 1,469
+invented people, 8 requests, 6.8 s, 4.69 MB, and a 200-record page that runs
+inside a 16 MB `memory_limit` — so the shared-host worry is smaller than it
+looked, because nothing accumulates across a page. Two things are still
+untested and both matter: **the real tree**, whose instance runs module 1.0.1
+and cannot be updated from this machine (`PROJECT.md` §9 #18), and **a real
+shared host**, where `max_execution_time` is enforced and PHP is not the CLI
+build the labs use.

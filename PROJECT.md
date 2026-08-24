@@ -101,10 +101,13 @@ path beside the stock transport rather than as a replacement for it. Extending
 `webtrees-API` would have meant rewriting auth, transport and payload —
 everything except the module skeleton.
 
-It now exists, at `server/webtrees-mobile-api/`: thirteen read-only `GET`
+It now exists, at `server/webtrees-mobile-api/`: fourteen read-only `GET`
 endpoints, no vendored dependencies, and one adapter class per webtrees minor
-version. **It has never been executed** — there is no PHP on this machine — so
-§9 #18 governs what may be claimed for it, and no parser has been retired.
+version. It runs: two lab installs, both webtrees versions, and the real tree
+(§9 #18 governs what may be claimed for it, and no parser has been retired —
+`api_eval.md` §11's rule is that none ever is). *This paragraph read "it has never been
+executed — there is no PHP on this machine" until 2026-08-24; PHP 8.4 and the
+labs arrived in §8 and this sentence did not notice.*
 
 Three findings carry that, and each is a fact about upstream rather than a
 preference:
@@ -553,10 +556,41 @@ confirmed by reading both versions while writing `api_eval.md`.
 - **A tree *can* be enumerated in-process, though not over a stock route.**
   `SearchService::searchIndividualNames($trees, $search, $offset, $limit)`
   applies no filter for an empty term array, so the same method that searches
-  also walks a whole tree ordered by `n_sort`. `paginateQuery()` dedupes
-  multi-name rows across the *whole* cursor and applies `canShow()` **before**
-  counting down the offset — which fixes both halves of the paging trap above.
-  It is a PHP cursor rather than a SQL `LIMIT`, so the cost is `O(offset)`.
+  also walks a whole tree ordered by `n_sort`.
+  **Its paging does not fix the multi-name trap, and reading it carelessly says
+  it does.** `paginateQuery()` dedupes against the collection it is *building*
+  and counts the offset down over rows it has not deduped, so `offset=5` counts
+  five *rows* where `limit=5` answered five *people* — and a person recorded
+  under two names arrives again on the next page. Same code in 2.2.6 and 2.3,
+  and it is the trap the stock autocomplete has, inherited rather than avoided
+  (§7, bug 53). What removes it is asking from the top every time — at
+  `offset=0` every accepted row is pushed, so the dedup set is everything
+  walked — and taking the page in the module.
+  It is a PHP cursor rather than a SQL `LIMIT`, so the cost is `O(offset)` in
+  time, and `O(offset)` in memory once the page is taken this way: measured on
+  a 1,469-person tree, a page at offset 1,400 costs 0.13 s against 0.05 s at
+  the top and runs inside a 16 MB `memory_limit`.
+- **Ordering by xref needs none of that.** `individuals` is keyed
+  `(i_file, i_id)`, so a walk that does not care about name order is a real
+  SQL `LIMIT` over an index: no join to `name`, no duplicates, and `O(1)` in
+  the offset — 0.26 s per page of fifty full records whether the offset is 0 or
+  1,400. Which is why the sync endpoint orders by xref and the search endpoint
+  cannot.
+- **An import writes no change rows, and deletes the ones there were.**
+  `GedcomLoad` truncates `change` for the tree before reading the first record
+  — `Http/RequestHandlers/GedcomLoad.php:106` on 2.2.6,
+  `Http/Controllers/GedcomLoad.php` on 2.3, and `Cli/Commands/TreeImport.php`
+  on both. Confirmed on the labs, where a freshly imported 19-person tree has
+  `MAX(change_id)` of nothing at all. So a watermark taken from that column
+  moves *backwards* after a re-import, which is what makes it a resync trigger;
+  and it cannot see the import itself, which is why the tree's record counts
+  are part of the fingerprint. What neither can see is in §9 #27.
+- **`LinkedRecordService` answers "who does this record show up on".**
+  `linkedIndividuals()` and `linkedFamilies()` are public, identical in both
+  versions, and already privacy-filtered — and the `link` table holds **both
+  directions** (`F1 CHIL X42` *and* `X42 FAMC F1`), so one hop finds the people
+  a note or a photograph hangs on and two hops find everyone in a changed
+  person's families.
 - **Media can be requested at any size.** `MediaFile::imageUrl($w, $h, $fit)`
   mints the signed URL server-side and `downloadUrl()` addresses the original.
   The 100-pixel ceiling in §9 #3 is a property of the media *tab*, not of
@@ -924,7 +958,10 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **8d** | The capability ledger: every remaining capability diffed transport against transport, and a lab with a photograph in it | ✅ — nine cleared, `statistics` deliberately not |
 | **9a** | Relationships drawn: a path as a family tree, and the direction each step runs | ✅ |
 | **9b** | Narrowing a page of search results — sex, age or year of birth, birthplace | ✅ |
-| **10** | A local database: sync the tree, read it offline | ⬜ — evaluated in `sync_eval.md`, recommended, not started |
+| **10a** | The sync wire: the whole tree in pages, then only what changed | ✅ — module `/records`, measured on 1,469 people |
+| **10b** | Drift schema, a local transport, the sync loop in an isolate | ⬜ |
+| **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ⬜ — closes §9 #24 |
+| **10d–f** | Charts and timeline from the store · thumbnail blobs and a sync screen · a ceiling for large trees | ⬜ — `sync_eval.md` §12 |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -969,6 +1006,7 @@ the parser behind it stays, fixtures and all, and stays tested.
 | `relationship` | how many paths, the site's own phrase for the whole relationship, each step's word and person, and which way each step runs | the real tree | ✅ |
 | `timeline` | which events, in what order | the real tree | ✅ |
 | `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | the real tree | ❌ **read from the page** |
+| `records` | the whole tree in pages, then a delta: every record identical to the one `/individual` answers, nobody handed over twice, a fingerprint that refuses what it cannot follow | both labs, 19 people and then 1,469 | ⏸ **nothing composes it yet** — Phase 10b is the client |
 
 All of them have now been run against **`tree.almou.sa`** — the real
 1,463-person tree with the module installed — as well as against both labs on
@@ -2284,6 +2322,98 @@ Released as **0.18.0** with the module at **1.2.1**. **604 tests** green
 transports on both webtrees versions with no differences, and the age checked
 across the whole lab tree — identical on 2.2.6 and 2.3, person for person.
 
+### 2026-08-24 (later still) — Phase 10a: the wire a local copy is filled from
+
+`sync_eval.md` §12 said to start here and said why: *"It is a single handler
+over machinery that already exists, it can be verified against both labs the
+same afternoon, and it answers the only question the rest depends on: does a
+real server hand over 1,463 records in eight requests without falling over."*
+It does — **8 requests, 4.69 MB, 6.8 seconds, inside a 16 MB `memory_limit`** —
+and getting there cost one real bug and corrected three documents.
+
+`GET /tree/{t}/mobile-api/v1/records` answers the same record
+`/individual/{xref}` does, in pages, with `sections` and `charts` stated once
+per page rather than once per person because they describe the tree and not
+anybody in it. With `since=<token>` it answers only what a change has touched.
+The record itself moved into `RecordComposer`, which is what makes "the same
+payload" a fact about the code rather than a promise: `/individual` and
+`/records` now compose from one place, and `live_check` diffs a page against
+the single-record endpoint field by field to keep it that way.
+
+**The bug is the part worth keeping.** The first walk of the lab tree in pages
+of five returned 22 people from a tree of 18, and four of them twice — the four
+with a romanized second name.
+`SearchService::searchIndividualNames($trees, $terms, $offset, $limit)` invites
+being paged by its own arguments, and `paginateQuery()` dedupes against the
+collection it is *building* while counting the offset down over rows it has not
+deduped. So an offset counts *rows* and a page counts *people*, and the
+difference arrives again on the next page. This is the trap §3 has always
+described in the stock autocomplete — and `api_eval.md` §4, `PROJECT.md` §3 and
+`sync_eval.md` §3 had all recorded it as *fixed* by the very method that has
+it. Three documents, one careless reading, and it survived because nothing had
+ever walked a whole tree in small pages. The search endpoint is fixed by asking
+from the top every time, where the dedup set is everything walked, and taking
+the page in the module; the sync endpoint does not use that walk at all,
+because ordering by xref makes paging an indexed SQL `LIMIT` — `O(1)` in the
+offset instead of `O(offset)`, no join to `name`, and duplicate-free by
+construction.
+
+**The fingerprint is `MAX(change_id)` and the tree's counts**, and both halves
+were confirmed rather than assumed. Every edit writes a `change` row, so the
+largest id is a watermark and a delta is everything above it. But an import
+*deletes* the tree's change rows before reading the first record — on 2.2.6, on
+2.3, and from the command line — so the watermark moves backwards after a
+re-import, which is exactly the signal to throw a local copy away; and it
+cannot see the import at all, which is why the counts are in the fingerprint
+too. A fingerprint this tree cannot describe a path from answers
+`resync: true`, which is not an error and carries no records.
+
+Two things only running it settled:
+
+- **A changed person is not one changed record.** A payload names their
+  parents, spouses, siblings and children, so renaming one man restates a
+  dozen other records — and a store that missed that would show his old name
+  beside his children until something else touched them. So a delta expands
+  every changed xref two hops through `LinkedRecordService`: what it links to,
+  and everybody in every family it belongs to. The `link` table holds both
+  directions (`F1 CHIL X42` *and* `X42 FAMC F1`), which is what makes one
+  method answer both questions. Changing X42 in the lab answers 13 people;
+  changing his family answers its 4; changing the note, the photograph or the
+  source on him answers him alone.
+- **A record this reader may not see is a tombstone, not a gap.** The lab's one
+  `RESN confidential` person, touched, comes back in `deleted` — because for
+  one reader's copy of a tree "you may no longer see this" and "this is gone"
+  are the same instruction. An xref that has left the tree altogether comes
+  back the same way, and a tombstone a client does not recognise costs it
+  nothing.
+
+Measured, on a lab rebuilt with 1,450 more invented people (`setup.sh 2.2.6
+8622 1450`, kept out of the default lab on purpose):
+
+| | |
+|---|---|
+| Full walk, 1,469 people | 8 requests at `limit=200`, **6.8 s**, 4.6 ms/person |
+| On the wire | **4.69 MB**, 3.2 KB/person |
+| Peak memory for a 200-record page | under **16 MB** — nothing accumulates |
+| A page of 50 full records | 0.26 s at offset 0, **0.26 s at offset 1,400** |
+| The search walk, same tree | 0.05 s → 0.13 s over the same offsets |
+
+The 3.2 KB is a *floor* rather than a figure: the bulk people carry a name, a
+sex, a birth and a death and nothing else, where `sync_eval.md` §8 measured
+6.2 KB over eighteen people who each have notes, a citation and photographs. A
+real tree sits between them, which brackets 1,463 people at **4.7–9 MB** and
+corroborates §8's "realistically 4–6 MB". The gzip figure from this tree is
+meaningless — 1,450 people drawn from eight given names compress absurdly well
+— so §8's ~2 MB estimate stands unverified.
+
+Released as **0.19.0** with the module at **1.3.0**. **604 tests** green plus
+14 goldens — unchanged, and worth saying why: nothing in `lib/` moved, because
+Phase 10a is deliberately server-side. What checks it is `tool/check_module.py`
+(40 files, both webtrees versions), a new `=== Sync ===` section in
+`live_check` that walks the tree, diffs every record against `/individual`,
+and asserts a stale fingerprint is refused, and both labs run end to end on
+both webtrees versions with every check passing.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -2344,6 +2474,7 @@ across the whole lab tree — identical on 2.2.6 and 2.3, person for person.
 | 49 | The module called a buried man living. `deceased` asked for a `DEAT` fact; `Gedcom::DEATH_EVENTS` is `DEAT`, `BURI`, `CREM`, and a chart box prints a tag for whichever it finds — so the page mourned him and the module did not | **The real tree, walking 40 records** |
 | 50 | A family with children, no marriage recorded and **no wife recorded at all** had its eldest son read as the second spouse. Nothing in the rows says which is which — a father and a son both render `wt-sex-m`, and the `<th>` beside them is a translated relationship name | **The real tree, walking 40 records** |
 | 51 | The lab had privacy **switched off** for its whole life: `canShowRecord()` returns true for everybody before it examines anything unless `HIDE_LIVE_PEOPLE` is `'1'`, so a `1 RESN confidential` in the GEDCOM did nothing and no privacy rule had ever been exercised | Found while building a record for bug 50 |
+| 53 | **The module's own paging handed the same person over twice.** `SearchService::searchIndividualNames($trees, $terms, $offset, $limit)` invites being paged by its own parameters, and `paginateQuery()` dedupes against the collection it is *building* while counting the offset down over rows it has not deduped — so `offset=5&limit=5` skips five *rows* and answers five *people*. Four of the lab's nineteen have a romanized second name, and browsing them in pages of five produced 22 rows for 18 people. Same code in 2.2.6 and 2.3, and the same trap §3 describes in the stock autocomplete: inherited, not avoided, and the design documents had all recorded it as fixed | **The first walk of a whole tree through the new sync endpoint** |
 | 52 | **Bug 19 again, and only half fixed the first time.** `ltrRun` isolates a lifespan so the paragraph around it cannot reorder it — which works for `1901–1974` and *not* for `١٣١٨–١٩٧٤`. An isolate sets the run's base direction; it does not change what is inside it, and Arabic-Indic digits are **Arabic** numbers rather than European ones, so bidi rule N1 resolves the dash between two of them as right-to-left and the run is reordered around it. Every lifespan on a site rendering in Arabic — which is every lifespan on `tree.almou.sa` — read `١٩٧٤–١٣١٨`: the man died before he was born, in an English interface and an Arabic one alike | **Rendered preview, from a fixture captured off a real server** |
 
 50 is the interesting one, because the markup genuinely does not say. The
@@ -2818,6 +2949,11 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # which events and in what order; and the statistics by the figures both
 # state — with coverage reported beside them, because a transport can be
 # right and still say less (§9 #23).
+# Then `=== Sync ===`, which walks the *whole* tree through the module's
+# records endpoint: it is the only check that pages far enough to have found
+# bug 53, and it diffs every record it receives against the single-record
+# endpoint, holds the fingerprint to the whole walk, and asks the server to
+# refuse three fingerprints it cannot follow.
 
 flutter test          # 604 tests, plus 14 goldens
 flutter analyze       # must stay clean
@@ -2850,6 +2986,11 @@ find server -name '*.php' -print0 | xargs -0 -n1 php -l
 # Requires: php8.4-cli php8.4-{sqlite3,mbstring,intl,gd,xml,curl,zip} composer
 tool/lab/setup.sh 2.2.6 8622
 tool/lab/setup.sh main  8623
+# A third argument appends that many more invented people, which is how the
+# sync figures in §6 were measured rather than extrapolated. Deliberately not
+# the default: a check that walks a whole tree should walk the small
+# deliberate one, where every shape is there on purpose.
+tool/lab/setup.sh 2.2.6 8622 1450
 php -S localhost:8622 -t ../lab/webtrees-2.2.6 ../lab/webtrees-2.2.6/index.php &
 
 # live_check reads the same person through BOTH transports and diffs them
@@ -3117,12 +3258,20 @@ Both tools read the password from the terminal with echo disabled, or from
    can fix that — the app already draws the placeholder — but it means a 2.3
    site with PNG or GIF media shows a gallery of placeholders, and it is worth
    reporting upstream.
-21. **The module's surname index and enumeration have never met a large tree.**
+21. **The module's surname index and enumeration have now met a large tree —
+   a synthetic one.** *(Narrowed 2026-08-24.)*
    `searchIndividualNames()` walks a PHP cursor rather than a SQL `LIMIT`, so
    a deep offset is `O(offset)`; `searchIndividualsAdvanced()` fetches a whole
    surname partition (webtrees caps it at 5,000) and pages it in PHP. Both are
-   bounded and both are what the website itself does, but the target tree is
-   1,463 people and neither has been measured on one ten times that.
+   bounded and both are what the website itself does.
+   Measured on a 1,469-person lab (§6, Phase 10a): a page of fifty costs
+   0.05 s at the top and 0.13 s at offset 1,400, and the whole browse walks in
+   1.2 s. **Fixing bug 53 made the search walk `O(offset)` in memory as well**
+   — the page is taken after a walk from the top, so the prefix is held — which
+   is why `Individuals::MAX_OFFSET` refuses past row 5,000 and names the
+   surname index instead. At offset 1,400 the request still runs inside a
+   16 MB `memory_limit`, so the ceiling is a guard rather than a limit anybody
+   meets. Still untested: a tree ten times that, and the surname index on one.
 22. **Nothing the project owns can see the screen.** *(Half closed by Phase
    5.)* Four faults (§7, 40–43)
    were found by a person using the app, after 509 tests, a static checker
@@ -3185,6 +3334,31 @@ Both tools read the password from the terminal with echo disabled, or from
    labs can now produce the real thing for a family whose every member is
    invented, so there is nothing left to sanitize. Capturing them is the
    cheapest remaining way to move a live-only check into the offline suite.
+
+27. **The sync fingerprint has one blind spot, and it is a re-import.**
+   `MAX(change_id)` plus the tree's individual and family counts notices every
+   edit (each writes a change row) and every import that changes how many
+   records there are. What it cannot see is a re-import of a *modified* GEDCOM
+   with the **same** number of individuals and families and no edits since:
+   the import deletes the change log rather than adding to it, so both halves
+   of the fingerprint are unchanged and a delta is honestly empty. The cheap
+   alternatives are worse — a content digest is a full scan of every record on
+   every sync, and the counts that would catch more (`name`, `link`) are not
+   indexed by tree. So the answer is a client that offers "sync again from
+   scratch", and this note, which exists because a client cannot work it out.
+   Nothing else about the token is guesswork: a backwards watermark, a token
+   this module never minted, and a delta larger than `MAX_DELTA` all answer
+   `resync` and were exercised at the boundary on both labs.
+
+28. **A delta is only as complete as its two hops.** A changed record expands
+   to what it links to and to everybody in every family it belongs to, which
+   covers every shape the data takes on a person's page. A third hop — a
+   citation on a note on a family — is not followed. The record is picked up
+   the next time the person themselves is touched, which on a tree edited
+   normally is soon, and never if that family is never edited again. A full
+   walk is the only thing that closes it, and it is what `resync` exists for.
+   Worth stating plainly because the alternative reading — "a delta is
+   complete" — is what a client would assume.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

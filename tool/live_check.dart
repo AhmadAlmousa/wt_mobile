@@ -13,6 +13,7 @@
 // The password is read from WEBTREES_PASSWORD, or from the terminal with echo
 // disabled. It is never written to disk.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -965,8 +966,8 @@ Future<void> main(List<String> args) async {
         report(
           'search "$term"',
           'stock=${byHtml.people.length}  module=${byJson.people.length}'
-              ' (the module dedupes multi-name rows across the whole cursor,'
-              ' so fewer is correct)',
+              ' (the module takes its page after deduplicating a person'
+              ' recorded under two names, so fewer is correct)',
         );
 
         // What a filter over search results runs on, and the one thing the
@@ -1022,6 +1023,132 @@ Future<void> main(List<String> args) async {
               '${listed.hasMore ? ' (more)' : ''}',
           ok: listed.people.isNotEmpty,
         );
+      }
+
+      // Phase 10a: the wire a local copy of the tree would be filled from.
+      // Checked here rather than in the app because there is no client for it
+      // yet — the point of this phase is to find out whether a real server
+      // hands over a whole tree in a handful of requests before anything is
+      // built on the assumption that it does.
+      if (capabilities.has('records')) {
+        stdout.writeln('\n=== Sync ===');
+        final api = ModuleApi(client);
+
+        Future<Map<String, Object?>> records(Map<String, String> query) =>
+            api.tree(
+              tree.name,
+              '/records',
+              query: query,
+              probe: 'syncing ${tree.name}',
+            );
+
+        const limit = 50;
+        final walked = <String, Map<String, Object?>>{};
+        final started = DateTime.now();
+        var pages = 0;
+        var repeated = 0;
+        var bytes = 0;
+        var offset = 0;
+        String? token;
+        String? drifted;
+
+        while (true) {
+          final page = await records({'offset': '$offset', 'limit': '$limit'});
+          pages++;
+          final stated = page['token'];
+          if (stated is String) {
+            token ??= stated;
+            // Rule 1 of the endpoint: a tree edited mid-walk states a
+            // different fingerprint on a later page, and a client that stored
+            // the last one would believe it had a record it never received.
+            if (stated != token) drifted = stated;
+          }
+          for (final person in _listOf(page['people'])) {
+            if (person is! Map<String, Object?>) continue;
+            final xref = person['xref'];
+            if (xref is! String) continue;
+            if (walked.containsKey(xref)) repeated++;
+            walked[xref] = person;
+            bytes += utf8.encode(jsonEncode(person)).length;
+          }
+          if (page['hasMore'] != true) break;
+          offset += limit;
+        }
+
+        final elapsed = DateTime.now().difference(started);
+        report(
+          'the whole tree, $limit at a time',
+          '${walked.length} people in $pages request(s), '
+              '${elapsed.inMilliseconds} ms, '
+              '${bytes ~/ (walked.isEmpty ? 1 : walked.length)} B/person',
+          ok: walked.isNotEmpty,
+        );
+        // The trap the stock autocomplete falls into and the name-ordered
+        // walk inherits: paging counts rows and a page counts people, so
+        // somebody with two names arrives twice (PROJECT.md §7, bug 53).
+        report(
+          'nobody handed over twice',
+          repeated == 0 ? 'yes' : '$repeated repeated',
+          ok: repeated == 0,
+        );
+        report(
+          'the fingerprint held for the whole walk',
+          drifted == null ? token ?? '(none)' : 'moved to $drifted',
+          ok: drifted == null && token != null,
+        );
+
+        // A page of records has to *be* the record the app already reads, or
+        // a local store would answer something subtly different from the
+        // server it was filled from.
+        final sample = int.tryParse(options['sample'] ?? '') ?? 0;
+        var compared = 0;
+        var differing = 0;
+        for (final xref in walked.keys.take(sample > 0 ? sample : 5)) {
+          final one = await api.tree(
+            tree.name,
+            '/individual/$xref',
+            probe: 'opening $xref',
+          );
+          // The two fields a page of records states once for the tree
+          // instead of once per person.
+          one.remove('sections');
+          one.remove('charts');
+          final where = _firstDifference(one, walked[xref]);
+          compared++;
+          if (where != null) {
+            differing++;
+            stdout.writeln('  FAIL  $xref differs at $where');
+          }
+        }
+        report(
+          'each record identical to /individual',
+          '$compared compared, $differing different',
+          ok: differing == 0,
+        );
+        failures += differing;
+
+        final again = await records({'since': token ?? '', 'limit': '1'});
+        report(
+          'nothing changed since that fingerprint',
+          '${_listOf(again['people']).length} record(s), '
+              '${_listOf(again['deleted']).length} tombstone(s)',
+          ok: _listOf(again['people']).isEmpty && again['resync'] != true,
+        );
+
+        for (final bogus in const [
+          'v1.999999999.0.0',
+          'not-a-token',
+          'v1.0.1',
+        ]) {
+          final answer = await records({'since': bogus, 'limit': '1'});
+          report(
+            'a fingerprint this tree cannot follow ("$bogus")',
+            answer['resync'] == true
+                ? 'asks for a fresh walk'
+                : 'accepted, which would leave a stale copy',
+            ok: answer['resync'] == true,
+          );
+        }
       }
     }
 
@@ -1277,6 +1404,40 @@ int _generationsIn(ChartData chart) {
       .map((node) => node.depth)
       .fold(1, (deepest, depth) => depth > deepest ? depth : deepest);
 }
+
+/// Where two decoded payloads first disagree, as a readable path.
+///
+/// Dart compares maps by identity, and a sync check that reported only
+/// "different" would send a person back to `curl` to find out where. This
+/// walks both sides together and names the first key or index that differs.
+String? _firstDifference(Object? left, Object? right, [String path = '']) {
+  if (left is Map && right is Map) {
+    for (final key in {...left.keys, ...right.keys}) {
+      final where = _firstDifference(left[key], right[key], '$path/$key');
+      if (where != null) return where;
+    }
+    return null;
+  }
+
+  if (left is List && right is List) {
+    if (left.length != right.length) {
+      return '$path (${left.length} vs ${right.length} items)';
+    }
+    for (var index = 0; index < left.length; index++) {
+      final where = _firstDifference(
+        left[index],
+        right[index],
+        '$path[$index]',
+      );
+      if (where != null) return where;
+    }
+    return null;
+  }
+
+  return left == right ? null : '$path ($left vs $right)';
+}
+
+List<Object?> _listOf(Object? value) => value is List ? value : const [];
 
 String _readPassword(String username) {
   final fromEnvironment = Platform.environment['WEBTREES_PASSWORD'];

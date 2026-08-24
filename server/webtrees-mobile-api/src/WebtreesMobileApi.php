@@ -18,6 +18,7 @@ use WebtreesMobileApi\Http\Handlers\IndividualRecord;
 use WebtreesMobileApi\Http\Handlers\Individuals;
 use WebtreesMobileApi\Http\Handlers\MediaRecord;
 use WebtreesMobileApi\Http\Handlers\RecordNotes;
+use WebtreesMobileApi\Http\Handlers\Records;
 use WebtreesMobileApi\Http\Handlers\RecordSources;
 use WebtreesMobileApi\Http\Handlers\Relationship;
 use WebtreesMobileApi\Http\Handlers\Statistics;
@@ -72,14 +73,16 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
      * a client can draw a path as a family tree instead of as a list; 1.2.1
      * states how old each person is, or was when they died, which is the one
      * figure a rendered page cannot be asked for because it is arithmetic on
-     * days rather than on two printed years.
+     * days rather than on two printed years; 1.3.0 hands over the whole tree
+     * a page at a time, and afterwards only what changed, which is what a
+     * client needs to keep a local copy of it (`sync_eval.md`).
      * `API_VERSION` is unchanged because the shape did not change — which is
      * exactly why a client must not assume the module it is talking to is the
      * module it was written against. A client older than 1.2.0's `direction`
      * ignores it; a client newer than the module it meets reads none and
      * draws the path flat, which is what `StepDirection.unknown` is for.
      */
-    public const string MODULE_VERSION = '1.2.1';
+    public const string MODULE_VERSION = '1.3.0';
 
     public const string AUTHOR = 'webtrees_mobile';
 
@@ -109,6 +112,7 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
         'media',
         'notes',
         'sources',
+        'records',
     ];
 
     public function title(): string
@@ -169,6 +173,13 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
         // Tree-scoped. `{tree}` binds through `TreeService::all()`, so a tree
         // this reader may not see never reaches the handler at all.
         $compat->addRoute(self::TREE_BASE . '/individuals', Individuals::class, $public);
+        // The same records as `/individual/{xref}`, in pages, and afterwards
+        // only the ones a change has touched. Public for the same reason
+        // every other tree route is: what may be seen is `canShow()`'s
+        // answer, and a tree this reader may not see never binds. What is
+        // new here is the *affordance*, not the visibility — a stock site
+        // already renders its whole individual list to whoever may read it.
+        $compat->addRoute(self::TREE_BASE . '/records', Records::class, $public);
         $compat->addRoute(self::TREE_BASE . '/individual/{xref}', IndividualRecord::class, $public);
         $compat->addRoute(self::TREE_BASE . '/family/{xref}', FamilyRecord::class, $public);
         $compat->addRoute(self::TREE_BASE . '/ancestors/{xref}', Ancestors::class, $public);

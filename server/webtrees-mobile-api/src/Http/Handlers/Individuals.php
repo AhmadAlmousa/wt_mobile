@@ -12,6 +12,7 @@ use Fisharebest\Webtrees\Validator;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use WebtreesMobileApi\Http\ApiException;
 use WebtreesMobileApi\Http\Json;
 use WebtreesMobileApi\Presenters\PersonPresenter;
 use WebtreesMobileApi\Support\Request;
@@ -37,19 +38,43 @@ use function usort;
  * only within the page being built, so the same person arrives again on the
  * next one.
  *
- * `SearchService::searchIndividualNames()` fixes all of that in one call.
+ * `SearchService::searchIndividualNames()` answers the first half in one call:
  * `whereSearch()` applies no filter for an empty term array, so the same
- * method that searches also **walks a whole tree in `n_sort` order**; and
- * `paginateQuery()` dedupes across the entire cursor and applies `canShow()`
- * *before* counting down the offset, so a page is a page.
+ * method that searches also **walks a whole tree in `n_sort` order**, which is
+ * what makes browsing possible at all.
  *
- * The one cost to design around: that walk is a PHP cursor rather than a SQL
- * `LIMIT`, so it is `O(offset)`. Deep pages get progressively more expensive,
- * which is why `surname` exists — partitioned browsing beats scrolling to row
- * 5,000.
+ * **It does not answer the second half by itself, and reading the source
+ * carelessly says it does.** `paginateQuery()` dedupes against the collection
+ * it is *building*, and counts the offset down over rows it has not deduped —
+ * so asking for `offset=5&limit=5` counts five *rows* and answers five
+ * *people*, and a person with two name rows arrives again on the next page.
+ * That is the same trap as the stock autocomplete, inherited rather than
+ * fixed (`PROJECT.md` §7, bug 53).
+ *
+ * What does fix it is asking from the top every time: with `offset=0` every
+ * accepted row is pushed, so the dedup set *is* everything walked so far, and
+ * the page is taken here. Exact, duplicate-free paging over a method that
+ * cannot offer it.
+ *
+ * Two costs to design around, both bounded by `MAX_OFFSET`. The walk is a PHP
+ * cursor rather than a SQL `LIMIT`, so it is `O(offset)` in time; and taking
+ * the page here means holding the whole prefix, so it is `O(offset)` in memory
+ * too. Deep pages get progressively more expensive, which is why `surname`
+ * exists — partitioned browsing beats scrolling to row 5,000, and past that
+ * row this endpoint says so rather than exhausting `memory_limit`.
  */
 final class Individuals implements RequestHandlerInterface
 {
+    /**
+     * How deep a name search may be paged.
+     *
+     * The same number webtrees caps its own advanced search at, and for the
+     * same reason: a page taken from the top holds every person before it, so
+     * beyond a few thousand the honest answer is the surname index rather
+     * than a request that walks the tree and then runs out of memory.
+     */
+    public const int MAX_OFFSET = 5000;
+
     public function __construct(private readonly SearchService $search_service)
     {
     }
@@ -82,14 +107,23 @@ final class Individuals implements RequestHandlerInterface
     ): ResponseInterface {
         $terms = $query === '' ? [] : [$query];
 
-        // One row beyond the page, so "are there more" is a fact rather than
-        // an inference from a full page.
+        if ($offset > self::MAX_OFFSET) {
+            throw ApiException::invalidParameter(
+                'That is too far into the results. Browse by surname instead.',
+                'offset',
+            );
+        }
+
+        // From the top, always, and one person beyond the page: that is what
+        // makes `paginateQuery()`'s dedup cover everything walked rather than
+        // only the page being built, and what makes "are there more" a fact
+        // rather than an inference from a full page.
         $found = $this->search_service
-            ->searchIndividualNames([$tree], $terms, $offset, $limit + 1)
+            ->searchIndividualNames([$tree], $terms, 0, $offset + $limit + 1)
             ->all();
 
-        $more = count($found) > $limit;
-        $rows = array_slice($found, 0, $limit);
+        $more = count($found) > $offset + $limit;
+        $rows = array_slice($found, $offset, $limit);
 
         // webtrees' own autocomplete resolves an xref before searching, and
         // an app that has just followed a link has an xref rather than a name.

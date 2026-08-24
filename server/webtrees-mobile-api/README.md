@@ -45,6 +45,7 @@ question entirely.
 | `/mobile-api/v1/capabilities` | what this installation implements — anonymous |
 | `/mobile-api/v1/access` | the account, its trees, roles and modules |
 | `/tree/{tree}/mobile-api/v1/individuals` | search (`q`), browse (no `q`), or a surname index (`surname`) |
+| `/tree/{tree}/mobile-api/v1/records` | the whole tree in pages, or (`since`) only what changed |
 | `/tree/{tree}/mobile-api/v1/individual/{xref}` | one person: facts, families, notes, sources, media |
 | `/tree/{tree}/mobile-api/v1/family/{xref}` | one family |
 | `/tree/{tree}/mobile-api/v1/ancestors/{xref}` | the pedigree, as a tree of people |
@@ -58,6 +59,49 @@ question entirely.
 
 Common parameters: `offset`, `limit` (capped at `limits.maxPageSize`),
 `generations`, `recursion`, `thumb`, `w`, `h`, `fit`, and `lang`.
+
+### Keeping a local copy of a tree
+
+`/records` is `/individual/{xref}` in pages: the same payload per person, with
+`sections` and `charts` stated once for the page instead of once per person,
+because they describe the tree rather than anybody in it.
+
+```jsonc
+{ "token": "v1.482.1463.412", "since": null, "offset": 0, "limit": 200,
+  "total": 1463, "hasMore": true, "resync": false,
+  "sections": ["personal_facts", "relatives"], "charts": ["…"],
+  "people": [ /* full records */ ], "deleted": [] }
+```
+
+`token` is a fingerprint of the tree: store it, send it back as `since`, and
+read nothing out of it. Then:
+
+- **`since=<token>`** answers only the individuals a change has touched —
+  including everyone whose record *draws* a changed person, because a payload
+  names their family — and lists in `deleted` anything gone from the tree or no
+  longer visible to this reader.
+- **`resync: true`** means start again with no `since`. Not an error: a tree
+  that was re-imported has no change log to compute a delta from, and a client
+  that has been away for more than `MAX_DELTA` edits is cheaper to answer with
+  a full walk.
+
+Three rules a client must hold to, none of which the wire can enforce:
+
+1. **Keep the token from the *first* page**, and if a later page states a
+   different one, run a delta from the first when the walk finishes: the tree
+   was edited while it was being read.
+2. **Advance `offset` by the `limit` you asked for**, never by the number of
+   records you received. Privacy is applied after a page of rows is taken, so a
+   short page is not the last page — `hasMore` is.
+3. **`deleted` is whole, not paged.** Every page of a delta carries all of it,
+   and applying it twice is the same as applying it once.
+
+`total` means "how many records this walk is about", and it is exact in only
+one of the two modes. On a full walk it is the tree's own count of
+individuals, **before privacy** — a denominator for a progress bar rather than
+a promise about how many will arrive. On a delta it is the number of affected
+individuals, which is exact, and counts none of the tombstones. `hasMore` is
+the precise statement in both.
 
 ### Errors
 
@@ -144,6 +188,14 @@ Two consequences worth knowing:
   `Gedcom::DEATH_EVENTS` — `DEAT`, `BURI`, `CREM` — because a man whose tree
   records his burial and no death was answered as living, while every chart
   box on the website mourned him.
+  **1.3.0** adds `/records`, and fixes something a client could see on the
+  endpoint beside it: `/individuals` was paging `SearchService` the way its
+  signature invites, and `paginateQuery()` counts the offset over rows it has
+  not deduplicated — so somebody recorded under two names was handed over
+  again on the next page. The page is now taken from a walk that always starts
+  at the top, which is what makes the dedup cover everything walked. The cost
+  is a ceiling: past `offset=5000` the answer is a `400` naming the surname
+  index, which is webtrees' own limit for the same reason.
 
 ## Known upstream defects a client will meet
 
@@ -164,7 +216,9 @@ src/WebtreesMobileApi.php  boot(): every route, in one place
 src/Compat/                the entire 2.2-vs-2.3 surface: eleven methods
 src/Http/                  Json, ApiException, middleware, one handler per endpoint
 src/Presenters/            person, fact, date, place, family, note, source, media
-src/Support/               parameter validation, shared fact gathering, the
+src/Support/               parameter validation, one person's whole record
+                           (shared by /individual and /records), the sync
+                           fingerprint, shared fact gathering, the
                            relationship graph
 ```
 

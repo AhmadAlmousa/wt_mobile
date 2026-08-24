@@ -4,6 +4,8 @@
 #
 #   tool/lab/setup.sh 2.2.6 8622
 #   tool/lab/setup.sh main  8623      # 2.3.0-dev, the working tree's branch
+#   tool/lab/setup.sh 2.2.6 8622 1450 # ...and 1450 more invented people, which
+#                                     # is what a sync of a real tree costs
 #
 # Everything lands under lab/ beside the upstream checkout, which is on the
 # big volume rather than on / (which has under 2G free). Nothing here touches
@@ -17,6 +19,10 @@ set -euo pipefail
 
 REF="${1:-2.2.6}"
 PORT="${2:-8622}"
+# Extra invented people, for measuring what a whole-tree walk costs. Zero for
+# every other purpose: the deliberate nineteen-person tree is the one the
+# parsers and the transports are checked against.
+BULK="${3:-0}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 UPSTREAM="$(cd "$HERE/../webtrees" && pwd)"
@@ -82,8 +88,13 @@ ln -s "$HERE/server/webtrees-mobile-api" "$LAB/modules_v4/webtrees-mobile-api"
 echo "  linked $LAB/modules_v4/webtrees-mobile-api"
 
 step 'synthetic tree'
-python3 "$HERE/tool/lab/make_gedcom.py" > "$LAB/data/lab.ged"
+python3 "$HERE/tool/lab/make_gedcom.py" --bulk "$BULK" > "$LAB/data/lab.ged"
 echo "  $(wc -l < "$LAB/data/lab.ged") lines, entirely invented"
+# `set -e` is on, so this is an `if` and not a `&&`: a false test on the last
+# command of a line would abort the script.
+if [ "$BULK" -gt 0 ]; then
+  echo "  including $BULK bulk people — not the tree to test parsers against"
+fi
 
 step 'install'
 php "$HERE/tool/lab/install.php" "$LAB" "$LAB/data/lab.ged" "$BASE_URL"

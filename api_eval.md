@@ -167,15 +167,24 @@ Two properties matter enormously:
    the same method enumerates a whole tree ordered by `n_sort` — the thing
    `PROJECT.md` §2 records as impossible on a stock instance, and the reason
    v1 is search-driven rather than browsable.
-2. `paginateQuery()` (`:996`) dedupes multi-name rows across the *whole* cursor
-   (`containsStrict`) and applies `canShow()` **before** counting down the
-   offset. That fixes both halves of the app's paging trap in one move: the
-   `nextUrl` that drops its query, and the person recorded under two names
-   appearing on two pages.
+2. `paginateQuery()` (`:996`) dedupes multi-name rows with `containsStrict`
+   and applies `canShow()` before counting down the offset.
+
+**Point 2 was read too generously, and §19 is what running it cost.** The
+dedup is against the collection being *built*, so it covers the page and not
+the cursor; and the offset counts rows that have not been deduped. Asking for
+`offset=5&limit=5` therefore skips five *rows* and answers five *people*, and
+a person recorded under two names arrives again on the next page — the same
+trap as the stock autocomplete, inherited rather than fixed. It is fixed by
+asking from `offset=0` every time, where the dedup set *is* everything walked,
+and taking the page in the module.
 
 Caveat to design around: the walk is `O(offset)` — it is a PHP cursor, not a
-SQL `LIMIT`. Deep pages get progressively more expensive, which argues for
-surname-partitioned browsing rather than an infinite scroll to row 5,000.
+SQL `LIMIT`. Taking the page in the module makes it `O(offset)` in memory too.
+Deep pages get progressively more expensive, which argues for
+surname-partitioned browsing rather than an infinite scroll to row 5,000 — and
+for a *sync* walk, for ordering by xref instead, which is an indexed `LIMIT`
+and needs none of this.
 
 ### Fact classification, already exactly the app's model
 
@@ -530,6 +539,7 @@ read-only endpoints simply avoid the question.
 | `GET /mobile-api/v1/access` | all of `access_probe.dart`, in one request |
 | `GET …/individuals?q=&surname=&offset=&limit=` | `tom-select-individual`; adds enumeration |
 | `GET …/individual/{xref}` | `record_parser` entire; no slug `301` |
+| `GET …/records?offset=&limit=&since=` | nothing — a local copy of the tree, §19 |
 | `GET …/family/{xref}` | new |
 | `GET …/ancestors/{xref}?generations=` | `chart_parser.parseAncestors` |
 | `GET …/descendants/{xref}?generations=` | `chart_parser.parseDescendants` |
@@ -1354,3 +1364,114 @@ That is bug 35's lesson for the third time, and the generalisation is worth
 stating plainly: **a lab proves nothing about a feature it has switched off**,
 and the switch is easy to leave alone precisely because nothing fails when it
 is wrong.
+
+---
+
+## 19. What handing over a whole tree found
+
+**Added 2026-08-24, after Phase 10a built `GET …/records`.** `sync_eval.md`
+argued that a local copy of a tree should be filled from paged record requests
+rather than downloaded as a file, and §12 of that document said to build the
+wire first because it answers the only question the rest depends on. It is
+built, it answers yes — 1,469 people in 8 requests, 6.8 s, 4.69 MB, inside a
+16 MB `memory_limit` — and it found one thing wrong with **this** document.
+
+### §4 read `paginateQuery` too generously
+
+The claim was that `paginateQuery()` "dedupes multi-name rows across the
+*whole* cursor and applies `canShow()` before counting down the offset. That
+fixes both halves of the app's paging trap in one move." Half of that is
+right. The dedup is against the collection being **built**, so it covers the
+page and not the cursor; and the offset counts rows that have not been deduped.
+So `offset=5&limit=5` skips five *rows* where the previous page answered five
+*people*, and somebody recorded under two names arrives twice.
+
+The lab has four such people out of nineteen, and the first walk of it in pages
+of five returned 22 rows for 18 people. Same code in 2.2.6 and 2.3. This is the
+trap `PROJECT.md` §3 has always described in the stock autocomplete — *"webtrees
+removes those duplicates only within the page it is building, so the same person
+can arrive again on the next one"* — and three documents had recorded the module
+as immune to it. Nothing caught it for two releases because nothing had ever
+paged a whole tree in small pages: the app's search fetches one page, and
+`--sample N` walks pages of fifty on a nineteen-person tree.
+
+Two different fixes, because there are two different questions:
+
+- **Searching and browsing** need name order, so `Individuals` now asks from
+  `offset=0` every time — where every accepted row is pushed, so the dedup set
+  *is* everything walked — and takes the page itself. Exact and duplicate-free
+  over a method that cannot offer it. The cost is that the prefix is held in
+  memory as well as walked, so `MAX_OFFSET` refuses past row 5,000 and names
+  the surname index, which is webtrees' own limit for its own version of this.
+- **Syncing** does not need name order at all, so `Records` orders by xref:
+  an indexed SQL `LIMIT` over `(i_file, i_id)`, no join to `name`, no
+  duplicates, and `O(1)` in the offset instead of `O(offset)`. A page of fifty
+  full records costs 0.26 s whether the offset is 0 or 1,400.
+
+The lesson is the one §14 already drew twice, in a new place: **a signature
+that invites a use is not a promise about it.** `searchIndividualNames($trees,
+$terms, $offset, $limit)` looks exactly like a paging API, and reading the
+implementation is what tells you the offset and the limit count different
+things.
+
+### One record composed in one place
+
+`/individual/{xref}` and `/records` answer the same payload, so composing it
+twice would have been two things to keep in step. `RecordComposer` owns it, and
+the split is where the cost is: which tabs a site runs, which charts it offers
+and which facts its sidebars claim are properties of the **tree and the
+reader**, so they are asked once per request rather than once per record — and
+stated once per page on the wire instead of two hundred times.
+`live_check`'s `=== Sync ===` diffs a page against the single-record endpoint
+field by field, which is what keeps "the same payload" a fact rather than a
+comment.
+
+### A delta is not a list of changed records
+
+The `change` table names an xref, and the honest expansion of that is bigger
+than it looks. A person's payload names their parents, spouses, siblings and
+children, so renaming one man restates a dozen other records — a store that
+took the change log literally would show his old name beside his children
+until something else touched them. So every changed xref expands two hops
+through `LinkedRecordService::linkedIndividuals()` and `linkedFamilies()`:
+what it links to, and everybody in every family it belongs to. Both are public
+and identical in 2.2.6 and 2.3, both privacy-filter what they answer, and the
+`link` table holds **both** directions (`F1 CHIL X42` *and* `X42 FAMC F1`),
+which is what lets one method answer "who shows this note" and "who is in this
+family".
+
+On the lab: changing the subject answers 13 people, changing one of his
+families answers its 4, and changing the note, the photograph or the source on
+him answers him alone. A third hop is deliberately not followed, and
+`PROJECT.md` §9 #28 says so where a client can find it.
+
+### The fingerprint, and the one thing it cannot see
+
+`MAX(change_id)` for the tree, plus its individual and family counts. Every
+edit writes a change row, so the largest id is a watermark and a delta is
+everything above it — and an **import deletes the tree's change rows** before
+reading the first record (`GedcomLoad` in both versions, `TreeImport` on the
+command line), so the watermark moving backwards is exactly the signal to
+throw a local copy away. That also means the watermark alone cannot see an
+import at all, which is why the counts are in the fingerprint.
+
+What it cannot see is a re-import of a *modified* file with the same number of
+individuals and families and no edits since. A content digest would catch it
+and costs a full scan of every record on every sync; the counts are two indexed
+lookups. So the answer is a client that offers "sync again from scratch", and
+`PROJECT.md` §9 #27, which exists because a client cannot work this out for
+itself.
+
+`resync: true` is the honest answer to everything else: a watermark that moved
+backwards, a token this module never minted, and a delta larger than
+`MAX_DELTA`. All three were exercised at the boundary on both labs — 2,000
+changed xrefs is a delta and 2,001 is a fresh walk.
+
+### What is still untested
+
+The real tree. `tree.almou.sa` runs module **1.0.1**, so it has no `/records`
+at all, and updating it is not something this machine can do (`PROJECT.md` §9
+#18). Everything in this section stands on two labs, a synthetic tree of 1,469
+invented people, and change rows written directly into the log to stand in for
+edits nobody made — which is what an accepted edit leaves behind, and is not
+the same as having made one through the website.
