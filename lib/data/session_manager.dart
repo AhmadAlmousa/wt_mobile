@@ -27,6 +27,14 @@ enum ConnectionStage {
   signingIn,
 
   signedIn,
+
+  /// A site is known and this device holds a copy of it, but the network is
+  /// not reachable.
+  ///
+  /// Deliberately not a kind of `signedOut`: nobody was turned away. The app
+  /// is reading its own copy, every screen that needs the site says so, and
+  /// the moment a network appears it can resume properly.
+  offline,
 }
 
 /// Builds the HTTP client for a site.
@@ -97,6 +105,10 @@ class SessionManager extends ChangeNotifier {
   bool get isBusy => _busy;
 
   bool get isSignedIn => _stage == ConnectionStage.signedIn;
+
+  /// Whether the app is reading this device's copy because it cannot reach
+  /// the site.
+  bool get isOffline => _stage == ConnectionStage.offline;
 
   /// Whether a password can be stored for next time.
   bool get canRemember => _credentials.canRemember;
@@ -216,12 +228,48 @@ class SessionManager extends ChangeNotifier {
 
     // The stored password no longer works. Drop it, or every future launch
     // would fail the same way with no route back to the sign-in form.
+    //
+    // Only on a *rejection*. An unreachable host says nothing about whether
+    // the password is good, and forgetting it there would punish a reader for
+    // being on a train.
     if (_error is SignInRejected) {
       developer.log('Discarding a rejected stored password', name: _log);
       await _credentials.forgetPassword(saved);
     }
     return false;
   }
+
+  /// Enters offline reading for [saved], which is known to have a local copy.
+  ///
+  /// Called only after a resume failed on an unreachable host. It sets no
+  /// client and performs no request: the app is about to read a file.
+  void goOffline(SavedConnection saved) {
+    _connection = saved;
+    _stage = ConnectionStage.offline;
+    _stopKeepAlive();
+    notifyListeners();
+  }
+
+  /// Leaves offline reading, so a resume can be attempted again.
+  ///
+  /// Does not itself reconnect: it puts the session back where the launch
+  /// screen expects to find it, and the launch screen does the rest.
+  void goOnline() {
+    if (_stage != ConnectionStage.offline) return;
+    _stage = _instance == null
+        ? ConnectionStage.disconnected
+        : ConnectionStage.signedOut;
+    notifyListeners();
+  }
+
+  /// Whether the failure that just happened was the network rather than the
+  /// site or the password.
+  ///
+  /// The distinction the first offline test showed was missing: "could not
+  /// reach the host" and "your password is wrong" had the same consequence,
+  /// so a reader with no signal was shown a sign-in form and told their login
+  /// failed.
+  bool get failedForLackOfNetwork => _error is UnreachableHost;
 
   /// Signs back in to the site used last, without asking anything.
   ///

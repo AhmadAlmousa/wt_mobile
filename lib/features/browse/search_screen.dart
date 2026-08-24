@@ -34,6 +34,7 @@ class SearchScreen extends StatefulWidget {
     required this.session,
     required this.records,
     required this.treeStore,
+    required this.onReconnect,
     required this.tree,
     required this.onOpenPerson,
     required this.onShowAccount,
@@ -49,6 +50,10 @@ class SearchScreen extends StatefulWidget {
   /// a download is waiting on their network, and how old an answer is
   /// (`sync_eval.md` §11 #1).
   final TreeStore treeStore;
+
+  /// Tries the site again after reading offline. Only the shell can do it —
+  /// it owns the session and the store — so this hands the tap upwards.
+  final VoidCallback onReconnect;
 
   final String tree;
 
@@ -300,6 +305,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 onChanged: _onChanged,
                 onSubmitted: _search,
               ),
+            ),
+            OfflineBanner(
+              session: widget.session,
+              onReconnect: widget.onReconnect,
             ),
             SyncStatus(store: widget.treeStore),
             Expanded(child: _body(context)),

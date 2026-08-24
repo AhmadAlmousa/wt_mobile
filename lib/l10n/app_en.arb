@@ -451,5 +451,11 @@
         "type": "int"
       }
     }
-  }
+  },
+  "errorNotAvailableOffline": "This needs the site, and there is no connection right now. What is on this device is still readable.",
+  "diagnosticsStageOffline": "Offline, reading this device's copy",
+  "offlineBanner": "Offline \u00b7 reading this device's copy",
+  "offlineBannerWhy": "Search, people and charts work. Relationships, timelines and site statistics need a connection.",
+  "offlineRetry": "Reconnect",
+  "offlineNothingStored": "There is no copy on this device yet, so signing in needs a connection."
 }

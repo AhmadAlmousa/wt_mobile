@@ -12,12 +12,21 @@ class SignInScreen extends StatefulWidget {
     required this.session,
     required this.onSignedIn,
     required this.onChangeSite,
+    required this.onReadOffline,
     super.key,
   });
 
   final SessionManager session;
   final VoidCallback onSignedIn;
   final VoidCallback onChangeSite;
+
+  /// Opens this device's copy instead, when the site cannot be reached.
+  ///
+  /// Returns whether there was one. The launch screen covers the reader who
+  /// saved their password; this covers the one who did not, and who would
+  /// otherwise be shown a form they cannot possibly submit while a complete
+  /// copy of the tree sits on the device (§7 bug 56, the second half).
+  final Future<bool> Function() onReadOffline;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -51,7 +60,16 @@ class _SignInScreenState extends State<SignInScreen> {
       _password.text,
       remember: _remember,
     );
-    if (ok && mounted) widget.onSignedIn();
+    if (ok && mounted) {
+      widget.onSignedIn();
+      return;
+    }
+
+    // Not a rejection — nothing answered at all. If this device holds a copy,
+    // that is the case the copy exists for.
+    if (mounted && widget.session.failedForLackOfNetwork) {
+      await widget.onReadOffline();
+    }
   }
 
   @override
@@ -152,6 +170,20 @@ class _SignInScreenState extends State<SignInScreen> {
                         if (session.error != null) ...[
                           const SizedBox(height: 20),
                           MessagePanel.error(session.error!.localized(text)),
+                          // Only ever shown after an attempt that could not
+                          // reach the site: the reader has just been told the
+                          // site is unreachable, and this says what the app
+                          // can still do about it.
+                          if (session.failedForLackOfNetwork) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              text.offlineNothingStored,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ],
                         const SizedBox(height: 24),
                         Text(

@@ -16,6 +16,7 @@ class LaunchScreen extends StatefulWidget {
   const LaunchScreen({
     required this.session,
     required this.onNothingToResume,
+    required this.onOfflineInstead,
     super.key,
   });
 
@@ -23,6 +24,18 @@ class LaunchScreen extends StatefulWidget {
 
   /// Called when no stored site could be opened, so the user has to be asked.
   final VoidCallback onNothingToResume;
+
+  /// Called when the site could not be *reached* and this device holds a copy.
+  ///
+  /// A different outcome from [onNothingToResume] and it has to be, because
+  /// they look identical from inside `resume()`: one means "we do not know who
+  /// you are", the other means "we know exactly who you are and the train went
+  /// into a tunnel". Showing a sign-in form for the second — with `login
+  /// failed` on it — is what the first offline test of 0.21.0 ran into.
+  ///
+  /// Returns whether a copy was actually opened, because only the shell can
+  /// answer that: it owns the store.
+  final Future<bool> Function() onOfflineInstead;
 
   @override
   State<LaunchScreen> createState() => _LaunchScreenState();
@@ -39,7 +52,17 @@ class _LaunchScreenState extends State<LaunchScreen> {
     // A success needs no navigation here: the router's redirect sees the
     // session change and moves the app on by itself.
     final resumed = await widget.session.resumeLastUsed();
-    if (!resumed && mounted) widget.onNothingToResume();
+    if (resumed || !mounted) return;
+
+    // The site was not reachable rather than unwilling. If this device holds
+    // a copy, that is not a failure at all — it is the case the copy exists
+    // for.
+    if (widget.session.failedForLackOfNetwork &&
+        await widget.onOfflineInstead()) {
+      return;
+    }
+
+    if (mounted) widget.onNothingToResume();
   }
 
   @override

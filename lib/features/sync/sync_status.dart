@@ -20,7 +20,75 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../data/local/tree_store.dart';
+import '../../data/session_manager.dart';
 import '../../l10n/app_localizations.dart';
+
+/// Says the app is reading this device's copy, and what that costs.
+///
+/// Shown wherever a reader might otherwise think something is broken. It is a
+/// *state*, not an error: nothing failed, there is simply no site to ask, and
+/// the sentence under it names the three things that need one so nobody hunts
+/// for a chart that will not come.
+class OfflineBanner extends StatelessWidget {
+  const OfflineBanner({required this.session, this.onReconnect, super.key});
+
+  final SessionManager session;
+  final VoidCallback? onReconnect;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: session,
+    builder: (context, _) {
+      if (!session.isOffline) return const SizedBox.shrink();
+
+      final theme = Theme.of(context);
+      final text = AppText.of(context);
+
+      return Material(
+        color: theme.colorScheme.tertiaryContainer,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_off_outlined,
+                size: 18,
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text.offlineBanner,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onTertiaryContainer,
+                      ),
+                    ),
+                    Text(
+                      text.offlineBannerWhy,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onTertiaryContainer.withValues(
+                          alpha: 0.85,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onReconnect != null)
+                TextButton(
+                  onPressed: onReconnect,
+                  child: Text(text.offlineRetry),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
 /// A one-line notice above the search results, or nothing at all.
 class SyncStatus extends StatelessWidget {

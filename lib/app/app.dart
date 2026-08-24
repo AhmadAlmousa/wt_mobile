@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/capabilities.dart';
+import '../data/local/local_charts.dart';
+import '../data/local/offline.dart';
 import '../data/local/records_page.dart';
 import '../data/local/tree_store.dart';
 import '../data/module/module_api.dart';
@@ -74,13 +76,24 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   /// Built per navigation rather than held, because the client is replaced
   /// whenever the app reconnects or signs in again — a cached repository would
   /// go on talking through a closed one.
-  RecordsTransport get _records =>
-      // Composed twice, over the same two sources: once as the thing the store
-      // falls back to for the bytes and the tree-level charts it cannot hold,
-      // and once as the thing the app reads. `local` is null unless a complete
-      // copy for *this* reader is open — everything that decides that lives in
-      // `TreeStore`, so by the time it reaches the composer it is decided.
-      _composed(local: widget.treeStore.transportOver(_composed));
+  RecordsTransport get _records {
+    // No site to ask. The store *is* the app now, and the things it cannot
+    // hold — photographs, the site's own statistics — say so rather than
+    // failing as though something broke.
+    if (widget.session.isOffline) {
+      final local = widget.treeStore.transportOver(
+        () => const OfflineRecordsTransport(),
+      );
+      return local ?? const OfflineRecordsTransport();
+    }
+
+    // Composed twice, over the same two sources: once as the thing the store
+    // falls back to for the bytes and the tree-level charts it cannot hold,
+    // and once as the thing the app reads. `local` is null unless a complete
+    // copy for *this* reader is open — everything that decides that lives in
+    // `TreeStore`, so by the time it reaches the composer it is decided.
+    return _composed(local: widget.treeStore.transportOver(_composed));
+  }
 
   /// The module where this site offers it, the site's own pages where it does
   /// not, and optionally this device's copy above both.
@@ -101,15 +114,32 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   /// Charts are read through the same client, and the same reasoning: it is
   /// replaced whenever the app reconnects, so nothing may hold one.
   ChartsTransport get _charts {
-    final client = widget.session.client;
+    // Offline the only charts that can be drawn are the ones this device can
+    // walk out of its own copy; everything else says so rather than issuing a
+    // request that cannot go anywhere.
+    final online = widget.session.isOffline
+        ? const OfflineChartsTransport()
+        : CapabilityChartsTransport(
+            stock: ChartsRepository(
+              widget.session.client,
+              version: widget.session.instance?.version,
+            ),
+            module: _capabilities.isPresent
+                ? ModuleChartsTransport(widget.session.client)
+                : null,
+          );
 
-    return CapabilityChartsTransport(
-      stock: ChartsRepository(
-        client,
-        version: widget.session.instance?.version,
-      ),
-      module: _capabilities.isPresent ? ModuleChartsTransport(client) : null,
-    );
+    // Layered above rather than beside: it looks at the handle, draws the ones
+    // it minted, and hands everything else on. Which is the same rule
+    // `CapabilityChartsTransport` already keeps — a handle is only meaningful
+    // to whoever made it.
+    final store = widget.treeStore.store;
+    final tree = widget.treeStore.tree;
+    if (store == null || tree == null || !widget.treeStore.isReadable) {
+      return online;
+    }
+
+    return LocalChartsTransport(store: store, tree: tree, online: online);
   }
 
   /// Whether the app has already walked into the account's only tree.
@@ -131,6 +161,10 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
       unawaited(_probeModule());
       return;
     }
+    // Going offline is not losing a session: the copy stays open and the
+    // reader stays where they were. Clearing here would throw away the
+    // access summary `_openOffline` has just read out of the store's stamp.
+    if (widget.session.isOffline) return;
     // Family photographs must not outlive the account that fetched them, and
     // the next account may not see the same single tree.
     _media.clear();
@@ -164,6 +198,60 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     _router.go(Routes.connect);
   }
 
+  /// Opens this device's copy when the site could not be reached.
+  ///
+  /// Returns whether there was one. False means the ordinary "ask them to
+  /// sign in" path, because a reader with no copy and no network genuinely
+  /// cannot be shown anything.
+  Future<bool> _openOffline() async {
+    final saved = (await widget.session.savedConnections()).firstOrNull;
+    if (saved == null) return false;
+
+    final state = await widget.treeStore.bindOffline(saved);
+    if (state == null) return false;
+
+    widget.session.goOffline(saved);
+    _boundTree = state.tree;
+    // The store's own stamp says who the reader is and what they may do, which
+    // is what an access probe would have gone to the site to ask.
+    _access = AccessSummary(
+      account: Account(
+        username: state.username,
+        // The real name was learned on a previous online visit and stored
+        // against the connection, so the account card reads the same offline
+        // as it does on.
+        realName: saved.displayName,
+      ),
+      trees: [
+        for (final tree in await widget.treeStore.storedTrees())
+          TreeAccess(
+            name: tree.tree,
+            role: TreeRole.values.firstWhere(
+              (candidate) => candidate.name == tree.role,
+              orElse: () => TreeRole.memberOrVisitor,
+            ),
+          ),
+      ],
+      isAdministrator: false,
+    );
+
+    if (mounted) {
+      setState(() {});
+      _router.go(Routes.searchIn(state.tree));
+    }
+    return true;
+  }
+
+  /// Tries the site again after a spell of reading this device's copy.
+  ///
+  /// Back to the launch screen rather than straight at a sign-in form: that
+  /// screen already knows how to resume a stored password, and if the network
+  /// is still down it will land back here, which is the right outcome.
+  void _reconnect() {
+    widget.session.goOnline();
+    _router.go(Routes.launch);
+  }
+
   /// The copy became readable, or stopped being. Rebuilds the routes so the
   /// composer is handed the store the moment it is worth reading — otherwise
   /// a sync that finished while the reader was looking at a screen would not
@@ -195,6 +283,14 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   /// This method only supplies the four things that identify a copy — who,
   /// which tree, which language, which module — and the wire to fill it from.
   Future<void> _bindStore(String tree) async {
+    // Offline the copy is already open and there is no wire to fill it from.
+    // Switching between trees this device holds needs no session at all.
+    if (widget.session.isOffline) {
+      _boundTree = tree;
+      await widget.treeStore.openStoredTree(tree);
+      return;
+    }
+
     final connection = widget.session.connection;
     final access = _access;
     if (connection == null || access == null) return;
@@ -279,7 +375,10 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
       final connected = widget.session.instance != null;
       final location = state.matchedLocation;
 
-      if (signedIn) {
+      // Reading this device's copy is as good as being signed in, as far as
+      // *where the reader may be* is concerned. The difference is what each
+      // screen can answer, and each screen says so itself.
+      if (signedIn || widget.session.isOffline) {
         // Any signed-in screen is fine; only a signed-out one is not.
         return location == Routes.connect ||
                 location == Routes.signIn ||
@@ -308,6 +407,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           onNothingToResume: () => _router.go(
             widget.session.instance == null ? Routes.connect : Routes.signIn,
           ),
+          onOfflineInstead: _openOffline,
         ),
       ),
       GoRoute(
@@ -317,6 +417,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           settings: widget.settings,
           onConnected: () => _router.go(Routes.signIn),
           onSignedIn: () => _router.go(Routes.access),
+          onReadOffline: _openOffline,
         ),
       ),
       GoRoute(
@@ -325,6 +426,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           session: widget.session,
           onSignedIn: () => _router.go(Routes.access),
           onChangeSite: () => _router.go(Routes.connect),
+          onReadOffline: _openOffline,
         ),
       ),
       GoRoute(
@@ -333,6 +435,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           session: widget.session,
           settings: widget.settings,
           capabilities: _capabilities,
+          offlineSummary: widget.session.isOffline ? _access : null,
           onSignedOut: _onSignedOut,
           // Stacked, so a reader who chose one of several trees can go back
           // to the list with the system back gesture.
@@ -358,6 +461,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
             session: widget.session,
             records: _records,
             treeStore: widget.treeStore,
+            onReconnect: _reconnect,
             tree: tree,
             // Only ever a label. The route still carries the tree's name,
             // so a link that arrives without a title still works.

@@ -26,6 +26,23 @@ final class UnreachableHost extends WebtreesError {
       ' Check the address and your connection.';
 }
 
+/// The app is reading its own copy, and this needs the site.
+///
+/// Not a failure of anything — a statement about where the app currently is.
+/// A local store holds records; it does not hold the site's arithmetic, its
+/// kinship wording, or bytes nobody downloaded yet (`sync_eval.md` §5). Asking
+/// for those with no network is answerable only with the truth.
+final class NotAvailableOffline extends WebtreesError {
+  const NotAvailableOffline(this.what);
+
+  /// What was asked for, for the log. The interface words its own version.
+  final String what;
+
+  @override
+  String get message =>
+      'This device holds a copy of the tree, but $what needs the site.';
+}
+
 /// Something answered, but it does not behave like webtrees.
 final class NotWebtrees extends WebtreesError {
   const NotWebtrees(this.address);

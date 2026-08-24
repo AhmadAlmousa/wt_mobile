@@ -186,6 +186,101 @@ class TreeStore extends ChangeNotifier {
     await _readState();
   }
 
+  /// Opens whatever copy this device holds for [connection], with no network.
+  ///
+  /// The piece Phase 10c was missing, and the first offline test found it: the
+  /// store was wired in *behind* a signed-in session, so an app with no signal
+  /// could not reach it at all — every route in went through a sign-in that
+  /// could not happen. Nothing about a copy actually needs the site, though.
+  /// It is a file on this device, opened with a key from this device's
+  /// keystore, and the row that says whose copy it is carries the account, the
+  /// role, the language and the module version — the whole stamp. So the store
+  /// can describe itself, and this is that.
+  ///
+  /// Returns the tree it opened, or null when there is nothing to open: no
+  /// key, no file, no complete copy, or a copy belonging to somebody else.
+  /// Null is the ordinary answer and means "ask them to sign in".
+  Future<StoredTreeState?> bindOffline(SavedConnection connection) async {
+    if (!await _keys.has(connection.key)) return null;
+
+    final key = await _keys.obtain(connection.key);
+    if (key == null) return null;
+
+    await _close();
+    final store = await _open(key: key);
+
+    // Complete copies only, and only this account's. A half-filled one would
+    // answer "nobody" for half a tree, and one belonging to another reader is
+    // not ours to read — though in practice their key would not have opened
+    // the file at all.
+    final states = await store.select(store.storedTreeStates).get();
+    final usable = states
+        .where(
+          (state) =>
+              !state.filling &&
+              state.token != null &&
+              state.username == connection.username,
+        )
+        .toList();
+
+    if (usable.isEmpty) {
+      await store.close();
+      _set(SyncPhase.unavailable);
+      return null;
+    }
+
+    // Most recently synced, which with one tree is the only one and with
+    // several is the one the reader was last looking at.
+    usable.sort(
+      (a, b) =>
+          (b.syncedAt ?? DateTime(0)).compareTo(a.syncedAt ?? DateTime(0)),
+    );
+    final state = usable.first;
+
+    _store = store;
+    _connection = connection;
+    _source = null;
+    _stamp = StoreStamp(
+      tree: state.tree,
+      username: state.username,
+      role: TreeRole.values.firstWhere(
+        (candidate) => candidate.name == state.role,
+        orElse: () => TreeRole.memberOrVisitor,
+      ),
+      language: state.language,
+      moduleVersion: state.moduleVersion,
+    );
+
+    await _readState();
+    return state;
+  }
+
+  /// The trees this device holds a complete copy of, for the account screen.
+  Future<List<StoredTreeState>> storedTrees() async {
+    final store = _store;
+    if (store == null) return const [];
+    return (store.select(
+      store.storedTreeStates,
+    )..where((row) => row.filling.equals(false))).get();
+  }
+
+  /// Points an already-open store at another tree it holds, with no network.
+  Future<void> openStoredTree(String tree) async {
+    final stamp = _stamp;
+    if (_store == null || stamp == null || stamp.tree == tree) return;
+    _stamp = StoreStamp(
+      tree: tree,
+      username: stamp.username,
+      role: stamp.role,
+      language: stamp.language,
+      moduleVersion: stamp.moduleVersion,
+    );
+    await _readState();
+  }
+
+  /// Which tree the open copy is currently answering for.
+  String? get tree => _stamp?.tree;
+
   /// Whether two stamps describe the same copy.
   ///
   /// The tree is not compared: one store holds several, and each carries its

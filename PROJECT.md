@@ -981,7 +981,9 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **10a** | The sync wire: the whole tree in pages, then only what changed | ✅ — module `/records`, measured on 1,469 people |
 | **10b** | Drift schema, a local transport, the sync loop off the UI isolate | ✅ — the store fills from the real tree; nothing composes it yet |
 | **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ✅ — encrypted at rest, composed, and filled on first use |
-| **10d–f** | Charts and timeline from the store · thumbnail blobs and a sync screen · a ceiling for large trees | ⬜ — `sync_eval.md` §12. 10f is the one with a deadline: the search page cap is 2,000, which is a placeholder, not a design |
+| **10d** | Charts walked out of the store — ancestors, descendants, pedigree, fan, compact, hourglass | ✅ — the timeline stays online, and §6 explains why that is not laziness |
+| **10e** | **Starting with no network at all**, plus thumbnail blobs | 🚧 — offline entry, browsing and charts done; photographs fall back to initials until the bytes are stored |
+| **10f** | A ceiling for large trees | ⬜ — the one with a deadline: the search page cap is 2,000, which is a placeholder, not a design |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -2629,6 +2631,91 @@ analyzer clean.
 
 ---
 
+### 2026-08-24 (later still) — Phases 10d and 10e: the app that starts in a tunnel
+
+Reported after the first real test of 0.21.0, in one sentence: *"I shut off
+wifi and data and it said login failed."* It did. The reasoning was wrong
+rather than the code — 10c wired the store in **behind a signed-in session**,
+so every route into the app went through a sign-in that could not happen, and
+a complete encrypted copy of 1,463 people sat on the device unreachable. The
+one thing an offline copy is for was the one thing it could not do.
+
+**The distinction that was missing.** `resume()` returns a bool, and *"we do
+not know who you are"* and *"the train went into a tunnel"* both came back as
+`false`. Only the first is a reason to show a sign-in form. `UnreachableHost`
+already existed as a distinct type, so this is not new knowledge — it is
+knowledge the launch path was throwing away one frame after acquiring it.
+`ConnectionStage.offline` is now its own state, and it is deliberately not a
+kind of `signedOut`: nobody was turned away.
+
+**Nothing about a copy needs the site.** It is a file on this device, opened
+with a key from this device's keystore, and `StoredTreeStates` already records
+the account, the role, the language and the module version — the whole stamp.
+So the store describes itself: `TreeStore.bindOffline` opens it with no
+network, and the shell builds an `AccessSummary` out of the stamp rather than
+probing for one. Everything the account screen shows offline is something the
+sync wrote down at the time.
+
+**What the reader gets, and what they are told.** Search, people, families and
+charts, plus a banner that says *"Offline · reading this device's copy"* with
+the three things that need a connection named underneath, so nobody hunts for
+a chart that will not come. Photographs fall back to initials — the bytes are
+not stored until 10e finishes — which both image paths already handled,
+because `AuthenticatedImage` has always had a placeholder.
+
+**10d, and `sync_eval.md` §4 called its shape exactly**: *"the shapes are walks
+over the stored family links. The app already owns every layout; only the shape
+was ever fetched."* That is the whole of `local_charts.dart`. Six chart kinds
+come out of two walks, numbered the way webtrees numbers them — Sosa, where a
+person's parents are always 2n and 2n+1, and d'Aboville built by concatenation
+— because a chart that renumbered itself offline would be a different chart.
+Not one screen changed: a chart has always been a `ChartData`, and where one
+came from was never their business. A `local:` handle is how the store says it
+will draw this one itself, which works because handles have always been opaque.
+
+**The walk is correct for a reason worth stating.** A record the reader may not
+see was never synced (`sync_eval.md` §6: *a hidden record is absent, not
+empty*), so the walk cannot reach it — privacy pruning happens by construction
+rather than by a rule this file has to remember. The same property the
+server-side chart has, arrived at from the other end. There is a test that
+deletes a grandparent and watches the chart stop there.
+
+**Three things the store will not draw, and only one is temporary.** A
+relationship needs the kinship wording `nameFromPath()` builds from a
+per-language table that is one of the largest things in webtrees; §5 said not
+to port it twice and that still holds. Statistics are the site's own
+arithmetic. And the **timeline** turns out to belong with them rather than with
+the charts: every position on one is the site's own measurement in the site's
+own layout — `TimelineEvent.position` documents why reading a year back out of
+a box is wrong — and a stored fact carries its date as *rendered text in six
+possible calendars* with no year behind it. Only a person's birth and death
+years are stated outright, which is a lifespan and not a life. Building a local
+scale would mean inventing a different one, so a timeline would move depending
+on whether the reader had signal. It stays online, and that is a design
+decision rather than a gap.
+
+**There are three doors into the app, and all three needed the same hinge.**
+The launch screen covers a reader who saved their password. The one who did
+not never reaches it — with nothing to resume the router sends them to
+*connect*, and a reader who signed out explicitly lands on *sign in*. All three
+now do the same thing: if the attempt failed because nothing answered, and this
+device holds a copy, open it. Found by writing the test for the second case and
+watching it land somewhere else.
+
+**Twelve new tests for the walks and five for the tunnel**, and the five are
+the ones that matter: with the network gone and a copy on the device the app
+opens the tree rather than a sign-in form; it searches it; a reader with no
+stored password gets the same offer from the connect screen; with *no* copy it
+still asks for a sign-in, because there is genuinely nothing to show; and a
+site that answers and refuses is **not** treated as a tunnel — a rejected
+password means the reader's access may have been revoked, and §6 #2 is
+emphatic that a stale copy is stale in the permissive direction.
+
+Released as **0.22.0**. **691 tests** green (674 → 691) plus 14 goldens,
+analyzer clean.
+
+---
+
 ## 7. Bugs found, and what they taught
 
 | # | Bug | Caught by |
@@ -2691,6 +2778,7 @@ analyzer clean.
 | 52 | **Bug 19 again, and only half fixed the first time.** `ltrRun` isolates a lifespan so the paragraph around it cannot reorder it — which works for `1901–1974` and *not* for `١٣١٨–١٩٧٤`. An isolate sets the run's base direction; it does not change what is inside it, and Arabic-Indic digits are **Arabic** numbers rather than European ones, so bidi rule N1 resolves the dash between two of them as right-to-left and the run is reordered around it. Every lifespan on a site rendering in Arabic — which is every lifespan on `tree.almou.sa` — read `١٩٧٤–١٣١٨`: the man died before he was born, in an English interface and an Arabic one alike | **Rendered preview, from a fixture captured off a real server** |
 | 54 | **A session that expired would have deleted the tree.** The shell wired "the store is destroyed" to *not signed in*, which is the same state webtrees leaves the app in when its idle timer fires and a silent re-login fails — so a phone left in a pocket would have thrown away a 5 MB copy through no decision of the reader's, and re-downloaded it. Deliberate sign-out and session expiry are different events and only one of them means "I am done here"; the destroy now hangs off the sign-out *callback* rather than off the session's state. An expired session leaves the copy alone, which is safe because it is encrypted under a key belonging to one account | **Reading the new code back before committing it** |
 | 55 | **One store holds several trees, but the phase describes one.** `TreeStore.bind` short-circuits when the reader has not changed — right, because the file has not changed — and that path skipped re-reading the state. Opening a second tree therefore inherited the first tree's `ready`, so `isReadable` said yes and every search in the new tree would have answered "nobody" out of a store that simply had no copy of it. The exact failure the phase's own staleness rule exists to prevent, one level up from where the rule was written | **Reading the new code back before committing it** |
+| 56 | **The offline copy could not be reached offline.** Phase 10c put the store behind a signed-in session, so with no network the launch screen's resume failed and the app showed a sign-in form saying the login failed — with a complete, encrypted copy of the tree sitting on the device. `resume()` collapsed "we do not know who you are" and "the host is unreachable" into one `false`, though `UnreachableHost` had been a distinct type since Phase 0. The whole point of a local copy is the case it could not serve | **The user, on the first real test of 0.21.0** |
 
 50 is the interesting one, because the markup genuinely does not say. The
 divider that separates a couple from its children is the marriage row, and a
@@ -3633,6 +3721,30 @@ Both tools read the password from the terminal with echo disabled, or from
    Still worth watching, because none of that is *proof*: the honest test is
    whether the next real bug report is diagnosable, and no real bug has been
    filed against a store yet.
+
+31. **Offline reading has no lock of its own, and the copy is a device
+   secret rather than an account one.** Deliberate, and worth stating because
+   it is a change in what "signed out" means. The store is encrypted with a key
+   in this device's keystore, so opening it needs the device and not the
+   password — which is what lets the app read in a tunnel at all. The
+   consequence: somebody holding an unlocked phone can read the tree without
+   knowing the account password, where before they would have met a sign-in
+   form. Against a device already unlocked that is a small step — the saved
+   password was in the same keystore, and the app would have signed itself in
+   — but it is a step, and it is now the *only* path for a reader who never
+   saved a password. An explicit sign-out still destroys the copy (§7 bug 54),
+   so the reader has a way to say no. A lock on the app itself is the answer if
+   this ever needs one, and `BiometricGate` already exists.
+
+32. **A tunnel mid-session is not the same as a cold start, and only the cold
+   start is handled.** Signing in and *then* losing signal leaves the app
+   signed in: the store already answers search, records and charts, so most of
+   it keeps working, but anything that needs the site fails with "could not
+   reach" rather than saying the app has gone offline. It does not fall back
+   into `ConnectionStage.offline`, and it does not show the banner. The right
+   fix is probably to treat a run of `UnreachableHost` failures as entering
+   offline, which is a judgement about how many and how fast, so it is not
+   something to guess at.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

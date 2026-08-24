@@ -1632,6 +1632,42 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'{count, plural, =1{yesterday} other{{count} days ago}}'**
   String syncDaysAgo(int count);
+
+  /// No description provided for @errorNotAvailableOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'This needs the site, and there is no connection right now. What is on this device is still readable.'**
+  String get errorNotAvailableOffline;
+
+  /// No description provided for @diagnosticsStageOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline, reading this device\'s copy'**
+  String get diagnosticsStageOffline;
+
+  /// No description provided for @offlineBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline · reading this device\'s copy'**
+  String get offlineBanner;
+
+  /// No description provided for @offlineBannerWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Search, people and charts work. Relationships, timelines and site statistics need a connection.'**
+  String get offlineBannerWhy;
+
+  /// No description provided for @offlineRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get offlineRetry;
+
+  /// No description provided for @offlineNothingStored.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no copy on this device yet, so signing in needs a connection.'**
+  String get offlineNothingStored;
 }
 
 class _AppTextDelegate extends LocalizationsDelegate<AppText> {

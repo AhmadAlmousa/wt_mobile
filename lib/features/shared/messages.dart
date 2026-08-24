@@ -22,6 +22,7 @@ extension LocalizedError on WebtreesError {
       address,
       detail == null ? '' : ' $detail.',
     ),
+    NotAvailableOffline() => text.errorNotAvailableOffline,
     NotWebtrees(:final address) => text.errorNotWebtrees(address),
     MaintenanceMode() => text.errorMaintenanceMode,
     ServerUnhealthy() => text.errorServerUnhealthy,

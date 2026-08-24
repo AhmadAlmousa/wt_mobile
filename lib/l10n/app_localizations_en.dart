@@ -924,4 +924,25 @@ class AppTextEn extends AppText {
     );
     return '$_temp0';
   }
+
+  @override
+  String get errorNotAvailableOffline =>
+      'This needs the site, and there is no connection right now. What is on this device is still readable.';
+
+  @override
+  String get diagnosticsStageOffline => 'Offline, reading this device\'s copy';
+
+  @override
+  String get offlineBanner => 'Offline · reading this device\'s copy';
+
+  @override
+  String get offlineBannerWhy =>
+      'Search, people and charts work. Relationships, timelines and site statistics need a connection.';
+
+  @override
+  String get offlineRetry => 'Reconnect';
+
+  @override
+  String get offlineNothingStored =>
+      'There is no copy on this device yet, so signing in needs a connection.';
 }

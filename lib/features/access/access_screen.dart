@@ -29,6 +29,7 @@ class AccessScreen extends StatefulWidget {
     this.capabilities,
     this.onAccessSummary,
     this.treeStore,
+    this.offlineSummary,
     super.key,
   });
 
@@ -71,6 +72,15 @@ class AccessScreen extends StatefulWidget {
   /// removes it. Null in tests that do not care.
   final TreeStore? treeStore;
 
+  /// What the store's own stamp says about the reader, when there is no site
+  /// to ask.
+  ///
+  /// Non-null puts this screen in offline mode: it states the account and the
+  /// trees this device holds, and does not probe. The row that records whose
+  /// copy a store is carries the account and the role, which is exactly what
+  /// a probe would have gone to the site for.
+  final AccessSummary? offlineSummary;
+
   @override
   State<AccessScreen> createState() => _AccessScreenState();
 }
@@ -85,6 +95,12 @@ class _AccessScreenState extends State<AccessScreen> {
   }
 
   void _load() {
+    final offline = widget.offlineSummary;
+    if (offline != null) {
+      setState(() => _summary = Future.value(offline));
+      return;
+    }
+
     setState(() {
       _summary = widget.session
           .withSession(() => AccessProbe(widget.session.client).describe())

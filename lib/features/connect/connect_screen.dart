@@ -16,6 +16,7 @@ class ConnectScreen extends StatefulWidget {
     required this.session,
     required this.settings,
     required this.onConnected,
+    required this.onReadOffline,
     required this.onSignedIn,
     super.key,
   });
@@ -25,6 +26,14 @@ class ConnectScreen extends StatefulWidget {
 
   /// Called once the site has been identified and is ready for sign-in.
   final VoidCallback onConnected;
+
+  /// Opens this device's copy instead, when the address cannot be reached.
+  ///
+  /// The last of the three doors into the app (§7 bug 56): a reader who never
+  /// saved a password lands *here* rather than on the sign-in form, so without
+  /// this one they would still be looking at a screen they cannot get past
+  /// while a complete copy sits on the device.
+  final Future<bool> Function() onReadOffline;
 
   /// Called when a stored password signed the user straight back in.
   final VoidCallback onSignedIn;
@@ -67,6 +76,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Future<void> _connect(String address) async {
     if (await widget.session.connect(address) && mounted) {
       widget.onConnected();
+      return;
+    }
+    // Nothing answered. If this device holds a copy, that is what it is for.
+    if (mounted && widget.session.failedForLackOfNetwork) {
+      await widget.onReadOffline();
     }
   }
 

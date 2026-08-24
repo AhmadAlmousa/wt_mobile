@@ -938,4 +938,25 @@ class AppTextAr extends AppText {
     );
     return '$_temp0';
   }
+
+  @override
+  String get errorNotAvailableOffline =>
+      'هذا يحتاج إلى الموقع، ولا يوجد اتصال الآن. وما على هذا الجهاز يبقى متاحًا للقراءة.';
+
+  @override
+  String get diagnosticsStageOffline => 'دون اتصال، تُقرأ نسخة هذا الجهاز';
+
+  @override
+  String get offlineBanner => 'دون اتصال · تُقرأ نسخة هذا الجهاز';
+
+  @override
+  String get offlineBannerWhy =>
+      'البحث والأشخاص والمخططات تعمل. أما الصلات والمخططات الزمنية وإحصاءات الموقع فتحتاج إلى اتصال.';
+
+  @override
+  String get offlineRetry => 'أعد الاتصال';
+
+  @override
+  String get offlineNothingStored =>
+      'لا توجد نسخة على هذا الجهاز بعد، لذا يحتاج تسجيل الدخول إلى اتصال.';
 }

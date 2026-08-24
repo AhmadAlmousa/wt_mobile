@@ -22,7 +22,7 @@ with the details; that one part does not, and §3 says why.
 | **Not the reason** | Request reduction. The app is already frugal — §2 |
 | **Shape** | Client-owned SQLite, filled by `GET …/records?offset=&limit=`, not a server-built `.sqlite` download |
 | **Package** | **Drift.** ObjectBox is the wrong tool here for one decisive reason — §9 |
-| **Cannot be local** | Relationship *wording*, statistics as the site publishes them, anything a signature covers — §5 |
+| **Cannot be local** | Relationship *wording*, statistics as the site publishes them, **the timeline's scale**, anything a signature covers — §5 |
 | **Hardest part** | Not the sync. The **privacy snapshot** — §6 |
 | **Second hardest** | Language. Everything the app shows is server-rendered per language — §7 |
 | **Size** | ~6 KB/person measured; **~9 MB for 1,463 people**, ~2 MB over the wire — §8 |
@@ -134,20 +134,34 @@ Given full records for every visible person, the app can serve locally:
 | `individuals` (search, browse, enumerate) | ✅ | A `LIKE` over stored names — and for the first time, sorting and tree-wide filters |
 | `individual` | ✅ | The stored record |
 | `family` | ✅ | Stored with the record |
-| `ancestors`, `descendants`, `hourglass` | ✅ | The shapes are walks over the stored family links. The app already owns every layout; only the *shape* was ever fetched |
-| `timeline` | ✅ | Derived from the stored facts, which already carry rendered dates |
+| `ancestors`, `descendants`, `hourglass` | ✅ **built, 10d** | The shapes are walks over the stored family links. The app already owns every layout; only the *shape* was ever fetched — and that is precisely how it turned out: six chart kinds, two walks, not one screen changed |
+| `timeline` | ❌ **moved to §5** | The facts carry *rendered* dates, not years, and a timeline's positions are the site's own layout — see the note in §5 |
 | `notes`, `sources`, `media` (list) | ✅ | Stored with the record |
 | media *bytes* | ✅ with work | Thumbnails must be downloaded and stored as blobs — see §5 |
 | `relationship` | ❌ **path yes, wording no** | §5 |
 | `statistics` | ❌ on purpose | §5 |
 
-That is nine of eleven, which is more than it looks: the two exceptions are
-the two capabilities where the *server* is doing something the app was never
-going to reimplement.
+That is eight of eleven once the timeline moves to §5 — still more than it
+looks, because every exception is a place where the *server* is doing something
+the app was never going to reimplement.
 
 ---
 
-## 5. The three things that stay online
+## 5. The things that stay online
+
+*Phase 10d added a fourth, and it was not on this list.* **The timeline.** §4
+put it under "derived from the stored facts, which already carry rendered
+dates" — and that is exactly the problem. They carry *rendered* dates: six
+calendars, `about`, `between … and …`, with no year behind them, because
+parsing one back would discard the calendar and lose the qualifier. Only a
+person's own birth and death years are stated outright, which is a lifespan and
+not a life. And every position the app draws on a timeline is **the site's own
+measurement in the site's own layout**, which the domain model has warned about
+since Phase 6e: reading a year out of a box's position is arithmetic on
+somebody else's drawing. A local scale would be a different scale, so a
+timeline would move depending on whether the reader had signal. It belongs
+here, with the two things the server is doing that the app was never going to
+reimplement.
 
 **Relationship wording.** The path between two people is a graph walk over the
 link table, and the local store would have the links — so the *path* is
@@ -434,8 +448,8 @@ Each phase is useful on its own and none of them requires the next.
 | **10a** ✅ | `GET …/records?offset=&limit=&since=` in the module; a `token` derived from `MAX(change_id)` and the tree's counts | The wire, testable with `curl` before any client work — **built, module 1.3.0**, and it answered the question below: 8 requests, 6.8 s, 4.69 MB, 16 MB of memory |
 | **10b** ✅ | Drift schema, a `LocalRecordsTransport`, and the sync loop off the UI isolate | The store fills. Nothing reads it yet — **built**: 1,463 real people in 30 requests into 10.70 MB, read back in 0.61 ms each |
 | **10c** ✅ | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | **Built.** Instant person and search, tree-wide filters, and §6 #3 answered — see the note below |
-| **10d** | Charts and timeline computed from the store | Nine of eleven capabilities local |
-| **10e** | Thumbnail blobs; a sync screen; the stamp and its invalidation rules | Genuinely offline |
+| **10d** ✅ | Charts computed from the store | **Built** — six chart kinds from two walks. The *timeline* moved to §5's list and the note below says why |
+| **10e** 🚧 | Starting with no network; thumbnail blobs | **Offline entry, browsing and charts built.** Photographs still fall back to initials |
 | **10f** | The ceiling for large trees (§8) | "Any webtrees instance" keeps meaning something |
 
 **Start with 10a.** It is a single handler over machinery that already exists,

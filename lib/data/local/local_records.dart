@@ -34,6 +34,7 @@ import '../../domain/records.dart';
 import '../module/module_decode.dart';
 import '../module/module_records.dart';
 import '../transport.dart';
+import 'local_charts.dart';
 import 'records_page.dart';
 import 'store.dart';
 
@@ -60,7 +61,7 @@ final class LocalRecordsTransport implements RecordsTransport {
   /// handing the screen every match is what makes the filters tree-wide and
   /// retires that apology.
   ///
-  /// It costs almost nothing because [_refFrom] reads **columns**, not
+  /// It costs almost nothing because [refOf] reads **columns**, not
   /// payloads: every field of a `PersonRef` was derived at write time and
   /// stored beside the record, so a thousand rows is one indexed `SELECT` and
   /// no JSON at all.
@@ -113,10 +114,24 @@ final class LocalRecordsTransport implements RecordsTransport {
     final rows = await select.get();
 
     return SearchPage(
-      people: [for (final row in rows.take(pageSize)) _refFrom(row)],
+      people: [for (final row in rows.take(pageSize)) refOf(row)],
       hasMore: rows.length > pageSize,
     );
   }
+
+  /// The chart kinds a walk over the stored links can produce.
+  ///
+  /// All of them are the same two walks drawn differently — which is the whole
+  /// point `PROJECT.md` §5 makes about taking the *shape* and leaving the
+  /// site's markup alone.
+  static const Set<ChartKind> _drawableLocally = {
+    ChartKind.ancestors,
+    ChartKind.pedigree,
+    ChartKind.fan,
+    ChartKind.compact,
+    ChartKind.descendants,
+    ChartKind.hourglass,
+  };
 
   /// One search row, out of the columns rather than out of the payload.
   ///
@@ -126,7 +141,7 @@ final class LocalRecordsTransport implements RecordsTransport {
   /// against a directly-decoded one to keep it that way. Reading the columns
   /// is what makes answering with the whole tree affordable: no JSON, and an
   /// index to sort by.
-  static PersonRef _refFrom(StoredPerson row) => PersonRef(
+  static PersonRef refOf(StoredPerson row) => PersonRef(
     xref: row.xref,
     name: row.name,
     alternateName: row.alternateName,
@@ -159,19 +174,31 @@ final class LocalRecordsTransport implements RecordsTransport {
 
     final state = await _state(tree);
 
+    final offered = _strings(state?.chartClasses);
+
     return individualFrom(
       personFromPayload(row.payload),
       xref: xref,
       sections: _strings(state?.sections),
-      // Handles into the *module*, which is where a chart is still drawn from.
-      // Phase 10d computes the shapes locally; until then a record read from
-      // the store opens the same charts as one read from the wire, because a
-      // handle is only ever passed back unread.
-      charts: ModuleRecordsTransport.chartHandles(
-        tree,
-        xref,
-        _strings(state?.chartClasses),
-      ),
+      // Which charts this record opens, and *who draws them*.
+      //
+      // A handle is opaque and only ever passed back to a transport, so this
+      // is where the store says "I can draw this one myself". The shapes it
+      // can — the walks up and down the stored family links — get a `local:`
+      // handle; everything else keeps the module's, because a relationship
+      // needs kinship wording and statistics are the site's own arithmetic
+      // (`sync_eval.md` §5), and a timeline is positioned in the site's own
+      // layout (`LocalChartsTransport.timeline`).
+      charts: {
+        for (final entry in ModuleRecordsTransport.chartHandles(
+          tree,
+          xref,
+          offered,
+        ).entries)
+          entry.key: _drawableLocally.contains(entry.key)
+              ? localChartHandle(entry.key, tree, xref)
+              : entry.value,
+      },
     );
   }
 

@@ -95,6 +95,7 @@ class DiagnosticsScreen extends StatelessWidget {
                 ConnectionStage.signedOut => text.diagnosticsStageSignedOut,
                 ConnectionStage.signingIn => text.diagnosticsStageSigningIn,
                 ConnectionStage.signedIn => text.diagnosticsStageSignedIn,
+                ConnectionStage.offline => text.diagnosticsStageOffline,
               },
             ),
             if (diagnostics.username != null)
