@@ -11,6 +11,8 @@ import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import '../shared/person_tile.dart';
+import 'search_filter.dart';
+import 'search_filter_sheet.dart';
 
 /// Finds people in one tree by name.
 ///
@@ -18,6 +20,13 @@ import '../shared/person_tile.dart';
 /// refuses an empty query, and no other route pages through a whole tree
 /// cheaply — so the screen asks for a name rather than pretending to offer a
 /// browsable list it cannot fill.
+///
+/// What it *can* do is narrow what came back. A common surname here matches
+/// hundreds of people, and every row already carries a birth year and a
+/// birthplace — a stock instance puts both in the title attribute of the
+/// years it prints — so a filter costs no request at all. See
+/// `search_filter.dart`, which decides what to offer by reading the rows
+/// rather than by asking which transport fetched them.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     required this.session,
@@ -83,6 +92,13 @@ class _SearchScreenState extends State<SearchScreen> {
   /// one — typing quickly otherwise leaves the wrong names on screen.
   int _generation = 0;
 
+  /// What the reader has narrowed the results to.
+  ///
+  /// Cleared with each new search: a filter chosen for one surname says
+  /// nothing about the next, and one left in force would look like a search
+  /// that found less than it did.
+  SearchFilter _filter = const SearchFilter();
+
   /// Whether this site publishes statistics for the tree.
   ///
   /// Read from the tree's own page, once, because that is where webtrees puts
@@ -137,6 +153,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _error = null;
         _hasSearched = false;
         _hasMore = false;
+        _filter = const SearchFilter();
       });
       return;
     }
@@ -148,6 +165,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _moreError = null;
       _searchedFor = query;
       _page = 1;
+      _filter = const SearchFilter();
     });
 
     try {
@@ -222,6 +240,18 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         title: Text(widget.title ?? widget.tree),
         actions: [
+          // Only once there is something to narrow. A filter button over an
+          // empty screen is a control for a list that does not exist.
+          if (_results.isNotEmpty && !_facets.isEmpty)
+            IconButton(
+              icon: Badge(
+                isLabelVisible: _filter.count > 0,
+                label: Text('${_filter.count}'),
+                child: const Icon(Icons.filter_list),
+              ),
+              tooltip: text.filter,
+              onPressed: _chooseFilter,
+            ),
           if (_hasStatistics)
             IconButton(
               icon: const Icon(Icons.insights_outlined),
@@ -269,6 +299,23 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// What these results can be narrowed by, read off the rows themselves.
+  SearchFacets get _facets => SearchFacets.of(_results);
+
+  /// The results after the filter, which is what the screen actually draws.
+  List<PersonRef> get _showing => _filter.applyTo(_results);
+
+  Future<void> _chooseFilter() async {
+    final chosen = await SearchFilterSheet.show(
+      context,
+      filter: _filter,
+      facets: _facets,
+      people: _results,
+    );
+    if (chosen == null || !mounted) return;
+    setState(() => _filter = chosen);
+  }
+
   Widget _body(BuildContext context) {
     final text = AppText.of(context);
     final error = _error;
@@ -296,25 +343,71 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-      // One row beyond the results when the site says it has more, which is
-      // where the reader asks for them.
-      itemCount: _results.length + (_hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _results.length) return _moreFooter(context);
+    final showing = _showing;
 
-        final person = _results[index];
-        // A search row is the one place the app draws somebody without
-        // knowing their sex: webtrees' autocomplete sends a name, a lifespan
-        // and sometimes a photograph, and nothing else. Opening them answers
-        // it; asking the server per row would be a request each.
-        return PersonTile(
-          person: person,
-          records: widget.records,
-          onOpen: () => widget.onOpenPerson(person.xref),
-        );
-      },
+    // A filter that hides everything and a search that found nothing look
+    // identical from outside, so this says which it is — and says that
+    // fetching the next page may yet find a match, because the filter runs
+    // over the rows already here and not over the tree.
+    if (showing.isEmpty) {
+      return Column(
+        children: [
+          _FilterBar(
+            filter: _filter,
+            shown: 0,
+            loaded: _results.length,
+            onClear: () => setState(() => _filter = const SearchFilter()),
+          ),
+          Expanded(
+            child: _EmptyState(
+              message: text.filterNoMatches,
+              icon: Icons.filter_list_off,
+            ),
+          ),
+          if (_hasMore) _moreFooter(context),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        if (!_filter.isEmpty)
+          _FilterBar(
+            filter: _filter,
+            shown: showing.length,
+            loaded: _results.length,
+            onClear: () => setState(() => _filter = const SearchFilter()),
+          ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+            // One row beyond the results when the site says it has more,
+            // which is where the reader asks for them.
+            itemCount: showing.length + (_hasMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == showing.length) return _moreFooter(context);
+
+              final person = showing[index];
+              // A search row is the one place the app draws somebody without
+              // knowing their sex: webtrees' autocomplete sends a name, a
+              // lifespan and sometimes a photograph, and nothing else.
+              // Opening them answers it; asking the server per row would be a
+              // request each.
+              return PersonTile(
+                person: person,
+                records: widget.records,
+                // What the filter narrowed on, where the row states it — so
+                // a list filtered by birthplace shows the birthplace, and a
+                // reader can see why each row is here.
+                relationship: _filter.birthPlace == null
+                    ? null
+                    : person.birthPlace,
+                onOpen: () => widget.onOpenPerson(person.xref),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -345,6 +438,57 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Text(text.showMoreResults),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// What the filter is doing to the list under it, and how to stop it.
+///
+/// Shown only while a filter is in force. Its job is to make sure nobody ever
+/// wonders why a search "found" forty people when the site said two hundred:
+/// the count is of the rows *loaded*, because that is all the filter can see.
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.filter,
+    required this.shown,
+    required this.loaded,
+    required this.onClear,
+  });
+
+  final SearchFilter filter;
+  final int shown;
+  final int loaded;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final text = AppText.of(context);
+
+    return Material(
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 4, 4),
+        child: Row(
+          children: [
+            Icon(
+              Icons.filter_list,
+              size: 18,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text.filterShowing(shown, loaded),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ),
+            TextButton(onPressed: onClear, child: Text(text.filterClear)),
+          ],
+        ),
       ),
     );
   }

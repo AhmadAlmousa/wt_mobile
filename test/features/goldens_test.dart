@@ -148,6 +148,18 @@ void main() {
         relationship: 'الإبن',
         onOpen: () {},
       ),
+      // The years a site rendering in Arabic actually prints. An isolate
+      // alone draws these as ١٩٧٤–١٣١٨ — the man dies before he is born, in
+      // an English interface and an Arabic one alike — because Arabic-Indic
+      // digits are *Arabic* numbers and the dash between two of them is
+      // resolved right-to-left. The picture is the only thing that says
+      // whether they still read in order.
+      PersonTile(
+        person: person('محمد الموسى', lifespan: '١٣١٨–١٩٧٤', deceased: true),
+        records: const NoRecords(),
+        relationship: 'أب',
+        onOpen: () {},
+      ),
     ],
   );
 
@@ -232,7 +244,7 @@ void main() {
           child: SizedBox(width: 360, child: tiles()),
           brightness: brightness,
           direction: direction,
-          size: const Size(400, 300),
+          size: const Size(400, 420),
         );
       });
     }

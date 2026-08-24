@@ -183,6 +183,73 @@ class AppTextAr extends AppText {
   }
 
   @override
+  String get filter => 'تصفية';
+
+  @override
+  String get filterTitle => 'تضييق النتائج';
+
+  @override
+  String get filterNone =>
+      'لا يوجد ما تُصفّى به هذه النتائج. الموقع يذكر الاسم وسنوات العمر فقط، ولم يجد هذا البحث أماكن ميلاد للاختيار منها.';
+
+  @override
+  String get filterClear => 'مسح';
+
+  @override
+  String filterApply(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count شخص',
+      many: '$count شخصًا',
+      few: '$count أشخاص',
+      two: 'شخصين',
+      one: 'شخصًا واحدًا',
+      zero: 'لا أحد',
+    );
+    return 'اعرض $_temp0';
+  }
+
+  @override
+  String get filterSex => 'الجنس';
+
+  @override
+  String get filterSexMale => 'الرجال';
+
+  @override
+  String get filterSexFemale => 'النساء';
+
+  @override
+  String get filterSexUnknown => 'غير مسجَّل';
+
+  @override
+  String get filterBorn => 'سنة الميلاد';
+
+  @override
+  String filterBornRange(String from, String to) {
+    return '$from–$to';
+  }
+
+  @override
+  String get filterBirthPlace => 'مكان الميلاد';
+
+  @override
+  String get filterAnyPlace => 'أي مكان';
+
+  @override
+  String filterShowing(int shown, int loaded) {
+    return 'عرض $shown من $loaded محمَّلة';
+  }
+
+  @override
+  String get filterNoMatches =>
+      'لا تطابق أيٌّ من النتائج المحمَّلة حتى الآن. قد يجد تحميل المزيد بعضها.';
+
+  @override
+  String get filterYearsNote =>
+      'السنوات كما يكتبها هذا الموقع، فالشجرة المحفوظة بالتقويم الهجري تُصفّى بالسنوات الهجرية.';
+
+  @override
   String get searchForAPerson => 'ابحث عن شخص';
 
   @override
@@ -322,6 +389,27 @@ class AppTextAr extends AppText {
     );
     return '$_temp0';
   }
+
+  @override
+  String get relationshipViewPath => 'المسار';
+
+  @override
+  String get relationshipViewTree => 'الشجرة';
+
+  @override
+  String get relationshipViewLabel => 'طريقة العرض';
+
+  @override
+  String get relationshipDrawTree => 'ارسم هذه القرابة كشجرة عائلة';
+
+  @override
+  String relationshipWayOf(int number, int total) {
+    return 'الطريق $number من $total';
+  }
+
+  @override
+  String get relationshipTreeUnplaced =>
+      'لم يذكر هذا الموقع اتجاه كل خطوة، لذلك رُسم الجميع في صف واحد.';
 
   @override
   String get relationshipOtherWays => 'صلات أخرى بينهما';

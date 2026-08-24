@@ -10,6 +10,7 @@ import '../../core/response_status.dart';
 import '../../core/webtrees_client.dart';
 import '../../domain/charts.dart';
 import '../../domain/notice.dart';
+import '../../domain/numerals.dart';
 import '../../domain/records.dart';
 import '../transport.dart';
 import 'dom.dart';
@@ -119,6 +120,7 @@ final class RecordsRepository implements RecordsTransport {
       final fragment = html.parseFragment(text);
       final nameSpan = fragment.querySelector('span.NAME');
       final name = textOf(nameSpan);
+      final (birth, death) = _lifeSpans(fragment);
 
       people.add(
         PersonRef(
@@ -128,11 +130,53 @@ final class RecordsRepository implements RecordsTransport {
           name: name ?? cleanText(fragment.text) ?? xref,
           lifespan: _lifespanAfter(fragment, nameSpan),
           thumbnailUrl: fragment.querySelector('img')?.attributes['src'],
+          birthYear: readNumber(textOf(birth)),
+          deathYear: readNumber(textOf(death)),
+          birthPlace: _placeIn(birth),
         ),
       );
     }
     return people;
   }
+
+  /// The two spans `Individual::lifespan()` writes, birth first.
+  ///
+  /// The one place a stock instance says more about a search result than a
+  /// name and two years, and it says it in an attribute nobody would look at:
+  /// each year is wrapped in a span whose `title` carries the *place* and the
+  /// full date of that event. So a filter by birthplace costs no request at
+  /// all — the site had already sent it.
+  ///
+  /// Positional because webtrees marks neither span. Two are emitted, always
+  /// and in that order, for anybody the row was built for; a row shaped any
+  /// other way answers nothing rather than guessing which is which.
+  static (Element?, Element?) _lifeSpans(DocumentFragment row) {
+    final spans = row.querySelectorAll('span[title]');
+    if (spans.length != 2) return (null, null);
+    return (spans.first, spans.last);
+  }
+
+  /// The place out of one of those `title` attributes.
+  ///
+  /// `lifespan()` builds the attribute as `{place} {date}` with nothing
+  /// between them — except that the date is wrapped in Unicode isolates
+  /// (`U+2068 … U+2069`) so it lays out correctly beside Arabic text. Those
+  /// are what make the two halves separable at all: without them the
+  /// attribute is one run of words in the site's language and no separator
+  /// this app is entitled to assume.
+  ///
+  /// So the place is everything before the isolate, and a title with no
+  /// isolate in it answers nothing.
+  static String? _placeIn(Element? span) {
+    final title = span?.attributes['title'];
+    if (title == null) return null;
+
+    final at = title.indexOf(_firstStrongIsolate);
+    return at < 0 ? null : cleanText(title.substring(0, at));
+  }
+
+  /// `U+2068 FIRST STRONG ISOLATE`, which webtrees opens a rendered date with.
+  static const String _firstStrongIsolate = '\u2068';
 
   /// The years a search row prints after the name.
   ///

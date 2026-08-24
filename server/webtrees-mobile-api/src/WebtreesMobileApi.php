@@ -68,12 +68,15 @@ class WebtreesMobileApi extends AbstractModule implements ModuleCustomInterface
      * (`PROJECT.md` §7, bugs 45–46); 1.1.1 stops answering a married name
      * recorded as a subtag as though it were a second name (bug 48), and
      * counts a burial as a death, which webtrees and every chart box already
-     * did (bug 49).
+     * did (bug 49); 1.2.0 says which way each step of a relationship runs, so
+     * a client can draw a path as a family tree instead of as a list.
      * `API_VERSION` is unchanged because the shape did not change — which is
      * exactly why a client must not assume the module it is talking to is the
-     * module it was written against.
+     * module it was written against. A client older than 1.2.0's `direction`
+     * ignores it; a client newer than the module it meets reads none and
+     * draws the path flat, which is what `StepDirection.unknown` is for.
      */
-    public const string MODULE_VERSION = '1.1.1';
+    public const string MODULE_VERSION = '1.2.0';
 
     public const string AUTHOR = 'webtrees_mobile';
 

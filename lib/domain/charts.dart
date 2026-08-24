@@ -210,10 +210,64 @@ final class DescendantNode {
   int get depth => '.'.allMatches(number).length + 1;
 }
 
+/// Which way through the family one step of a relationship goes.
+///
+/// The *word* on a step is the site's own and cannot be switched on — `أب`
+/// and `father` are the same step — so the direction is recovered
+/// structurally. Both transports can state it, and both were checked against
+/// the same grids on a live 2.2.6: webtrees lays a relationship out with
+/// ancestors above and descendants below, and moves sideways for anybody in
+/// the same generation.
+///
+/// This is what turns a list of names into a family tree: a step that goes up
+/// is a generation up, and the boxes can be placed.
+enum StepDirection {
+  /// Up a generation, to a parent.
+  toParent,
+
+  /// Down a generation, to a child.
+  toChild,
+
+  /// Along the same generation — a sibling, or somebody married in.
+  ///
+  /// One value for both on purpose. A relationship chart moves right for
+  /// either, so the stock transport genuinely cannot tell them apart, and a
+  /// distinction only one transport could make would be a disagreement
+  /// between them rather than a fact about the family. The label on the step
+  /// says which, in the site's own words.
+  sideways,
+
+  /// The step's direction was not stated — an older module, or a grid this
+  /// app could not walk.
+  ///
+  /// Drawn on the same generation rather than guessed at, which is the shape
+  /// that is wrong by least.
+  unknown;
+
+  /// How many generations this step moves, positive being downwards.
+  int get generations => switch (this) {
+    StepDirection.toParent => -1,
+    StepDirection.toChild => 1,
+    StepDirection.sideways || StepDirection.unknown => 0,
+  };
+
+  /// The direction the module names, or [unknown] where it named none.
+  static StepDirection fromName(String? name) => switch (name) {
+    'parent' => StepDirection.toParent,
+    'child' => StepDirection.toChild,
+    'sideways' => StepDirection.sideways,
+    _ => StepDirection.unknown,
+  };
+}
+
 /// One step along a relationship path: a link, and who it reaches.
 @immutable
 final class RelationshipStep {
-  const RelationshipStep({required this.relationship, required this.person});
+  const RelationshipStep({
+    required this.relationship,
+    required this.person,
+    this.direction = StepDirection.unknown,
+  });
 
   /// How the two are related, in the site's own words — `father`, `أم` —
   /// already translated, and already knowing whether a brother is older or
@@ -222,6 +276,9 @@ final class RelationshipStep {
 
   /// The person this step arrives at.
   final PersonRef person;
+
+  /// Which way through the family this step goes — see [StepDirection].
+  final StepDirection direction;
 }
 
 /// One way two people are related.

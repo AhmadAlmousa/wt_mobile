@@ -381,7 +381,7 @@ void _paintJoins(
   }
 
   for (final edge in layout.edges) {
-    if (edge.isCouple) {
+    if (edge.isStraight) {
       if (edge.kind == EdgeKind.divorce) {
         _paintParted(canvas, edge, up, ink);
       } else {

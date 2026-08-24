@@ -156,6 +156,7 @@ final class Relationship implements RequestHandlerInterface
                 )),
                 'person'       => $person instanceof Individual ? $people->present($person) : null,
                 'via'          => ['family' => $family instanceof Family ? $family->xref() : null],
+                'direction'    => $this->direction($family, $nodes[$n - 1], $person),
             ];
         }
 
@@ -174,5 +175,50 @@ final class Relationship implements RequestHandlerInterface
             ),
             'steps'       => $steps,
         ];
+    }
+
+    /**
+     * Which way through the family this step goes.
+     *
+     * The step's *word* is the site's own — `أب`, `father` — so a client
+     * cannot switch on it, and a relationship is a list of names until
+     * something says which way each link runs. This is that something, and it
+     * is the same three-way test `RelationshipsChartModule::chart()` uses to
+     * decide whether to move up, down or right in its grid: the two people
+     * either share this family as children, share it as spouses, or one of
+     * them is a spouse in it and the other a child.
+     *
+     * A sibling and a spouse answer the same `sideways`, deliberately. The
+     * grid the HTML transport reads moves right for both, so distinguishing
+     * them here would make the two transports disagree about a family rather
+     * than say something more about it — and the label between the boxes
+     * already says which, in the site's own words.
+     */
+    private function direction(GedcomRecord $family, GedcomRecord $from, GedcomRecord $to): string
+    {
+        if (!$family instanceof Family) {
+            return 'unknown';
+        }
+
+        $children = $family->children();
+        $spouses  = $family->spouses();
+
+        if ($children->contains($from) && $children->contains($to)) {
+            return 'sideways';
+        }
+
+        if ($spouses->contains($from) && $spouses->contains($to)) {
+            return 'sideways';
+        }
+
+        if ($spouses->contains($from) && $children->contains($to)) {
+            return 'child';
+        }
+
+        if ($children->contains($from) && $spouses->contains($to)) {
+            return 'parent';
+        }
+
+        return 'unknown';
     }
 }

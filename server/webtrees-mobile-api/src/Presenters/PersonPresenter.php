@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WebtreesMobileApi\Presenters;
 
+use Fisharebest\Webtrees\Date;
 use Fisharebest\Webtrees\Gedcom;
 use Fisharebest\Webtrees\Individual;
 use Fisharebest\Webtrees\MediaFile;
@@ -11,6 +12,7 @@ use WebtreesMobileApi\Compat\Compat;
 use WebtreesMobileApi\Compat\CompatInterface;
 
 use function preg_match_all;
+use function strip_tags;
 
 /**
  * A person as they appear in a list: enough to draw a row and open them.
@@ -53,9 +55,55 @@ final class PersonPresenter
             'sex'           => self::sexName($this->compat->sexCode($individual)),
             'deceased'      => $this->isDeceased($individual),
             'lifespan'      => $this->lifespan($individual),
+            'birthYear'     => $this->year($individual->getBirthDate()),
+            'deathYear'     => $this->year($individual->getDeathDate()),
+            'birthPlace'    => $this->birthPlace($individual),
             'thumbnail'     => $this->thumbnailUrl($individual),
             'private'       => !$individual->canShow(),
         ];
+    }
+
+    /**
+     * The year of a date, **in the calendar the record keeps it in**.
+     *
+     * `Date::minimumDate()` is the calendar date object webtrees itself
+     * sorts and converts with, and its `year` is that calendar's own year —
+     * 1318 for a Hijri record, 1901 for a Gregorian one. Deliberately not
+     * converted to a common era: the HTML transport can only read the year
+     * the page *printed*, which is this one, and a module that answered a
+     * converted year would disagree with the floor about every Hijri record
+     * in the tree.
+     *
+     * Zero means the date states no year at all — `Date('')` for a record
+     * with no birth, and an event dated to a month with no year — which is
+     * absence rather than the year nought.
+     */
+    private function year(Date $date): int|null
+    {
+        if (!$date->isOK()) {
+            return null;
+        }
+
+        $year = $date->minimumDate()->year();
+
+        return $year === 0 ? null : $year;
+    }
+
+    /**
+     * Where the tree records the birth, shortened as the site shortens it.
+     *
+     * `Place::shortName()` is what `Individual::lifespan()` puts in the title
+     * of the year it prints, which is the only place a stock instance states
+     * a birthplace on a search result — so this is the same string, and the
+     * two transports can be diffed on it.
+     */
+    private function birthPlace(Individual $individual): string|null
+    {
+        if (!$individual->canShow()) {
+            return null;
+        }
+
+        return Text::orNull(strip_tags($individual->getBirthPlace()->shortName()));
     }
 
     /**

@@ -4,13 +4,21 @@
 /// character in it is a digit or a dash. Dropped into an Arabic paragraph the
 /// bidirectional algorithm lays it out right to left, and the person appears
 /// to have died before they were born. The fix is to isolate the run, which is
-/// what webtrees itself does in the markup it sends.
+/// what webtrees itself does in the markup it sends — and, where the digits
+/// themselves are Arabic, to override inside that isolate as well. See
+/// [ltrRun].
 library;
 
 import 'dart:ui' show TextDirection;
 
-/// U+2066: lays the run out left to right regardless of what is in it.
+/// U+2066: isolates the run from the text around it, at a left-to-right base.
 const String _leftToRightIsolate = '\u2066';
+
+/// U+202D: makes every character in the run left-to-right, whatever it is.
+const String _leftToRightOverride = '\u202D';
+
+/// U+202C: ends an override.
+const String _popDirectionalFormatting = '\u202C';
 
 /// U+2068: lays the run out according to its own first strong character.
 const String _firstStrongIsolate = '\u2068';
@@ -18,13 +26,32 @@ const String _firstStrongIsolate = '\u2068';
 /// U+2069: ends an isolate.
 const String _popDirectionalIsolate = '\u2069';
 
-/// [text] laid out left to right, whatever surrounds it.
+/// [text] laid out left to right, whatever surrounds it *and whatever is in
+/// it*.
 ///
 /// For runs that are Latin or numeric by nature — a lifespan, a version, a
 /// record id — and would otherwise be reordered by the paragraph around them.
+///
+/// **An isolate alone is not enough, and it took an Arabic tree to show it.**
+/// An isolate sets the *base* direction of the run; the bidirectional
+/// algorithm still classifies what is inside it. Latin digits are European
+/// numbers and come out in order, but Arabic-Indic digits — `١٣١٨`, which is
+/// what a site rendering in Arabic prints — are *Arabic* numbers, and rule N1
+/// makes the dash between two of them behave as right-to-left. The run is
+/// then reordered around that dash and `١٣١٨–١٩٧٤` is drawn as
+/// `١٩٧٤–١٣١٨`: the person died before they were born, which is the whole
+/// thing this function exists to prevent. It happens in an English interface
+/// and an Arabic one alike.
+///
+/// So the isolate is kept — it is what stops the run disturbing the line
+/// around it — and an *override* is added inside it, which forces every
+/// character to left-to-right and leaves nothing for N1 to decide. Verified
+/// by rendering all four combinations of numeral system and interface
+/// direction.
 String ltrRun(String? text) => text == null || text.isEmpty
     ? ''
-    : '$_leftToRightIsolate$text$_popDirectionalIsolate';
+    : '$_leftToRightIsolate$_leftToRightOverride$text'
+          '$_popDirectionalFormatting$_popDirectionalIsolate';
 
 /// [text] laid out according to its own script, whatever surrounds it.
 ///

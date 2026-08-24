@@ -183,6 +183,70 @@ class AppTextEn extends AppText {
   }
 
   @override
+  String get filter => 'Filter';
+
+  @override
+  String get filterTitle => 'Narrow these results';
+
+  @override
+  String get filterNone =>
+      'Nothing to narrow these results by. The site states a name and a lifespan, and this search found no birthplaces to choose from.';
+
+  @override
+  String get filterClear => 'Clear';
+
+  @override
+  String filterApply(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people',
+      one: '1 person',
+      zero: 'no matches',
+    );
+    return 'Show $_temp0';
+  }
+
+  @override
+  String get filterSex => 'Sex';
+
+  @override
+  String get filterSexMale => 'Men';
+
+  @override
+  String get filterSexFemale => 'Women';
+
+  @override
+  String get filterSexUnknown => 'Not recorded';
+
+  @override
+  String get filterBorn => 'Year of birth';
+
+  @override
+  String filterBornRange(String from, String to) {
+    return '$from–$to';
+  }
+
+  @override
+  String get filterBirthPlace => 'Born at';
+
+  @override
+  String get filterAnyPlace => 'Anywhere';
+
+  @override
+  String filterShowing(int shown, int loaded) {
+    return 'Showing $shown of $loaded loaded';
+  }
+
+  @override
+  String get filterNoMatches =>
+      'None of the results loaded so far match. Loading more may find some.';
+
+  @override
+  String get filterYearsNote =>
+      'Years as this site writes them, so a tree kept in the Hijri calendar is filtered in Hijri years.';
+
+  @override
   String get searchForAPerson => 'Search for a person';
 
   @override
@@ -319,6 +383,27 @@ class AppTextEn extends AppText {
     );
     return '$_temp0';
   }
+
+  @override
+  String get relationshipViewPath => 'Path';
+
+  @override
+  String get relationshipViewTree => 'Tree';
+
+  @override
+  String get relationshipViewLabel => 'How to show it';
+
+  @override
+  String get relationshipDrawTree => 'Draw this as a family tree';
+
+  @override
+  String relationshipWayOf(int number, int total) {
+    return 'Way $number of $total';
+  }
+
+  @override
+  String get relationshipTreeUnplaced =>
+      'This site did not say which way each step goes, so everyone is drawn on one row.';
 
   @override
   String get relationshipOtherWays => 'Other ways they are related';

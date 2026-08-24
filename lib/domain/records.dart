@@ -33,6 +33,9 @@ final class PersonRef {
     this.sex = Sex.unknown,
     this.isDeceased = false,
     this.thumbnailUrl,
+    this.birthYear,
+    this.deathYear,
+    this.birthPlace,
   });
 
   /// The record identifier, e.g. `X42`. Unique within a tree.
@@ -67,6 +70,30 @@ final class PersonRef {
   /// authorization token: webtrees still checks the viewer's own permission,
   /// so it must be fetched with the session cookies.
   final String? thumbnailUrl;
+
+  /// The year the tree records a birth in, **as the site counts years**.
+  ///
+  /// Not converted, and deliberately not turned into an age. webtrees renders
+  /// a year in the calendar the record is kept in, so a tree of Hijri dates
+  /// answers `1318` where a Gregorian one answers `1901` — and subtracting
+  /// either from a Gregorian *today* would produce a number that is simply
+  /// wrong. What it is good for is comparing people in one tree with each
+  /// other, which is what a filter over search results does.
+  ///
+  /// Null where the tree records no birth, which is ordinary: a filter with
+  /// nothing to compare leaves the row alone rather than hiding it.
+  final int? birthYear;
+
+  /// The year of death, on the same terms as [birthYear].
+  final int? deathYear;
+
+  /// Where the tree records the birth, in the site's own words.
+  ///
+  /// Already shortened by webtrees to the part it prints — usually a town and
+  /// a country. Kept as one string rather than split on its separator: the
+  /// separator is translated too (`،` in Arabic), and the levels of a place
+  /// hierarchy are a tree's own business.
+  final String? birthPlace;
 
   @override
   bool operator ==(Object other) => other is PersonRef && other.xref == xref;

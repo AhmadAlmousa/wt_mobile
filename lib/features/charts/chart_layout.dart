@@ -43,6 +43,14 @@ enum EdgeKind {
   /// to each other. webtrees says so in words the app cannot translate; a
   /// chart says it in the line.
   divorce,
+
+  /// Two people the site placed in the same generation.
+  ///
+  /// Only a relationship path draws one, and only because a path is walked
+  /// rather than descended: the grid it is read from moves right for a
+  /// sibling and for a spouse alike, so this says "beside" and the label on
+  /// the edge says which. See [StepDirection.sideways].
+  sideways,
 }
 
 /// How big the pieces of a chart are drawn.
@@ -120,6 +128,7 @@ final class ChartEdge {
     required this.from,
     required this.to,
     this.kind = EdgeKind.descent,
+    this.label,
   });
 
   final Offset from;
@@ -127,8 +136,21 @@ final class ChartEdge {
 
   final EdgeKind kind;
 
+  /// What this link is called, where the site named it.
+  ///
+  /// Only a relationship path carries these. A descent chart's lines need no
+  /// caption — the shape *is* the caption — but a path is a route, and a
+  /// route that does not say `father` at each turn is a row of boxes.
+  final String? label;
+
   /// A marriage rather than a descent, however it ended.
-  bool get isCouple => kind != EdgeKind.descent;
+  bool get isCouple => kind == EdgeKind.marriage || kind == EdgeKind.divorce;
+
+  /// Drawn as one straight line rather than as an elbow.
+  ///
+  /// Everything that joins two boxes standing side by side: an elbow between
+  /// them would turn a corner that is not there.
+  bool get isStraight => kind != EdgeKind.descent;
 }
 
 /// Everything needed to draw a chart, and how large a canvas it needs.
@@ -190,6 +212,7 @@ final class ChartLayout {
           from: Offset(size.width - edge.from.dx, edge.from.dy),
           to: Offset(size.width - edge.to.dx, edge.to.dy),
           kind: edge.kind,
+          label: edge.label,
         ),
     ],
   );
@@ -560,7 +583,12 @@ ChartLayout layoutHourglass(
   final edges = <ChartEdge>[
     ...above.edges,
     for (final edge in below.edges)
-      ChartEdge(from: edge.from + shift, to: edge.to + shift, kind: edge.kind),
+      ChartEdge(
+        from: edge.from + shift,
+        to: edge.to + shift,
+        kind: edge.kind,
+        label: edge.label,
+      ),
   ];
 
   // The descendants may reach further left than the ancestors do, so the
@@ -593,6 +621,7 @@ ChartLayout layoutHourglass(
           from: edge.from + nudge,
           to: edge.to + nudge,
           kind: edge.kind,
+          label: edge.label,
         ),
     ],
     size: Size(

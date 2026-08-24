@@ -106,6 +106,18 @@ void main() {
       expect(isolated, contains('1875–1940'));
     });
 
+    test('and keeps it when the digits are Arabic ones too', () {
+      // The isolate alone does not: Arabic-Indic digits are *Arabic* numbers
+      // rather than European ones, so rule N1 makes the dash between two of
+      // them behave as right-to-left and the run is reordered around it. An
+      // override inside the isolate leaves nothing for that rule to decide.
+      final isolated = ltrRun('١٨٧٥–١٩٤٠');
+
+      expect(isolated, startsWith('\u2066\u202D'));
+      expect(isolated, endsWith('\u202C\u2069'));
+      expect(isolated, contains('١٨٧٥–١٩٤٠'));
+    });
+
     test('a name is left to find its own direction', () {
       // A second recorded name may be Arabic or romanized, and only the text
       // itself can say which.

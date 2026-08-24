@@ -36,9 +36,12 @@ class PersonTile extends StatelessWidget {
   /// looking like a block.
   final Color? color;
 
-  /// What this person is to whoever is being read — "father", "أخ أكبر" —
-  /// where the site has already said it. Shown above the name, because it is
-  /// what the reader is scanning the list for.
+  /// One short line above the name, saying what this person is *here*.
+  ///
+  /// A kinship word on a relationship path — "father", "أخ أكبر" — or the
+  /// birthplace in a list narrowed by one. Either way it is the site's own
+  /// words and it is what the reader is scanning the list for, which is why
+  /// it sits above the name rather than under it.
   final String? relationship;
 
   final Widget? trailing;

@@ -17,6 +17,14 @@ String fixture(String version, String name) =>
     File('test/fixtures/$version/$name').readAsStringSync();
 
 /// A tom-select reply in the shape webtrees actually sends.
+///
+/// **Captured from a running 2.2.6**, not transcribed, and the difference is
+/// the whole reason the app can filter these rows at all: a lifespan is not
+/// the text `1901–1974` but two spans, each carrying the *place* and the full
+/// date of that event in its `title` — separated from the place by the
+/// Unicode isolates webtrees wraps every rendered date in. The transcribed
+/// version of this fixture said none of that, and a filter written against it
+/// would have found nothing on a real site.
 String searchJson({required bool more}) => jsonEncode({
   'data': [
     {
@@ -24,13 +32,20 @@ String searchJson({required bool more}) => jsonEncode({
       'text':
           '<img src="/tree/main/media-thumbnail/M11/1?s=aa" width="30">&nbsp;'
           '<span class="NAME" dir="auto" translate="no">عبد الله '
-          '<span class="SURN">الموسى</span></span>, 1901–1974',
+          '<span class="SURN">الموسى</span></span>, '
+          '<span title="الكويت، الكويت \u2068حوالي ١٩٠١\u2069">١٩٠١</span>'
+          '–<span title="مكة، السعودية \u2068١٩٧٤\u2069">١٩٧٤</span>',
     },
     {
       'value': 'X43',
       'text':
           '<span class="NAME" dir="auto" translate="no">نورة '
-          '<span class="SURN">الموسى</span></span>, 1903–1980',
+          '<span class="SURN">الموسى</span></span>, '
+          // Nothing recorded but the years, which is the ordinary shape: the
+          // place half of the title is empty and the app must read no place
+          // rather than an empty one.
+          '<span title=" \u2068١٩٠٣\u2069">١٩٠٣</span>'
+          '–<span title=" \u2068١٩٨٠\u2069">١٩٨٠</span>',
     },
   ],
   'nextUrl': more ? '/tree/main/tom-select-individual?page=2' : null,
@@ -115,6 +130,39 @@ void main() {
       // media file, so absence is normal rather than a parse failure.
       expect(page.people.first.thumbnailUrl, contains('media-thumbnail'));
       expect(page.people.last.thumbnailUrl, isNull);
+    });
+
+    test('reads the years out of the lifespan the site printed', () async {
+      serve(site());
+      final page = await records.search('main', 'الموسى');
+
+      // In the site's own numerals, which is what a stock instance sends —
+      // and which is why the app reads a number rather than parsing a string.
+      expect(page.people.first.lifespan, '١٩٠١–١٩٧٤');
+      expect(page.people.first.birthYear, 1901);
+      expect(page.people.first.deathYear, 1974);
+      expect(page.people.last.birthYear, 1903);
+    });
+
+    test('reads the birthplace out of the title nobody looks at', () async {
+      serve(site());
+      final page = await records.search('main', 'الموسى');
+
+      // `Individual::lifespan()` writes the title as the place, a space, and
+      // then the date wrapped in Unicode isolates — so the place is
+      // everything before the opening isolate, and it is the one thing a
+      // stock search row says beyond a name and two years.
+      expect(page.people.first.birthPlace, 'الكويت، الكويت');
+    });
+
+    test('a row that records no place says none, not an empty one', () async {
+      serve(site());
+      final page = await records.search('main', 'الموسى');
+
+      // The title is still there, and still has the isolate in it — what is
+      // missing is the place before it, and a filter must treat that as
+      // "unstated" rather than as a place whose name is nothing.
+      expect(page.people.last.birthPlace, isNull);
     });
 
     test('reports a further page when the server offers one', () async {

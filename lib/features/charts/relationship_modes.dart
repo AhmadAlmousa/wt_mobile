@@ -17,6 +17,26 @@ import 'package:meta/meta.dart';
 import '../../domain/charts.dart';
 import '../../domain/records.dart';
 
+/// How a relationship is put on screen.
+///
+/// Two modes rather than one, because the question has two halves and no
+/// single drawing answers both. The path down the page says *what the link
+/// is*: a spine of names with the site's own word on every rung, read top to
+/// bottom like a sentence. The tree says *where these people sit in the
+/// family*: two branches leaving one grandfather and meeting again three
+/// generations later, which a list has no up or down to show.
+///
+/// Each gets the whole body when it is chosen. A chart squeezed under a
+/// column of controls is a picture of a family rather than one anybody can
+/// read, and a path is easier to follow at full width too.
+enum RelationshipView {
+  /// The steps, one under the next.
+  path,
+
+  /// The same steps, placed by generation and joined.
+  tree,
+}
+
 /// A way through the family, as a reader would name it.
 enum RelationshipSide {
   /// The shortest link there is, whichever way it runs.

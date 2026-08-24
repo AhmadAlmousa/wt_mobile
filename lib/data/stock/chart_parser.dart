@@ -185,6 +185,16 @@ final class ChartParser {
     // A step moves two cells: the relationship's name sits between the two
     // people it links, whether they are stacked, side by side, or — where
     // webtrees turns a corner — diagonally apart.
+    //
+    // The row it moves through is also *what the step means*, which is the
+    // one structural thing this grid states.
+    // `RelationshipsChartModule::chart()` walks the same path webtrees found
+    // and emits the table bottom-up (`for ($row = $max_y; $row >= $min_y`),
+    // so a smaller row index is further up the page: a parent. It moves down
+    // for a child, and right — never up or down — for anybody in the same
+    // generation, which is why a sibling and a spouse share one direction
+    // here (see [StepDirection.sideways]). Confirmed against six live grids
+    // on 2.2.6, including both diagonals.
     const directions = [
       [-1, 0],
       [1, 0],
@@ -212,7 +222,17 @@ final class ChartParser {
         );
         if (next == null || !seen.add(next.xref)) continue;
 
-        steps.add(RelationshipStep(relationship: label, person: next));
+        steps.add(
+          RelationshipStep(
+            relationship: label,
+            person: next,
+            direction: switch (direction[0]) {
+              < 0 => StepDirection.toParent,
+              > 0 => StepDirection.toChild,
+              _ => StepDirection.sideways,
+            },
+          ),
+        );
         atRow += direction[0] * 2;
         atColumn += direction[1] * 2;
         moved = true;

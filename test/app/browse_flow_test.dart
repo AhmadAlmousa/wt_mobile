@@ -18,6 +18,16 @@ import '../support/test_app.dart';
 String fixture(String name) =>
     File('test/fixtures/v2_2_6/$name').readAsStringSync();
 
+/// A lifespan as `Individual::lifespan()` really writes one.
+///
+/// Two spans, each carrying the place and the full date in its `title` and
+/// separated from it by the Unicode isolates webtrees wraps a rendered date
+/// in — which is where the app gets a birth year and a birthplace for a
+/// search result, and therefore what the filter runs on.
+String lifespanMarkup(int born, int died, String place) =>
+    '<span title="$place \u2068about $born\u2069">$born</span>'
+    '–<span title=" \u2068$died\u2069">$died</span>';
+
 /// A page of results, in the shape webtrees sends them.
 ///
 /// `nextUrl` is what says a further page exists — and webtrees builds it
@@ -32,7 +42,8 @@ String searchJson(String query, {int page = 1}) => jsonEncode({
             'value': 'X43',
             'text':
                 '<span class="NAME" dir="auto">نورة '
-                '<span class="SURN">الموسى</span></span>, 1903–1980',
+                '<span class="SURN">الموسى</span></span>, '
+                '${lifespanMarkup(1903, 1980, 'مكة، السعودية')}',
           },
         ]
       : [
@@ -41,14 +52,16 @@ String searchJson(String query, {int page = 1}) => jsonEncode({
               'value': 'X42',
               'text':
                   '<span class="NAME" dir="auto">عبد الله '
-                  '<span class="SURN">الموسى</span></span>, 1901–1974',
+                  '<span class="SURN">الموسى</span></span>, '
+                  '${lifespanMarkup(1901, 1974, 'الكويت، الكويت')}',
             }
           else ...[
             {
               'value': 'X60',
               'text':
                   '<span class="NAME" dir="auto">خالد '
-                  '<span class="SURN">الموسى</span></span>, 1926–2001',
+                  '<span class="SURN">الموسى</span></span>, '
+                  '${lifespanMarkup(1926, 2001, 'مكة، السعودية')}',
             },
             // The same person twice: webtrees searches the name table, so
             // somebody recorded under two names is two rows, and it removes
@@ -57,7 +70,8 @@ String searchJson(String query, {int page = 1}) => jsonEncode({
               'value': 'X42',
               'text':
                   '<span class="NAME" dir="auto">عبد الله '
-                  '<span class="SURN">الموسى</span></span>, 1901–1974',
+                  '<span class="SURN">الموسى</span></span>, '
+                  '${lifespanMarkup(1901, 1974, 'الكويت، الكويت')}',
             },
           ],
         ],
@@ -448,6 +462,64 @@ void main() {
     expect(server.routes, contains('/tree/main/relationships-1-3/X42/X43'));
   });
 
+  testWidgets('draws the same relationship as a family tree', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Relationship'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'نورة');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('نورة الموسى').last);
+    await tester.pumpAndSettle();
+
+    // The list of steps, which is the mode it opens in.
+    expect(find.byType(ChartCanvas), findsNothing);
+
+    await tester.tap(find.text('Tree'));
+    await tester.pumpAndSettle();
+
+    // The same two people, placed rather than listed — and the site's own
+    // word still on the line between them.
+    final canvas = tester.widget<ChartCanvas>(find.byType(ChartCanvas));
+    expect(canvas.layout.people.map((p) => p.person.xref), ['X42', 'X43']);
+    expect(canvas.layout.edges.single.label, 'أخت');
+    // A sister is a step along the page, so both boxes sit on one row.
+    expect(
+      canvas.layout.people.first.topLeft.dy,
+      canvas.layout.people.last.topLeft.dy,
+    );
+
+    // And back again, because a path says what a tree cannot.
+    await tester.tap(find.text('Path'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChartCanvas), findsNothing);
+    expect(find.text('القرابة: أخت'), findsOne);
+  });
+
+  testWidgets('the button beside a relationship draws it', (tester) async {
+    await openTree(tester);
+    await search(tester, 'الموسى');
+    await tester.tap(find.text('عبد الله الموسى'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Relationship'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'نورة');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('نورة الموسى').last);
+    await tester.pumpAndSettle();
+
+    // Beside the site's own phrase for this relationship rather than in the
+    // bar: a screen can be showing several, and each is a different shape.
+    await tester.tap(find.byTooltip('Draw this as a family tree'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChartCanvas), findsOne);
+  });
+
   testWidgets('offers the ways of asking, and says which have no answer', (
     tester,
   ) async {
@@ -606,6 +678,85 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(server.routes, contains('/tree/main/individual/X7'));
+  });
+
+  testWidgets('narrows the results without asking the server again', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'كثير');
+    await tester.tap(find.text('Show more'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('خالد الموسى'), findsOne);
+    final asked = server.routes.length;
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    // A birthplace the page states in an attribute nobody would look at,
+    // which is the whole reason this filter costs no request.
+    await tester.tap(find.text('الكويت، الكويت'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show 1 person'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('عبد الله الموسى'), findsOne);
+    expect(find.text('خالد الموسى'), findsNothing);
+    // Says what it is doing, and against how many rows — the count is of the
+    // results loaded, because that is all the filter can see.
+    expect(find.textContaining('Showing 1 of 2'), findsOne);
+    expect(server.routes.length, asked, reason: 'no further request');
+  });
+
+  testWidgets('a filter that hides everything says so', (tester) async {
+    await openTree(tester);
+    await search(tester, 'كثير');
+    await tester.tap(find.text('Show more'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    // Two narrowings, because one is never enough here: every place chip is
+    // a place some loaded row names, so choosing one always keeps somebody.
+    await tester.tap(find.text('مكة، السعودية'));
+    await tester.pumpAndSettle();
+    // From the end thumb rather than from the middle of the track: with the
+    // whole span selected both thumbs sit at the edges, and a drag begun
+    // halfway between them could take hold of either.
+    final track = tester.getRect(find.byType(RangeSlider));
+    await tester.dragFrom(
+      Offset(track.right - 24, track.center.dy),
+      Offset(-track.width, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show no matches'));
+    await tester.pumpAndSettle();
+
+    // Which is a different thing from a search that found nobody, and the
+    // difference is worth a sentence: another page may yet hold a match.
+    expect(find.textContaining('None of the results loaded'), findsOne);
+    expect(find.textContaining('Showing 0 of 2'), findsOne);
+  });
+
+  testWidgets('a new search starts unfiltered', (tester) async {
+    await openTree(tester);
+    await search(tester, 'كثير');
+    await tester.tap(find.text('Show more'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('مكة، السعودية'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show 1 person'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Showing 1 of 2'), findsOne);
+
+    // A filter chosen for one surname says nothing about the next, and one
+    // left in force would look like a search that found less than it did.
+    await search(tester, 'نورة');
+    expect(find.text('نورة الموسى'), findsOne);
+    expect(find.textContaining('Showing'), findsNothing);
   });
 
   testWidgets('fetches the next page of results when asked', (tester) async {

@@ -224,7 +224,68 @@ class ChartCanvas extends StatelessWidget {
               onTap: () => onTapPerson(placement.person),
             ),
           ),
+
+        // Above the boxes, because a caption sits on the line it names and
+        // the line is painted underneath everything.
+        for (final edge in layout.edges)
+          if (edge.label case final label?)
+            Positioned(
+              // Centred on the middle of the line, which is where the elbow
+              // turns and where a straight run has most room.
+              left: (edge.from.dx + edge.to.dx) / 2 - _EdgeLabel.width / 2,
+              top: (edge.from.dy + edge.to.dy) / 2 - _EdgeLabel.height / 2,
+              width: _EdgeLabel.width,
+              height: _EdgeLabel.height,
+              child: _EdgeLabel(label),
+            ),
       ],
+    );
+  }
+}
+
+/// What a joining line is called, drawn on the line.
+///
+/// Only a relationship path has these: a descent chart's shape is its own
+/// caption, and a path is a route that has to say `father` at each turn or it
+/// is a row of boxes. The word is the site's own and takes its direction from
+/// itself — a kinship term is written in the site's language, not the
+/// reader's.
+class _EdgeLabel extends StatelessWidget {
+  const _EdgeLabel(this.text);
+
+  final String text;
+
+  /// Fixed, and centred on the line rather than laid out against it: the
+  /// arithmetic that places every box is in `chart_layout.dart` and knows
+  /// nothing about fonts, so a caption that could resize would move the
+  /// picture out from under it.
+  static const double width = 108;
+  static const double height = 26;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: colors.secondaryContainer,
+          borderRadius: BorderRadius.circular(100),
+          border: BoxBorder.all(color: colors.surface, width: 2),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          textDirection: directionOf(text),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colors.onSecondaryContainer,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -244,9 +305,11 @@ class _JoiningLines extends CustomPainter {
   final ChartLayout layout;
   final Color color;
 
-  /// Couples are drawn in a stronger colour than descent, because the
-  /// difference between a marriage and a divorce is carried by that line and
-  /// has to survive being looked at from across a whole chart.
+  /// Straight lines are drawn in a stronger colour than descent: a couple,
+  /// because the difference between a marriage and a divorce is carried by
+  /// that line and has to survive being looked at from across a whole chart;
+  /// a same-generation link on a relationship path, because it is a step the
+  /// reader is following rather than a family it can see the shape of.
   final Color coupleColor;
 
   @override
@@ -261,7 +324,7 @@ class _JoiningLines extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     for (final edge in layout.edges) {
-      if (edge.isCouple) {
+      if (edge.isStraight) {
         if (edge.kind == EdgeKind.divorce) {
           _drawParted(canvas, edge, couple);
         } else {

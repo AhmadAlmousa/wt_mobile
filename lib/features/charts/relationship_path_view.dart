@@ -125,6 +125,7 @@ class RelationshipSummary extends StatelessWidget {
   const RelationshipSummary({
     required this.description,
     required this.steps,
+    this.onDrawTree,
     super.key,
   });
 
@@ -133,6 +134,14 @@ class RelationshipSummary extends StatelessWidget {
 
   /// How many links the shortest path holds.
   final int steps;
+
+  /// Draws this same relationship as a family tree.
+  ///
+  /// Beside the phrase rather than in the bar, because it is a button about
+  /// *this* relationship and a screen can be showing several — a family where
+  /// cousins marry links two people by more than one line, and each is a
+  /// different shape.
+  final VoidCallback? onDrawTree;
 
   @override
   Widget build(BuildContext context) {
@@ -146,23 +155,36 @@ class RelationshipSummary extends StatelessWidget {
         color: colors.primaryContainer,
         borderRadius: BorderRadius.circular(AppTheme.shapeExtraLarge),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            description,
-            textDirection: directionOf(description),
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: colors.onPrimaryContainer,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  textDirection: directionOf(description),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: colors.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  text.relationshipSteps(steps),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.onPrimaryContainer.withValues(alpha: 0.75),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            text.relationshipSteps(steps),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colors.onPrimaryContainer.withValues(alpha: 0.75),
+          if (onDrawTree case final draw?)
+            IconButton.filledTonal(
+              icon: const Icon(Icons.account_tree_outlined),
+              tooltip: AppText.of(context).relationshipDrawTree,
+              onPressed: draw,
             ),
-          ),
         ],
       ),
     );

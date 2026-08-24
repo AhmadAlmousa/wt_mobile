@@ -409,6 +409,102 @@ abstract class AppText {
   /// **'Linked to {xref}'**
   String linkedTo(String xref);
 
+  /// No description provided for @filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filter;
+
+  /// No description provided for @filterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrow these results'**
+  String get filterTitle;
+
+  /// No description provided for @filterNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to narrow these results by. The site states a name and a lifespan, and this search found no birthplaces to choose from.'**
+  String get filterNone;
+
+  /// No description provided for @filterClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get filterClear;
+
+  /// How many results the chosen filter leaves.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count, plural, =0{no matches} =1{1 person} other{{count} people}}'**
+  String filterApply(int count);
+
+  /// No description provided for @filterSex.
+  ///
+  /// In en, this message translates to:
+  /// **'Sex'**
+  String get filterSex;
+
+  /// No description provided for @filterSexMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Men'**
+  String get filterSexMale;
+
+  /// No description provided for @filterSexFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Women'**
+  String get filterSexFemale;
+
+  /// No description provided for @filterSexUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recorded'**
+  String get filterSexUnknown;
+
+  /// No description provided for @filterBorn.
+  ///
+  /// In en, this message translates to:
+  /// **'Year of birth'**
+  String get filterBorn;
+
+  /// The chosen span of birth years.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to}'**
+  String filterBornRange(String from, String to);
+
+  /// No description provided for @filterBirthPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Born at'**
+  String get filterBirthPlace;
+
+  /// No description provided for @filterAnyPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Anywhere'**
+  String get filterAnyPlace;
+
+  /// How many of the results fetched so far survive the filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {loaded} loaded'**
+  String filterShowing(int shown, int loaded);
+
+  /// No description provided for @filterNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'None of the results loaded so far match. Loading more may find some.'**
+  String get filterNoMatches;
+
+  /// No description provided for @filterYearsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Years as this site writes them, so a tree kept in the Hijri calendar is filtered in Hijri years.'**
+  String get filterYearsNote;
+
   /// No description provided for @searchForAPerson.
   ///
   /// In en, this message translates to:
@@ -654,6 +750,42 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 step} other{{count} steps}}'**
   String relationshipSteps(int count);
+
+  /// No description provided for @relationshipViewPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get relationshipViewPath;
+
+  /// No description provided for @relationshipViewTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tree'**
+  String get relationshipViewTree;
+
+  /// No description provided for @relationshipViewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How to show it'**
+  String get relationshipViewLabel;
+
+  /// No description provided for @relationshipDrawTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw this as a family tree'**
+  String get relationshipDrawTree;
+
+  /// Which of several relationship paths is on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Way {number} of {total}'**
+  String relationshipWayOf(int number, int total);
+
+  /// No description provided for @relationshipTreeUnplaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This site did not say which way each step goes, so everyone is drawn on one row.'**
+  String get relationshipTreeUnplaced;
 
   /// No description provided for @relationshipOtherWays.
   ///

@@ -236,6 +236,27 @@ accepts and turns anything else into a typed error. Only an anonymous `404`
 proves a tree private — re-confirmed live 2026-08-22, along with `302` from an
 anonymous `/my-account`.
 
+### What a stock search row actually says
+
+*Confirmed live on 2.2.6 and 2.3, 2026-08-24.* The autocomplete endpoint
+renders `views/selects/individual.phtml`, which is a thumbnail, the full name
+and `Individual::lifespan()`. That last one is not the string it looks like:
+
+```html
+<span title="الكويت، الكويت ⁨حوالي ١٨٧٥⁩">١٨٧٥</span>–<span title=" ⁨١٩٤٥⁩">١٩٤٥</span>
+```
+
+Each year is a span whose `title` holds the **place** and the full date of
+that event, and the date is wrapped in `U+2068 … U+2069` — which is the only
+thing that makes the two halves separable, because the space between them is
+the site's own and the place may contain spaces too. So a birth year, a death
+year and a birthplace arrive with every search result on an untouched
+instance, at no extra request. **Sex does not**, and cannot: `fullName()`
+emits a `span.NAME` and nothing else.
+
+The lifespan text is rendered in the site's numerals (`١٨٧٥`), and in the
+calendar the record is kept in — see `domain/numerals.dart` and §9 #24.
+
 ### Data availability on a stock instance
 
 - **No API exists.** `app/Http/Routes/ApiRoutes.php` is an empty placeholder.
@@ -900,6 +921,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **8b** | The lab: 2.2.6 and 2.3 installs, the module running, both transports diffed | ✅ — then against the real tree, see §9 #18 |
 | **8c** | What a reader saw: family facts, the mourning ribbon, the whole chart, a PDF drawn as shapes | ✅ |
 | **8d** | The capability ledger: every remaining capability diffed transport against transport, and a lab with a photograph in it | ✅ — nine cleared, `statistics` deliberately not |
+| **9a** | Relationships drawn: a path as a family tree, and the direction each step runs | ✅ |
+| **9b** | Narrowing a page of search results — sex, year of birth, birthplace | ✅ |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -916,7 +939,7 @@ from a box to the person.
 | Circle (fan), Compact | the same ancestors data, laid out differently | ✅ 6b |
 | Hourglass | ancestors *and* descendants of one person, stitched at the subject | ✅ 6b |
 | Family book | the hourglass with every spouse's family drawn too | 6c |
-| Relationships | the server's own path between two people, walked out of its grid | ✅ 6c |
+| Relationships | the server's own path between two people, walked out of its grid | ✅ 6c, drawn as a tree in 9a |
 | Timeline | event boxes and year labels, each stating its own position | ✅ 6e |
 | Lifespan | bars positioned against a scale of decades, the same way | 6f |
 | Statistics | plain counts in the markup, **and** chart data as JSON inside `statistics.draw*Chart(…)` calls | ✅ 6d |
@@ -936,12 +959,12 @@ the parser behind it stays, fixtures and all, and stays tested.
 |---|---|---|---|
 | `access` | account, admin, tree count, role, own record | the real tree | ✅ |
 | `individual` | name, sex, deceased, lifespan, parents, siblings, spouses, children, primary facts, tags, family events, dates in both calendars | the real tree | ✅ |
-| `individuals` | same result count for the same query; enumeration | the real tree | ✅ |
+| `individuals` | same result count for the same query; enumeration; each person's birth year and birthplace | the real tree | ✅ |
 | `notes`, `sources` | how many of each a record carries, and which hang off a fact | both labs — the real site runs neither tab | ✅ |
 | `media` | how many items, which are on a fact, and the bytes of every thumbnail | both labs — this account can see none of the real tree's 86 | ✅ |
 | `family` | each family's membership by xref — kind, spouses, children | the real tree | ✅ |
 | `ancestors`, `descendants` | how many people, how many generations, and **the shape**: who sits at which Sosa or d'Aboville number | the real tree | ✅ |
-| `relationship` | how many paths, the site's own phrase for the whole relationship, and each step's word and person | the real tree | ✅ |
+| `relationship` | how many paths, the site's own phrase for the whole relationship, each step's word and person, and which way each step runs | the real tree | ✅ |
 | `timeline` | which events, in what order | the real tree | ✅ |
 | `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | the real tree | ❌ **read from the page** |
 
@@ -955,13 +978,16 @@ a timeline, and the statistics total. It found one disagreement, on a name
 transports apart and the fourth time one of them was simply right.
 
 One caveat the table cannot carry: **`tree.almou.sa` runs module 1.0.1** and
-this repository is at **1.1.1**, so the real-tree evidence for `relationship`
+this repository is at **1.2.0**, so the real-tree evidence for `relationship`
 and `timeline` is evidence about the *previous* module. Both differ there
 exactly as this session's fixes predict — the bare kinship word, and a
 timeline event without its calendar conversion — and both agree on the labs,
 which run the code here. The same goes for the two module fixes the real tree
 itself produced (§7, bugs 48 and 49): a name and a burial, both corrected
-here, neither deployed there. **Updating the instance is the one outstanding
+here, neither deployed there. **1.2.0 adds a step's direction**, which 1.0.1
+does not send — so a relationship drawn as a tree there falls back to one flat
+row until the instance is updated, and says so on the screen rather than
+drawing a shape nobody stated. **Updating the instance is the one outstanding
 action, and it is not something this machine can do.**
 
 Two capabilities are cleared on labs alone and cannot be more than that here:
@@ -2029,6 +2055,147 @@ because `tree.almou.sa` runs module 1.0.1 and the fix is here. The
 relationship wording differs there for the same reason. Neither is a fault;
 both close when the instance is updated.
 
+### 2026-08-24 — Phase 9a: a relationship has two shapes, and a path only shows one
+
+A relationship screen answered one question well and a second one not at all.
+*What is the link?* is a sentence — `القرابة: حفيد`, two steps — and the path
+down the page says it perfectly: a spine of names with the site's own word on
+every rung, read top to bottom. *Where do these people sit in the family?* is
+a picture, and a list has no up and no down to draw it with. Two branches
+leaving one grandfather and meeting again three generations later is the shape
+a reader is actually asking about, and nothing on the screen could show it.
+
+So the screen has two modes now, and each gets the whole body — a chart under
+a column of controls is a picture of a family rather than one anybody can
+read. The path keeps the ways of asking (`closest`, father's side, mother's
+side, through a spouse, blood lines only); the tree gets a switch back and,
+where a side offers several, a way to step between them. Beside every
+relationship the screen states — the closest one, and each of the *other ways*
+a family where cousins marry produces — there is a button that draws that
+particular one.
+
+**The whole feature turns on one fact the app did not have: which way each
+step goes.** The word on a step is the site's own and cannot be switched on;
+`أب` and `father` are the same step and a client that matched on either would
+work in one language and quietly fail in the other. It has to be structural,
+and both transports can now state it:
+
+- **The module** asks the family record the same three-way question
+  `RelationshipsChartModule::chart()` asks before deciding whether to move up,
+  down or right in its grid: the two people either share this family as
+  children, share it as spouses, or one is a spouse in it and the other a
+  child.
+- **The page** states it in the geometry of that grid, and the grid is walked
+  already. webtrees prints its table from the top row down, so a smaller row
+  index is further up the page: a parent. The parser was recording the
+  direction it moved and throwing it away.
+
+A sibling and a spouse answer the same `sideways`, deliberately. The grid
+moves right for both, so the stock path genuinely cannot tell them apart, and
+a distinction only one transport could make would be a *disagreement* between
+them rather than a fact about the family. The label between the boxes says
+which, in the site's own words.
+
+**The two versions draw that grid differently, and only running both showed
+it.** 2.2.6 turns the corner with a diagonal cell only where the previous step
+ran the other way — `if ($n > 2 && preg_match('/fat|mot|par/', …))` — and 2.3
+dropped that test and uses a diagonal for every step after the first. The same
+four people are three columns wide on 2.2.6 and five on 2.3. Reading the
+*sign of the row change* rather than a column position is what makes both
+answer the same thing, and `test/fixtures/*/relationship_cousin.html` is the
+first pair of fixtures in this repository **captured from a running server on
+each version** rather than transcribed. `live_check` now diffs directions
+alongside the wording; both labs agree, on both versions.
+
+The layout itself (`features/charts/relationship_layout.dart`) is ordinary
+arithmetic over that: a step to a parent is a row up, a step to a child is a
+row down, sideways stays on the row, and a column advances when it must —
+either because the step moved along the page, or because the box it would
+otherwise take is occupied. That last rule is the one that matters: up to a
+grandparent and down the other branch has to put the cousin *beside* the
+subject, not on top of them. It reuses `ChartCanvas`, so the tree pans, zooms,
+mirrors for Arabic and opens a person exactly as every other chart does — with
+one addition, an optional label on an edge, because a route that does not say
+`father` at each turn is a row of boxes.
+
+### 2026-08-24 — Phase 9b: what a search row was already saying
+
+A common surname in this family matches hundreds of people and the app could
+only offer them as one list. The three things a reader wants next — the women,
+a generation, the branch that stayed in one town — are all properties of rows
+already on screen, so the question was never *how to ask the server again*. It
+was what the rows actually carry.
+
+**More than anyone here had noticed.** `Individual::lifespan()` does not write
+`1901–1974`; it writes two spans, and each carries the *place* and the full
+date of that event in its `title`:
+
+```html
+<span title="الكويت، الكويت ⁨about 1901⁩">1901</span>–<span title=" ⁨1974⁩">1974</span>
+```
+
+The autocomplete endpoint renders that view verbatim. So a stock instance —
+the floor, with no module and no extra request — has been sending a birth year
+and a birthplace with every search result since the beginning, and the parser
+was taking the text and dropping the attributes. The two halves of the title
+are separable because the date is wrapped in Unicode isolates
+(`U+2068 … U+2069`); without them the attribute is one run of words in the
+site's language with no separator this app would be entitled to assume.
+
+**Sex is the one thing the page does not say**, and the module does. So the
+filter sheet is built from the *rows* rather than from the transport that
+fetched them: a control appears when some row can answer it. On a stock
+instance that is years and places; with the module installed a sex chip row
+appears beside them, and nothing has to ask which transport answered. Both
+transports are now diffed on all three, per person, in `live_check` — 17
+people, both webtrees versions, all agreeing.
+
+Three decisions worth keeping:
+
+- **A slider over the year of birth, not over an age.** webtrees renders a
+  year in the calendar the record is kept in, so a Hijri tree answers `1318`
+  where a Gregorian one answers `1901`, and subtracting either from a
+  Gregorian *today* would produce a number that is simply wrong. The ends of
+  the slider are two years the site itself printed, taken from the results in
+  view, so one control works for either kind of tree and its labels always
+  match what the rows show. The sheet says so in a line under it.
+- **A row that does not say is kept.** A person with no recorded birth is not
+  a person born outside the range; a tree records a birth for maybe half its
+  people, and hiding the rest would assert something it never said. A
+  birthplace is the exception, and deliberately: asking for people born in
+  Kuwait is asking about a stated place.
+- **The count is of the rows loaded.** A filter that hides everything and a
+  search that found nobody look identical from outside, so the bar says
+  `Showing 1 of 2 loaded` and the empty state says another page may yet hold a
+  match. The button in the sheet counts before it applies, too.
+
+Reading a year meant reading a number in the site's own numerals, which is a
+thing the app had gone out of its way never to do — a chart computes its own
+Sosa numbers precisely so it never has to read the printed ones.
+`domain/numerals.dart` is therefore as narrow as it can be: it answers a year
+or nothing, across every numeral system `fisharebest/localization` renders in.
+Chinese numerals are deliberately absent, because `ScriptHani` is not a
+contiguous run — a site rendering in it answers no year, and a filter with no
+year to filter on leaves every row alone.
+
+**And then the pictures showed bug 19 was never fixed.** The new fixture is a
+real capture, so its lifespan is `١٣١٨–١٩٧٤` in Arabic-Indic digits — and
+every one of them rendered backwards. `ltrRun` isolates a run so the paragraph
+around it cannot reorder it, which is the right fix for `1901–1974` and no fix
+at all for Arabic numerals: an isolate sets the run's *base* direction and the
+algorithm still classifies what is inside it, so the dash between two Arabic
+numbers resolves right-to-left and the run is reordered around it. An override
+inside the isolate leaves nothing for that rule to decide. It has been wrong
+for every lifespan on `tree.almou.sa` since the first one was drawn, in both
+languages, and nothing but a rendered picture of real digits was ever going to
+say so (§7, bug 52). A component golden now holds an Arabic-Indic lifespan.
+
+Released as **0.17.0** with the module at **1.2.0**. **595 tests** green
+(548 → 595) plus 14 goldens, analyzer clean, `live_check` walked against both
+labs on both webtrees versions with no differences — including the two new
+comparisons, each step's direction and each search row's birth year and
+birthplace, the latter over seventeen people at a time.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -2089,6 +2256,7 @@ both close when the instance is updated.
 | 49 | The module called a buried man living. `deceased` asked for a `DEAT` fact; `Gedcom::DEATH_EVENTS` is `DEAT`, `BURI`, `CREM`, and a chart box prints a tag for whichever it finds — so the page mourned him and the module did not | **The real tree, walking 40 records** |
 | 50 | A family with children, no marriage recorded and **no wife recorded at all** had its eldest son read as the second spouse. Nothing in the rows says which is which — a father and a son both render `wt-sex-m`, and the `<th>` beside them is a translated relationship name | **The real tree, walking 40 records** |
 | 51 | The lab had privacy **switched off** for its whole life: `canShowRecord()` returns true for everybody before it examines anything unless `HIDE_LIVE_PEOPLE` is `'1'`, so a `1 RESN confidential` in the GEDCOM did nothing and no privacy rule had ever been exercised | Found while building a record for bug 50 |
+| 52 | **Bug 19 again, and only half fixed the first time.** `ltrRun` isolates a lifespan so the paragraph around it cannot reorder it — which works for `1901–1974` and *not* for `١٣١٨–١٩٧٤`. An isolate sets the run's base direction; it does not change what is inside it, and Arabic-Indic digits are **Arabic** numbers rather than European ones, so bidi rule N1 resolves the dash between two of them as right-to-left and the run is reordered around it. Every lifespan on a site rendering in Arabic — which is every lifespan on `tree.almou.sa` — read `١٩٧٤–١٣١٨`: the man died before he was born, in an English interface and an Arabic one alike | **Rendered preview, from a fixture captured off a real server** |
 
 50 is the interesting one, because the markup genuinely does not say. The
 divider that separates a couple from its children is the marriage row, and a
@@ -2563,7 +2731,7 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # state — with coverage reported beside them, because a transport can be
 # right and still say less (§9 #23).
 
-flutter test          # 548 tests
+flutter test          # 595 tests, plus 14 goldens
 flutter analyze       # must stay clean
 dart format lib test tool   # CI fails if this changes anything
 
@@ -2607,7 +2775,8 @@ flutter run -d linux  # web is not viable — no CORS
 # Walks connect → sign-in → tree → person (twice: the top, and scrolled down
 # to family, photos, notes and sources) → account → settings, and into the
 # ancestors, descendants, fan and hourglass charts, the chart options sheet,
-# a relationship, a timeline and the site's statistics. One shot is rendered
+# a relationship (both ways it can be drawn), the search filter sheet,
+# a timeline and the site's statistics. One shot is rendered
 # on a wide surface — a chart that will not fit a phone legibly opens showing
 # a corner of itself, and reviewing the layout needs the whole family.
 # Not collected by `flutter test`: it writes files and asserts nothing.
@@ -2686,10 +2855,20 @@ Both tools read the password from the terminal with echo disabled, or from
    site's, but `RelationshipsChartModule::calculateRelationships()` is
    `private` — so ~150 lines of Dijkstra would have to be reimplemented, and
    that reimplementation could drift from what the website answers (§3).
-6. **The charts have been read on 2.2.6 only.** Both parsers run against
-   fixtures for 2.2.6 and 2.3, and the two versions' chart templates differ by
-   one attribute — but 2.3 has never answered a real request here, so that is
-   an argument from source, not evidence.
+6. **The charts have been read on 2.2.6 only — except the relationship
+   chart.** Both parsers run against fixtures for 2.2.6 and 2.3, and the two
+   versions' chart templates differ by one attribute — but 2.3 has never
+   answered a real request here for the ancestors or descendants charts, so
+   that much is an argument from source, not evidence.
+   *(Narrowed 2026-08-24.)* The **relationship** chart has now been read live
+   on both, and the two do not merely differ by an attribute: 2.2.6 turns a
+   corner with a diagonal cell only where the previous step ran the other way
+   (`if ($n > 2 && preg_match('/fat|mot|par/', $relationships[$n - 2]))`) and
+   2.3 dropped that test, so the same four people are three columns wide on
+   one and five on the other. Both are now fixtures captured from a running
+   server (`relationship_cousin.html`), and the parser reads the sign of the
+   row change rather than a column position, which is what makes them agree.
+   Assume the other charts hold a difference of the same size.
 7. **HTML parsing is theme- and version-coupled.** Mitigated so far by parsing
    tab fragments rather than whole pages, a two-version fixture matrix, and
    `ParseFailure` naming the parser, selector and version — which a reader can
@@ -2882,7 +3061,21 @@ Both tools read the password from the terminal with echo disabled, or from
    payload that is accurate, narrower than the page, and preferred anyway.
    The timeline was the other half of it and was fixed rather than demoted
    (bug 46).
-24. **The module fixtures are still written from the design.**
+24. **A filter narrows the rows in hand, not the tree.** The three filters on
+   the search screen run over the results already fetched, because everything
+   they run on is already in those rows — which is what makes them free. The
+   consequence is that "no matches" can mean "none in the first fifty", and
+   the screen says exactly that. Neither transport is asked to filter:
+   `searchIndividualsAdvanced()` could do sex and a place *id* server-side,
+   and neither maps onto what a phone can offer without a place index the
+   stock floor does not publish. Worth revisiting only if a real tree makes
+   paging-then-filtering feel wrong; on 1,463 people it does not.
+   **And a stock instance offers no sex filter at all**, because its search
+   rows state no sex. The sheet is built from the rows rather than from the
+   transport, so this appears as a control that is simply absent rather than
+   as one that does nothing — but it does mean two instances of the same app
+   offer different filters, and only the diagnostics screen explains why.
+25. **The module fixtures are still written from the design.**
    `test/fixtures/module/` was transcribed from `api_eval.md` §7 rather than
    captured from a server, which is why bug 40 survived everything — and the
    labs can now produce the real thing for a family whose every member is

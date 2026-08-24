@@ -814,6 +814,15 @@ Future<void> main(List<String> args) async {
             _pathOf(walkedHere.firstOrNull),
             _pathOf(walkedThere.firstOrNull),
           );
+          // Which way each step runs, which is what a tree is drawn from —
+          // and the one thing the two recover completely differently: the
+          // page states it as a move through a grid whose geometry changed
+          // between 2.2.6 and 2.3, and the module asks the family record.
+          compare(
+            'relationship: directions',
+            _directionsOf(walkedHere.firstOrNull),
+            _directionsOf(walkedThere.firstOrNull),
+          );
         }
 
         // A timeline's *positions* are each transport's own arithmetic — the
@@ -959,6 +968,40 @@ Future<void> main(List<String> args) async {
               ' (the module dedupes multi-name rows across the whole cursor,'
               ' so fewer is correct)',
         );
+
+        // What a filter over search results runs on, and the one thing the
+        // two arrive at completely differently: the module states it, the
+        // page hides it in the `title` of the years it prints. Compared per
+        // *person* rather than in bulk, because the two search routes need
+        // not return the same rows in the same order — a person in both is
+        // the only comparison that means anything.
+        final overlap = {
+          for (final person in byHtml.people) person.xref: person,
+        };
+        var births = 0;
+        var differed = 0;
+        for (final person in byJson.people) {
+          final other = overlap[person.xref];
+          if (other == null) continue;
+          births++;
+          if (other.birthYear != person.birthYear ||
+              other.birthPlace != person.birthPlace) {
+            differed++;
+            stdout.writeln(
+              '  DIFF  ${person.xref} born: '
+              'stock=${other.birthYear}@${other.birthPlace}  '
+              'module=${person.birthYear}@${person.birthPlace}',
+            );
+          }
+        }
+        report(
+          'search: birth year and place',
+          differed == 0
+              ? '$births person(s) in both, all agreeing'
+              : '$differed of $births disagree',
+          ok: differed == 0,
+        );
+        if (differed > 0) failures += differed;
 
         // The thing no stock route can do at all.
         final listed = await module.search(tree.name, '');
@@ -1171,6 +1214,14 @@ String _pathOf(RelationshipPath? path) {
     path.description,
     for (final step in path.steps) '${step.relationship}→${step.person.xref}',
   ].join(' · ');
+}
+
+/// The way each step of a path runs, as a line worth reading in a diff.
+String _directionsOf(RelationshipPath? path) {
+  if (path == null) return '(no path)';
+  if (path.steps.isEmpty) return '(no steps)';
+
+  return [for (final step in path.steps) step.direction.name].join(' ');
 }
 
 /// A timeline's events in the order it draws them, by what each one *is*.

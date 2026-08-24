@@ -36,19 +36,32 @@ Map<String, Canned Function(Sent)> _browsableSite() {
     '/tree/main/tom-select-individual': (request) => Canned(
       200,
       contentType: 'application/json',
+      // The lifespan is the shape a real server sends — two spans, each
+      // carrying the place and the full date in its `title` — because that is
+      // where the filter gets its years and its birthplaces from. Written as
+      // a plain string it would photograph a filter sheet with nothing in it.
       body: jsonEncode({
         'data': [
           {
             'value': 'X42',
             'text':
                 '<span class="NAME" dir="auto">عبد الله '
-                '<span class="SURN">الموسى</span></span>, 1901–1974',
+                '<span class="SURN">الموسى</span></span>, '
+                '${_lifespan(1901, 1974, 'الكويت، الكويت')}',
           },
           {
             'value': 'X43',
             'text':
                 '<span class="NAME" dir="auto">نورة '
-                '<span class="SURN">الموسى</span></span>, 1903–1980',
+                '<span class="SURN">الموسى</span></span>, '
+                '${_lifespan(1903, 1980, 'مكة، السعودية')}',
+          },
+          {
+            'value': 'X80',
+            'text':
+                '<span class="NAME" dir="auto">خالد '
+                '<span class="SURN">الموسى</span></span>, '
+                '${_lifespan(1955, null, 'الكويت، الكويت')}',
           },
         ],
         'nextUrl': null,
@@ -72,6 +85,10 @@ Map<String, Canned Function(Sent)> _browsableSite() {
         Canned(200, body: fixture('chart_descendants.html')),
     '/tree/main/relationships-1-3/X42/X43': (_) =>
         Canned(200, body: fixture('relationship_sibling.html')),
+    // Two ways to the same great-nephew, one of them turning a corner — which
+    // is what a tree shows and a list cannot.
+    '/tree/main/relationships-1-3/X42/X80': (_) =>
+        Canned(200, body: fixture('relationship_grandchild.html')),
     '/tree/main/timeline-10': (_) =>
         Canned(200, body: fixture('timeline.html')),
     '/module/statistics_chart/Chart/main': (_) => const Canned(
@@ -186,7 +203,10 @@ Future<void> main() async {
     }
     // The charts are opened from the person rather than from the account
     // screen, so these steps rejoin the walk at step 3.
-    if ((steps >= 6 && steps <= 10) || steps == 12 || steps == 13) {
+    if ((steps >= 6 && steps <= 10) ||
+        steps == 12 ||
+        steps == 13 ||
+        steps == 15) {
       await tester.enterText(find.byType(TextField), 'الموسى');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
@@ -198,7 +218,7 @@ Future<void> main() async {
         find.byType(ActionChip).at(switch (steps) {
           7 => 1,
           9 => 2,
-          10 => 3,
+          10 || 15 => 3,
           12 => 4,
           _ => 0,
         }),
@@ -223,6 +243,28 @@ Future<void> main() async {
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(find.text('نورة الموسى').last);
+      await tester.pumpAndSettle();
+    }
+    // The same screen's other mode. A different person, because the point of
+    // a tree is the shape: this one is related two ways, and one of them
+    // turns a corner.
+    if (steps == 15) {
+      await tester.enterText(find.byType(TextField), 'الموسى');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('خالد الموسى').last);
+      await tester.pumpAndSettle();
+      // The mode switch, which sits above the answer. Found by its icon
+      // rather than its label: the labels are translated.
+      await tester.tap(find.byIcon(Icons.account_tree_outlined).first);
+      await tester.pumpAndSettle();
+    }
+    // Where a reader narrows a page of results they already have.
+    if (steps == 16) {
+      await tester.enterText(find.byType(TextField), 'الموسى');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.filter_list));
       await tester.pumpAndSettle();
     }
     // The fan is the ancestors chart bent round a circle: same fetch, same
@@ -416,6 +458,26 @@ Future<void> main() async {
         );
       });
 
+      testWidgets('relationship as a tree $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'relationship-tree-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 15,
+        );
+      });
+
+      testWidgets('search filter $tag $mode', (tester) async {
+        await capture(
+          tester,
+          'search-filter-$tag-$mode',
+          locale: locale,
+          theme: theme,
+          steps: 16,
+        );
+      });
+
       testWidgets('timeline $tag $mode', (tester) async {
         await capture(
           tester,
@@ -437,6 +499,18 @@ Future<void> main() async {
       });
     }
   }
+}
+
+/// A lifespan in the markup `Individual::lifespan()` actually emits.
+///
+/// Each year is a span whose `title` holds the place and then the full date,
+/// wrapped in the Unicode isolates that let the two halves be told apart.
+String _lifespan(int born, int? died, String place) {
+  const open = '\u2068';
+  const close = '\u2069';
+
+  return '<span title="$place $open$born$close">$born</span>'
+      '–<span title=" $open${died ?? ''}$close">${died ?? ''}</span>';
 }
 
 Future<ByteData> _bytesOf(String path) =>

@@ -126,6 +126,12 @@ final class ModuleChartsTransport implements ChartsTransport {
                     RelationshipStep(
                       relationship: stringOf(step['relationship']) ?? '',
                       person: person,
+                      // Absent from module 1.1.1 and older, which answers
+                      // [StepDirection.unknown] and draws the path flat
+                      // rather than wrongly.
+                      direction: StepDirection.fromName(
+                        stringOf(step['direction']),
+                      ),
                     ),
             ],
           ),

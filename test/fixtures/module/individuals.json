@@ -12,7 +12,10 @@
       "deceased": true,
       "lifespan": "1901–1974",
       "thumbnail": "/tree/main/media-thumbnail/M11/1?s=aa",
-      "private": false
+      "private": false,
+      "birthYear": 1901,
+      "deathYear": 1974,
+      "birthPlace": "الكويت، الكويت"
     },
     {
       "xref": "X43",
@@ -22,7 +25,10 @@
       "deceased": true,
       "lifespan": "1903–1980",
       "thumbnail": null,
-      "private": false
+      "private": false,
+      "birthYear": 1903,
+      "deathYear": 1980,
+      "birthPlace": null
     }
   ]
 }

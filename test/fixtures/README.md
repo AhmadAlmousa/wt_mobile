@@ -59,3 +59,23 @@ check it against what the server printed.
 None of the three tab fixtures has been seen from a running server: `tree.almou.sa` runs
 none of those modules (§9 of `PROJECT.md`), so these fixtures are the only
 thing standing behind those parsers.
+
+| `relationship_cousin.html` | **captured** from a running 2.2.6 and a running 2.3 lab |
+
+The cousin fixtures are the first pair in this directory that were *both*
+captured rather than transcribed. They exist because the relationship grid is
+where the app recovers each step's **direction** — the one structural thing
+that markup states — and because the two versions lay that grid out
+differently: 2.2.6 turns the corner with a diagonal only where the previous
+step ran the other way
+(`if ($n > 2 && preg_match('/fat|mot|par/', $relationships[$n - 2]))`), while
+2.3 dropped that test and uses a diagonal for every step after the first. So
+the same four people are three columns wide on one version and five on the
+other, and a parser that read column positions rather than the *sign of the
+row change* would answer differently on each.
+
+Everything the parser reads is as the server sent it — the table geometry, the
+box classes and xrefs, the names, the lifespans and each connector cell's own
+markup. The thumbnails, the facts dropdown and the absolute URLs were removed,
+which is the whole of the difference between 8KB here and 78KB on the wire.
+Every person in them is invented by `tool/lab/make_gedcom.py`.

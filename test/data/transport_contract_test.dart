@@ -100,6 +100,29 @@ void main() {
         expect(page.hasMore, isFalse);
       });
 
+      // The three things a filter over search results runs on, and the one
+      // place the two transports arrive at them completely differently: the
+      // module states each outright, and the stock path reads them out of the
+      // `title` attribute webtrees puts on the years it prints. A screen that
+      // offers a filter has to get the same answer either way.
+      test('states where and when a search result was born', () async {
+        final page = await build().search('main', 'الموسى');
+
+        expect(page.people.first.birthYear, 1901);
+        expect(page.people.first.deathYear, 1974);
+        expect(page.people.first.birthPlace, 'الكويت، الكويت');
+      });
+
+      test(
+        'a person with no recorded birthplace has none, not an empty one',
+        () async {
+          final page = await build().search('main', 'الموسى');
+
+          expect(page.people.last.birthYear, 1903);
+          expect(page.people.last.birthPlace, isNull);
+        },
+      );
+
       test('an empty query costs nothing and answers nothing new', () async {
         // The stock path refuses locally, because webtrees' autocomplete
         // answers an empty collection for an empty term. The module enumerates

@@ -273,6 +273,73 @@ void main() {
         expect(paths.single.steps.single.relationship, 'أخت');
       });
 
+      test('says which way each step goes', () {
+        // The one structural thing this grid states, and what turns a list of
+        // names into a family tree: webtrees prints its table from the top
+        // row down, so a smaller row index is further up the page.
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_ancestors.html'),
+          from: 'X42',
+        );
+        expect(paths.single.steps.map((step) => step.direction), [
+          StepDirection.toParent,
+          StepDirection.toParent,
+        ]);
+      });
+
+      test('a step across a row is neither up nor down', () {
+        // A sibling and a spouse are one direction here on purpose: the grid
+        // moves right for both, so distinguishing them would be a guess.
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_sibling.html'),
+          from: 'X42',
+        );
+        expect(paths.single.steps.single.direction, StepDirection.sideways);
+      });
+
+      test('walks a path that turns a corner, whichever way it is drawn', () {
+        // Captured from a running server on each version, because the two
+        // draw this differently: 2.2.6 turns the corner with a diagonal only
+        // where the previous step ran the other way, and 2.3 uses one for
+        // every step after the first — so these four people are three columns
+        // wide on one and five on the other. Reading the *sign* of the row
+        // change rather than a column position is what makes both answer the
+        // same thing.
+        final paths = const ChartParser().parseRelationships(
+          fixture(version, 'relationship_cousin.html'),
+          from: 'X80',
+        );
+
+        expect(paths, hasLength(2), reason: 'two ways they are related');
+
+        final direct = paths.first;
+        expect(direct.steps.map((step) => step.person.xref), [
+          'X60',
+          'X42',
+          'X62',
+        ]);
+        expect(direct.steps.map((step) => step.direction), [
+          StepDirection.toParent,
+          StepDirection.toParent,
+          StepDirection.toChild,
+        ]);
+
+        // The other way leaves through the mother and crosses a row.
+        final throughMother = paths.last;
+        expect(throughMother.steps.map((step) => step.person.xref), [
+          'X70',
+          'X43',
+          'X42',
+          'X62',
+        ]);
+        expect(throughMother.steps.map((step) => step.direction), [
+          StepDirection.toParent,
+          StepDirection.toParent,
+          StepDirection.sideways,
+          StepDirection.toChild,
+        ]);
+      });
+
       test('answers nothing when the site found no link', () {
         // Two people in one tree need not be related at all, and webtrees
         // says so in a sentence rather than an empty chart.

@@ -22,6 +22,12 @@ PersonRef personFrom(Map<String, Object?> json) => PersonRef(
   sex: sexFrom(stringOf(json['sex'])),
   isDeceased: json['deceased'] == true,
   thumbnailUrl: stringOf(json['thumbnail']),
+  // Absent from module 1.1.1 and older. A filter with nothing to compare
+  // leaves the row alone, so an older module costs the reader a narrower
+  // filter rather than a wrong answer.
+  birthYear: intOf(json['birthYear']),
+  deathYear: intOf(json['deathYear']),
+  birthPlace: stringOf(json['birthPlace']),
 );
 
 /// The GEDCOM sex the module states outright.
