@@ -2,9 +2,25 @@
     <!-- The whole app is an HTTP client for a webtrees site. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- The device now holds the tree (Phase 10c), so it must not leave it.
+
+         `sync_eval.md` §6 #3 calls keeping a whole visible tree on a phone
+         "a real change in exposure" — until Phase 10 the app held only what it
+         had fetched, in RAM. The file is encrypted and its key lives in the
+         Android keystore, which is already enough; these two attributes close
+         the case that remains, which is a backup or an `adb backup` carrying
+         the ciphertext off the device to be worked on at leisure.
+
+         allowBackup="false" also spares a restored phone a file it can never
+         open: the keystore key does not travel with a backup, so a restored
+         store would be permanently unreadable ciphertext. Better that it is
+         simply not there, and the next sync makes a new one. -->
     <application
         android:label="webtrees"
         android:usesCleartextTraffic="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

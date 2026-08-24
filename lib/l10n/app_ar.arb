@@ -334,5 +334,83 @@
   "diagnosticsAppVersion": "إصدار التطبيق",
   "diagnosticsUserAgent": "معرّف العميل",
   "diagnosticsCopy": "نسخ التقرير",
-  "diagnosticsCopied": "نُسخ التقرير"
+  "diagnosticsCopied": "نُسخ التقرير",
+  "diagnosticsFromStore": "هذا الجهاز",
+  "diagnosticsStore": "نسخة دون اتصال",
+  "diagnosticsStoreNone": "غير محفوظة على هذا الجهاز",
+  "diagnosticsStorePeople": "{count, plural, =0{لا أشخاص} =1{شخص واحد} =2{شخصان} few{{count} أشخاص} many{{count} شخصًا} other{{count} شخص}}",
+  "@diagnosticsStorePeople": {
+    "description": "How many people this device's copy of the tree holds.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "diagnosticsStoreSynced": "آخر تحديث {when}",
+  "@diagnosticsStoreSynced": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "filterShowingAll": "عرض {shown} من {total}",
+  "@filterShowingAll": {
+    "description": "How many people survive the filter, when every match is already in hand.",
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "filterNoMatchesInTree": "لا أحد في هذه الشجرة يطابق.",
+  "syncTitle": "نسخة دون اتصال",
+  "syncWhy": "حفظ الشجرة على جهازك يجعل كل بحث وكل شخص فوريًا، ويتيح لك قراءتها دون أي اتصال.",
+  "syncWaitingForWifi": "بانتظار شبكة Wi\u2011Fi",
+  "syncWaitingForWifiWhy": "سيبدأ التنزيل تلقائيًا عند اتصالك بشبكة Wi\u2011Fi.",
+  "syncNow": "نزّل الآن",
+  "syncSyncing": "يجري تنزيل الشجرة\u2026",
+  "syncReady": "جاهزة للقراءة دون اتصال",
+  "syncFailed": "توقّف التنزيل قبل اكتماله",
+  "syncFailedWhy": "حُفظ ما وصل. والمحاولة التالية تُكمل من حيث توقّف.",
+  "syncRetry": "أعد المحاولة",
+  "syncRemove": "إزالة النسخة دون اتصال",
+  "syncRemoved": "أُزيلت النسخة دون اتصال",
+  "syncFromStoreNotice": "مقروء من هذا الجهاز، حُدّث {when}",
+  "@syncFromStoreNotice": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "syncJustNow": "الآن",
+  "syncMinutesAgo": "{count, plural, =1{قبل دقيقة} =2{قبل دقيقتين} few{قبل {count} دقائق} many{قبل {count} دقيقة} other{قبل {count} دقيقة}}",
+  "@syncMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncHoursAgo": "{count, plural, =1{قبل ساعة} =2{قبل ساعتين} few{قبل {count} ساعات} many{قبل {count} ساعة} other{قبل {count} ساعة}}",
+  "@syncHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncDaysAgo": "{count, plural, =1{أمس} =2{قبل يومين} few{قبل {count} أيام} many{قبل {count} يومًا} other{قبل {count} يوم}}",
+  "@syncDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

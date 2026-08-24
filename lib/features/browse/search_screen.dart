@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/errors.dart';
+import '../../data/local/tree_store.dart';
 import '../../data/session_manager.dart';
 import '../../data/transport.dart';
 import '../../domain/charts.dart';
@@ -11,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import '../shared/person_tile.dart';
+import '../sync/sync_status.dart';
 import 'search_filter.dart';
 import 'search_filter_sheet.dart';
 
@@ -31,6 +33,7 @@ class SearchScreen extends StatefulWidget {
   const SearchScreen({
     required this.session,
     required this.records,
+    required this.treeStore,
     required this.tree,
     required this.onOpenPerson,
     required this.onShowAccount,
@@ -41,6 +44,12 @@ class SearchScreen extends StatefulWidget {
 
   final SessionManager session;
   final RecordsTransport records;
+
+  /// This device's copy, for the two things a reader is owed about it: that
+  /// a download is waiting on their network, and how old an answer is
+  /// (`sync_eval.md` §11 #1).
+  final TreeStore treeStore;
+
   final String tree;
 
   /// What the family calls this tree, when the app was told.
@@ -292,7 +301,9 @@ class _SearchScreenState extends State<SearchScreen> {
                 onSubmitted: _search,
               ),
             ),
+            SyncStatus(store: widget.treeStore),
             Expanded(child: _body(context)),
+            SyncFreshness(store: widget.treeStore),
           ],
         ),
       ),
@@ -346,9 +357,14 @@ class _SearchScreenState extends State<SearchScreen> {
     final showing = _showing;
 
     // A filter that hides everything and a search that found nothing look
-    // identical from outside, so this says which it is — and says that
-    // fetching the next page may yet find a match, because the filter runs
-    // over the rows already here and not over the tree.
+    // identical from outside, so this says which it is.
+    //
+    // And it now says *how much was looked at*. `PROJECT.md` §9 #24: a filter
+    // narrows the rows in hand, so on a paged answer "no matches" can only
+    // honestly mean "none of the ones loaded" — but when there is no further
+    // page there are no further rows, and the filter has seen every match in
+    // the tree. A local store makes that the ordinary case rather than the
+    // end of a long scroll, which is what closes the risk.
     if (showing.isEmpty) {
       return Column(
         children: [
@@ -356,11 +372,14 @@ class _SearchScreenState extends State<SearchScreen> {
             filter: _filter,
             shown: 0,
             loaded: _results.length,
+            everything: !_hasMore,
             onClear: () => setState(() => _filter = const SearchFilter()),
           ),
           Expanded(
             child: _EmptyState(
-              message: text.filterNoMatches,
+              message: _hasMore
+                  ? text.filterNoMatches
+                  : text.filterNoMatchesInTree,
               icon: Icons.filter_list_off,
             ),
           ),
@@ -376,6 +395,7 @@ class _SearchScreenState extends State<SearchScreen> {
             filter: _filter,
             shown: showing.length,
             loaded: _results.length,
+            everything: !_hasMore,
             onClear: () => setState(() => _filter = const SearchFilter()),
           ),
         Expanded(
@@ -453,12 +473,19 @@ class _FilterBar extends StatelessWidget {
     required this.filter,
     required this.shown,
     required this.loaded,
+    required this.everything,
     required this.onClear,
   });
 
   final SearchFilter filter;
   final int shown;
   final int loaded;
+
+  /// Whether [loaded] is every match there is, rather than every match
+  /// fetched so far. It changes what the count *means*, so it changes the
+  /// sentence: "of 40 loaded" is an apology, "of 40" is an answer.
+  final bool everything;
+
   final VoidCallback onClear;
 
   @override
@@ -480,7 +507,9 @@ class _FilterBar extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                text.filterShowing(shown, loaded),
+                everything
+                    ? text.filterShowingAll(shown, loaded)
+                    : text.filterShowing(shown, loaded),
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.onSecondaryContainer,
                 ),

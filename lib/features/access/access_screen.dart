@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../core/errors.dart';
 import '../../data/access_probe.dart';
 import '../../data/diagnostics.dart';
+import '../../data/local/tree_store.dart';
 import '../../data/module/module_api.dart';
 import '../../data/session_manager.dart';
 import '../../data/settings_store.dart';
@@ -12,6 +13,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/message_panel.dart';
 import '../shared/messages.dart';
 import '../shared/settings_sheet.dart';
+import '../sync/sync_status.dart';
 
 /// Shows who is signed in, which trees they can reach, and what they may do.
 ///
@@ -25,6 +27,8 @@ class AccessScreen extends StatefulWidget {
     required this.onBrowseTree,
     required this.onOnlyTree,
     this.capabilities,
+    this.onAccessSummary,
+    this.treeStore,
     super.key,
   });
 
@@ -53,6 +57,20 @@ class AccessScreen extends StatefulWidget {
   /// why this is a separate callback the shell can decline to act on.
   final void Function(String name, String? title) onOnlyTree;
 
+  /// Hands the summary up to the shell, which is the only place that can act
+  /// on it.
+  ///
+  /// It carries the reader's **role in each tree**, which is half of what
+  /// stamps a local store (`sync_eval.md` §6): a copy filled for a member must
+  /// never be answered for somebody who has since been demoted to a visitor.
+  /// This screen is the one place the roles are read, and it runs after every
+  /// sign-in, so it is also where a *changed* role is first knowable.
+  final void Function(AccessSummary summary)? onAccessSummary;
+
+  /// This device's copy, for the diagnostics screen and for the control that
+  /// removes it. Null in tests that do not care.
+  final TreeStore? treeStore;
+
   @override
   State<AccessScreen> createState() => _AccessScreenState();
 }
@@ -74,6 +92,7 @@ class _AccessScreenState extends State<AccessScreen> {
             // The real name is only discoverable here, so this is the one
             // chance to label the connection for next time.
             await widget.session.noteAccountName(summary.account.realName);
+            widget.onAccessSummary?.call(summary);
             if (summary.trees.length == 1 && mounted) {
               final only = summary.trees.single;
               widget.onOnlyTree(only.name, only.title);
@@ -81,6 +100,21 @@ class _AccessScreenState extends State<AccessScreen> {
             return summary;
           });
     });
+  }
+
+  /// Deletes this device's copy without signing out.
+  ///
+  /// Worth its own control rather than only happening at sign-out: a reader
+  /// who has thought about what is on their phone should be able to act on it
+  /// without also losing their session. `sync_eval.md` §6 is about the app not
+  /// keeping more than it should; this is the reader's half of that.
+  Future<void> _removeOfflineCopy() async {
+    final text = AppText.of(context);
+    await widget.treeStore?.destroy();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(text.syncRemoved)));
   }
 
   Future<void> _signOut() async {
@@ -116,6 +150,12 @@ class _AccessScreenState extends State<AccessScreen> {
               diagnostics: Diagnostics.of(
                 widget.session,
                 capabilities: widget.capabilities,
+                // The third answer. A reader wondering why a figure looks
+                // wrong has to be told it came from a copy, and when that
+                // copy was taken (`sync_eval.md` §11 #1).
+                hasStore: widget.treeStore?.isReadable ?? false,
+                syncedAt: widget.treeStore?.syncedAt,
+                storedPeople: widget.treeStore?.people ?? 0,
               ),
             ),
           ),
@@ -183,6 +223,10 @@ class _AccessScreenState extends State<AccessScreen> {
                       tree: tree,
                       onOpen: () => widget.onBrowseTree(tree.name, tree.title),
                     ),
+                  if (widget.treeStore case final store?) ...[
+                    const SizedBox(height: 28),
+                    _OfflineCopy(store: store, onRemove: _removeOfflineCopy),
+                  ],
                   for (final warning in summary.warnings) ...[
                     const SizedBox(height: 12),
                     MessagePanel.warning(warning.localized(text)),
@@ -195,6 +239,78 @@ class _AccessScreenState extends State<AccessScreen> {
       ),
     );
   }
+}
+
+/// What is kept on this device, and a way to stop keeping it.
+///
+/// Shown only once there is something to say. A reader who never left wifi and
+/// never thought about it sees one line telling them the tree is readable
+/// offline; a reader who wants it gone has the control next to it.
+class _OfflineCopy extends StatelessWidget {
+  const _OfflineCopy({required this.store, required this.onRemove});
+
+  final TreeStore store;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: store,
+    builder: (context, _) {
+      if (store.phase == SyncPhase.unavailable) return const SizedBox.shrink();
+
+      final theme = Theme.of(context);
+      final text = AppText.of(context);
+      final syncedAt = store.syncedAt;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text.syncTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(switch (store.phase) {
+                    SyncPhase.ready => text.syncReady,
+                    SyncPhase.syncing => text.syncSyncing,
+                    SyncPhase.waitingForWifi => text.syncWaitingForWifi,
+                    SyncPhase.failed => text.syncFailed,
+                    SyncPhase.offered || SyncPhase.unavailable => text.syncWhy,
+                  }, style: theme.textTheme.bodyLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    store.phase == SyncPhase.ready && syncedAt != null
+                        ? '${text.diagnosticsStorePeople(store.people)} · '
+                              '${text.diagnosticsStoreSynced(relativeTime(syncedAt, text))}'
+                        : text.syncWhy,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton(
+                      onPressed: store.people > 0 ? onRemove : null,
+                      child: Text(text.syncRemove),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _AccountCard extends StatelessWidget {

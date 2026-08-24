@@ -536,6 +536,47 @@ void main() {
       },
     );
 
+    test('a search row out of the columns says what the payload does', () async {
+      // The invariant behind Phase 10c's one optimisation. A search row is
+      // built from the stored **columns** rather than by decoding the payload,
+      // which is what makes answering with the whole tree affordable — and it
+      // is only safe while the columns say exactly what `personFrom` would.
+      // They are written by that same function, so this holds by
+      // construction; it is asserted because nothing else would notice if a
+      // future column stopped being filled.
+      final captured =
+          jsonDecode(
+                File('test/fixtures/module/records.json').readAsStringSync(),
+              )
+              as Map<String, Object?>;
+      final wire = RecordsPage.fromJson(captured);
+
+      await TreeSync(
+        store: store,
+        source: _ScriptedSource([wire]),
+        stamp: stamp,
+      ).run();
+
+      final local = LocalRecordsTransport(store: store, online: _NoOnline());
+      final found = await local.search('main', 'X42');
+      final row = found.people.single;
+      final direct = personFrom(
+        wire.people.firstWhere((person) => person['xref'] == 'X42'),
+      );
+
+      expect(row.xref, direct.xref);
+      expect(row.name, direct.name);
+      expect(row.alternateName, direct.alternateName);
+      expect(row.sex, direct.sex);
+      expect(row.isDeceased, direct.isDeceased);
+      expect(row.lifespan, direct.lifespan);
+      expect(row.birthYear, direct.birthYear);
+      expect(row.deathYear, direct.deathYear);
+      expect(row.age, direct.age);
+      expect(row.birthPlace, direct.birthPlace);
+      expect(row.thumbnailUrl, direct.thumbnailUrl);
+    });
+
     test('a record this copy does not hold is absent, not empty', () async {
       final local = LocalRecordsTransport(store: store, online: _NoOnline());
       await expectLater(

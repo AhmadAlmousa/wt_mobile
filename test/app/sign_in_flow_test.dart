@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/core/secret_store.dart';
+import 'package:webtrees_mobile/data/local/tree_store.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
 
 import '../support/fake_webtrees.dart';
@@ -25,7 +26,11 @@ void main() {
     // to represent a fresh launch of the app.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: testSettings()),
+      WebtreesMobileApp(
+        session: session,
+        settings: testSettings(),
+        treeStore: TreeStore.none(),
+      ),
     );
     await tester.pumpAndSettle();
   }

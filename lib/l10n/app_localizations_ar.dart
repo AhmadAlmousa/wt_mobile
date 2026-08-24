@@ -812,4 +812,130 @@ class AppTextAr extends AppText {
 
   @override
   String get diagnosticsCopied => 'نُسخ التقرير';
+
+  @override
+  String get diagnosticsFromStore => 'هذا الجهاز';
+
+  @override
+  String get diagnosticsStore => 'نسخة دون اتصال';
+
+  @override
+  String get diagnosticsStoreNone => 'غير محفوظة على هذا الجهاز';
+
+  @override
+  String diagnosticsStorePeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count شخص',
+      many: '$count شخصًا',
+      few: '$count أشخاص',
+      two: 'شخصان',
+      one: 'شخص واحد',
+      zero: 'لا أشخاص',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsStoreSynced(String when) {
+    return 'آخر تحديث $when';
+  }
+
+  @override
+  String filterShowingAll(int shown, int total) {
+    return 'عرض $shown من $total';
+  }
+
+  @override
+  String get filterNoMatchesInTree => 'لا أحد في هذه الشجرة يطابق.';
+
+  @override
+  String get syncTitle => 'نسخة دون اتصال';
+
+  @override
+  String get syncWhy =>
+      'حفظ الشجرة على جهازك يجعل كل بحث وكل شخص فوريًا، ويتيح لك قراءتها دون أي اتصال.';
+
+  @override
+  String get syncWaitingForWifi => 'بانتظار شبكة Wi‑Fi';
+
+  @override
+  String get syncWaitingForWifiWhy =>
+      'سيبدأ التنزيل تلقائيًا عند اتصالك بشبكة Wi‑Fi.';
+
+  @override
+  String get syncNow => 'نزّل الآن';
+
+  @override
+  String get syncSyncing => 'يجري تنزيل الشجرة…';
+
+  @override
+  String get syncReady => 'جاهزة للقراءة دون اتصال';
+
+  @override
+  String get syncFailed => 'توقّف التنزيل قبل اكتماله';
+
+  @override
+  String get syncFailedWhy =>
+      'حُفظ ما وصل. والمحاولة التالية تُكمل من حيث توقّف.';
+
+  @override
+  String get syncRetry => 'أعد المحاولة';
+
+  @override
+  String get syncRemove => 'إزالة النسخة دون اتصال';
+
+  @override
+  String get syncRemoved => 'أُزيلت النسخة دون اتصال';
+
+  @override
+  String syncFromStoreNotice(String when) {
+    return 'مقروء من هذا الجهاز، حُدّث $when';
+  }
+
+  @override
+  String get syncJustNow => 'الآن';
+
+  @override
+  String syncMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'قبل $count دقيقة',
+      many: 'قبل $count دقيقة',
+      few: 'قبل $count دقائق',
+      two: 'قبل دقيقتين',
+      one: 'قبل دقيقة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'قبل $count ساعة',
+      many: 'قبل $count ساعة',
+      few: 'قبل $count ساعات',
+      two: 'قبل ساعتين',
+      one: 'قبل ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'قبل $count يوم',
+      many: 'قبل $count يومًا',
+      few: 'قبل $count أيام',
+      two: 'قبل يومين',
+      one: 'أمس',
+    );
+    return '$_temp0';
+  }
 }

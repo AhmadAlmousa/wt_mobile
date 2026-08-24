@@ -433,7 +433,7 @@ Each phase is useful on its own and none of them requires the next.
 |---|---|---|
 | **10a** ✅ | `GET …/records?offset=&limit=&since=` in the module; a `token` derived from `MAX(change_id)` and the tree's counts | The wire, testable with `curl` before any client work — **built, module 1.3.0**, and it answered the question below: 8 requests, 6.8 s, 4.69 MB, 16 MB of memory |
 | **10b** ✅ | Drift schema, a `LocalRecordsTransport`, and the sync loop off the UI isolate | The store fills. Nothing reads it yet — **built**: 1,463 real people in 30 requests into 10.70 MB, read back in 0.61 ms each |
-| **10c** | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | Instant person and search — and **tree-wide filters**, which closes §9 #24. **Gated on §6 #3**: no store on a device until encryption at rest has an answer. `live_check` already diffs three ways |
+| **10c** ✅ | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | **Built.** Instant person and search, tree-wide filters, and §6 #3 answered — see the note below |
 | **10d** | Charts and timeline computed from the store | Nine of eleven capabilities local |
 | **10e** | Thumbnail blobs; a sync screen; the stamp and its invalidation rules | Genuinely offline |
 | **10f** | The ceiling for large trees (§8) | "Any webtrees instance" keeps meaning something |
@@ -460,7 +460,36 @@ its own: fetching needs the session, which lives on the main isolate, and the
 part that would actually stall a screen — 1,463 SQLite writes — is already on
 drift's own background isolate, so an extra one would buy nothing. And 10c is
 now gated rather than merely next: §6 #3's encryption decision has to be taken
-before a store exists on a device, and after 10b none does.
+before a store exists on a device, and after 10b none does. *(That gate opened
+the same day — see below.)*
+
+*10c done the same day, and it changed three things in this document.*
+
+**§6 #3 was the gate and it cost almost nothing.** This section pointed at
+`package:sqlite3` 3.x's build hooks and everyone read that as a native
+toolchain step. It is four lines of `pubspec.yaml`: `sqlite3` 3.5.2 ships
+pre-compiled **SQLite3MultipleCiphers** binaries beside the plain ones,
+sha256-verified from its own sources, so encryption is a *selection* and not a
+build — no per-ABI compile, no OpenSSL, nothing new in CI. `sqlite3mc` rather
+than the SQLCipher build, which links OpenSSL on three platforms and lags
+upstream SQLite. The key is 256 bits per **connection** — site and account —
+kept beside the password and written so it cannot travel to another device;
+§6 #1's "a new store, not a filtered one" therefore holds twice over, once by
+the stamp and once because the file simply will not open. §6 #2 is done too:
+sign-out destroys the file *and* the key.
+
+**§5 was right about what stays online, and §10's staleness rule is one line.**
+`Capability.answerableLocally` is `{individuals, individual}`. Everything this
+document said should stay online does, and the charts wait for 10d.
+
+**§1's "hardest part" ranking was wrong, and worth correcting.** Privacy was
+named the hardest thing and encryption its unanswered half; both turned out to
+be the *cheapest* parts, because webtrees had already done the work — the
+store inherits privacy by construction (a hidden record is absent, so a walk
+cannot reach it) and the cipher was a package flag. The hardest part in
+practice was **policy**: deciding when a copy is made, when it may be read
+from, and how a reader is told which of three sources answered. None of that
+appears in §11's risk list except obliquely as #1.
 
 ---
 

@@ -980,8 +980,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **9b** | Narrowing a page of search results — sex, age or year of birth, birthplace | ✅ |
 | **10a** | The sync wire: the whole tree in pages, then only what changed | ✅ — module `/records`, measured on 1,469 people |
 | **10b** | Drift schema, a local transport, the sync loop off the UI isolate | ✅ — the store fills from the real tree; nothing composes it yet |
-| **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ⬜ — closes §9 #24, gated on §9 #29 |
-| **10d–f** | Charts and timeline from the store · thumbnail blobs and a sync screen · a ceiling for large trees | ⬜ — `sync_eval.md` §12 |
+| **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ✅ — encrypted at rest, composed, and filled on first use |
+| **10d–f** | Charts and timeline from the store · thumbnail blobs and a sync screen · a ceiling for large trees | ⬜ — `sync_eval.md` §12. 10f is the one with a deadline: the search page cap is 2,000, which is a placeholder, not a design |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
 **Phase 6 shape.** webtrees offers twelve charts; the app draws none of their
@@ -1026,7 +1026,7 @@ the parser behind it stays, fixtures and all, and stays tested.
 | `relationship` | how many paths, the site's own phrase for the whole relationship, each step's word and person, and which way each step runs | the real tree | ✅ |
 | `timeline` | which events, in what order | the real tree | ✅ |
 | `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | the real tree | ❌ **read from the page** |
-| `records` | the whole tree in pages, then a delta: every record identical to the one `/individual` answers, nobody handed over twice, a fingerprint that refuses what it cannot follow | both labs, 19 people and then 1,469 — **and the real tree: 1,463 people in 30 requests, filling a real store** | ⏸ **nothing composes it yet** — Phase 10c is where the composer may prefer it |
+| `records` | the whole tree in pages, then a delta: every record identical to the one `/individual` answers, nobody handed over twice, a fingerprint that refuses what it cannot follow | both labs, 19 people and then 1,469 — **and the real tree: 1,463 people in 30 requests, filling a real store** | ✅ **composed since 10c** — the store answers `individual` and `individuals`; everything else stays online |
 
 All of them have now been run against **`tree.almou.sa`** — the real
 1,463-person tree with the module installed — as well as against both labs on
@@ -2516,6 +2516,119 @@ was the price `sync_eval.md` §9 named for choosing Drift and is now paid.
 
 ---
 
+### 2026-08-24 (later still) — Phase 10c: the copy is locked, and it answers
+
+Phase 10b left a store that filled and was never read, and said why: the
+encryption question was *"a decision to take before the first byte is written,
+not after"* (`sync_eval.md` §6 #3), and no byte had been written on a device.
+This phase answers it and lets the composer in.
+
+**The gate cost almost nothing, which was not the expectation.** `sync_eval.md`
+§6 pointed at `package:sqlite3` 3.x's build hooks and the plan assumed a native
+toolchain step — a compile per ABI, a new class of CI failure, OpenSSL on
+Android. It is four lines of `pubspec.yaml`:
+
+```yaml
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
+```
+
+`sqlite3` 3.5.2 ships pre-compiled SQLite3MultipleCiphers binaries beside the
+plain ones, sha256-verified from its own sources, so choosing encryption is a
+*selection* and not a build. `sqlite3mc` over `sqlcipher` for two reasons: the
+SQLCipher build links OpenSSL on Android, Linux and Windows, and it lags
+upstream SQLite. Both answer `PRAGMA key`. Nothing was added to CI.
+
+**The key is per connection, and never leaves the device.** 256 bits from
+`Random.secure`, kept under the site *and* account in the same keystore as the
+password, passed to SQLite as a blob literal — `PRAGMA key = "x'…'"` — rather
+than as a passphrase, because the key is already uniformly random and a KDF
+over it would add cost and no entropy. Written `deviceOnly`, which is new on
+`SecretStore.write`: a Keychain item with the default accessibility rides an
+encrypted iCloud backup and can be restored onto another phone, and a key that
+travels with the ciphertext makes the encryption ceremonial. The password is
+deliberately *not* device-only — restoring a phone and finding the app still
+signed in is what a reader expects, and a password is a secret they can retype.
+A tree is not.
+
+**A file this key cannot open is deleted, before drift ever sees it.** Three
+ordinary ways to get one — another account signed in, the keystore lost the key
+to a reinstall, a device that ran out of space mid-sync — and in all three the
+honest answer is that there is no copy here and the next sync will make one.
+Nothing is lost the server does not still have, which is what makes deleting
+right rather than drastic. Probed with a real statement rather than with
+`PRAGMA key` alone: the pragma reads nothing, so it succeeds against a file it
+cannot open, and the failure would otherwise surface as
+`SqliteException(26): file is not a database` at whatever screen read first.
+
+**What is composed, and what is deliberately not.** `Capability.answerableLocally`
+is `{individuals, individual}` and nothing else. A capability belongs there only
+where the store holds *the bytes the server sent* — true of a record, because
+the payload is kept verbatim. `relationship` and `statistics` stay online
+permanently (`sync_eval.md` §5); the charts and the timeline are computable from
+the stored links and are Phase 10d. One fallback, on `individual` only: a record
+absent from the store means either that the reader may not see them or that the
+copy is behind, only the server can tell those apart, and it applies the same
+privacy either way — so asking is safe and the alternative is telling a reader
+that somebody who exists does not. A search deliberately does **not** fall back:
+a search that found nothing locally has searched the whole tree, which is the
+point of the phase.
+
+**The download policy is the half a reader actually meets.** Agreed with the
+user: 10 MB is nothing on a modern plan, so the copy is made on first use in
+the background — but on a cellular network the app waits, says *"the download
+will start on its own the next time you are on Wi-Fi"*, and offers a
+**Download now** that always wins. `TreeStore` watches
+`onConnectivityChanged` rather than re-checking when a screen opens, because a
+promise the reader has to come back and collect is not one. A *delta* never
+waits: the protection is for the first copy, which is megabytes, and making
+somebody wait for wifi to see yesterday's edits would be protecting them from
+nothing.
+
+**And it closes §9 #24, in a way that did not need the store.** The store
+answers a search with up to 2,000 matches in one page instead of 50 —
+affordable because a search row is now built from the **columns** the sync
+already derived rather than by decoding the payload, so a thousand rows is one
+indexed `SELECT` and no JSON. That puts every match in the filter's hands. But
+the visible fix is smaller and better: the screen keys its wording on
+`!hasMore` rather than on which transport answered, so *any* search paged to
+its end now says *"Nobody in this tree matches"* and drops the word "loaded"
+from the count. The apology survives exactly where it is true. The store is
+what makes the good case ordinary rather than the end of a long scroll.
+
+**Signing out takes the tree with it.** `sync_eval.md` §6 #2 asked for it and
+10b left `TreeSync.wipe` with no caller. `TreeStore.destroy` now runs from the
+shell's sign-out path and deletes the file, its `-wal` and `-shm`, *and* the
+key — a deleted key alone leaves ciphertext, which is close to destruction and
+is not it. Android is closed too: `allowBackup="false"`,
+`fullBackupContent="false"` and a `data_extraction_rules.xml` excluding every
+domain from both cloud backup and device transfer. **iOS is the residue** and
+§9 #29 says so: the documents directory is backed up by iCloud, the key is not,
+so a restored copy is unreadable ciphertext rather than a leak — but the
+ciphertext still leaves the device, and `NSURLIsExcludedFromBackupKey` needs a
+platform channel nobody has written because nobody ships iOS from this repo.
+
+Two defects found reading the new code back, both in the wiring rather than in
+the store, and both logged as §7 bugs 54 and 55: a **session expiry** would
+have destroyed the copy exactly as a deliberate sign-out does, and opening a
+**second tree** would have inherited the first one's `ready`. The second is the
+phase's own staleness rule being broken one level above where it was written,
+which is the more interesting of the two.
+
+**Fifty-four new tests**, and the ones worth naming are in
+`test/data/store_encryption_test.dart`, because they are the evidence the gate
+is shut rather than assertions that SQLite works: against a **real encrypted
+file**, a name written into it is not on the disk in the clear, the header is
+not `SQLite format 3`, and an unkeyed, wrongly-keyed or other-account open is
+refused. A mock of a cipher would prove nothing at all.
+
+Released as **0.21.0**. **674 tests** green (620 → 674) plus 14 goldens,
+analyzer clean.
+
+---
+
 ## 7. Bugs found, and what they taught
 
 | # | Bug | Caught by |
@@ -2576,6 +2689,8 @@ was the price `sync_eval.md` §9 named for choosing Drift and is now paid.
 | 51 | The lab had privacy **switched off** for its whole life: `canShowRecord()` returns true for everybody before it examines anything unless `HIDE_LIVE_PEOPLE` is `'1'`, so a `1 RESN confidential` in the GEDCOM did nothing and no privacy rule had ever been exercised | Found while building a record for bug 50 |
 | 53 | **The module's own paging handed the same person over twice.** `SearchService::searchIndividualNames($trees, $terms, $offset, $limit)` invites being paged by its own parameters, and `paginateQuery()` dedupes against the collection it is *building* while counting the offset down over rows it has not deduped — so `offset=5&limit=5` skips five *rows* and answers five *people*. Four of the lab's nineteen have a romanized second name, and browsing them in pages of five produced 22 rows for 18 people. Same code in 2.2.6 and 2.3, and the same trap §3 describes in the stock autocomplete: inherited, not avoided, and the design documents had all recorded it as fixed | **The first walk of a whole tree through the new sync endpoint** |
 | 52 | **Bug 19 again, and only half fixed the first time.** `ltrRun` isolates a lifespan so the paragraph around it cannot reorder it — which works for `1901–1974` and *not* for `١٣١٨–١٩٧٤`. An isolate sets the run's base direction; it does not change what is inside it, and Arabic-Indic digits are **Arabic** numbers rather than European ones, so bidi rule N1 resolves the dash between two of them as right-to-left and the run is reordered around it. Every lifespan on a site rendering in Arabic — which is every lifespan on `tree.almou.sa` — read `١٩٧٤–١٣١٨`: the man died before he was born, in an English interface and an Arabic one alike | **Rendered preview, from a fixture captured off a real server** |
+| 54 | **A session that expired would have deleted the tree.** The shell wired "the store is destroyed" to *not signed in*, which is the same state webtrees leaves the app in when its idle timer fires and a silent re-login fails — so a phone left in a pocket would have thrown away a 5 MB copy through no decision of the reader's, and re-downloaded it. Deliberate sign-out and session expiry are different events and only one of them means "I am done here"; the destroy now hangs off the sign-out *callback* rather than off the session's state. An expired session leaves the copy alone, which is safe because it is encrypted under a key belonging to one account | **Reading the new code back before committing it** |
+| 55 | **One store holds several trees, but the phase describes one.** `TreeStore.bind` short-circuits when the reader has not changed — right, because the file has not changed — and that path skipped re-reading the state. Opening a second tree therefore inherited the first tree's `ready`, so `isReadable` said yes and every search in the new tree would have answered "nobody" out of a store that simply had no copy of it. The exact failure the phase's own staleness rule exists to prevent, one level up from where the rule was written | **Reading the new code back before committing it** |
 
 50 is the interesting one, because the markup genuinely does not say. The
 divider that separates a couple from its children is the marriage row, and a
@@ -3415,9 +3530,21 @@ Both tools read the password from the terminal with echo disabled, or from
    the search screen run over the results already fetched, because everything
    they run on is already in those rows — which is what makes them free. The
    consequence is that "no matches" can mean "none in the first fifty", and
-   the screen says exactly that. **This is the risk a local store closes
-   outright** (`sync_eval.md` §1): with the tree on the device the filters are
-   tree-wide and instant, and the sentence apologising for them goes away. Neither transport is asked to filter:
+   the screen says exactly that. **Phase 10c closes it, conditionally, and the
+   condition is the honest part.** Two halves. The store answers a search with
+   up to 2,000 matches in one page rather than 50 — affordable because
+   `LocalRecordsTransport._refFrom` builds each row from the **columns** the
+   sync already derived, so a thousand rows is one indexed `SELECT` and no
+   JSON at all — which puts every match in the filter's hands. And the screen
+   now keys its wording on `!hasMore` rather than on the transport: with no
+   further page it says *"Nobody in this tree matches"* and *"Showing 3 of
+   40"*, and with one outstanding it keeps the old *"None of the results
+   loaded so far"* and *"of 40 loaded"*. So the apology did not go away, it
+   became conditional — true on a store, true after paging any transport to
+   its end, and still shown to every reader whose copy is filling or whose
+   site has no module. That is a better outcome than the risk asked for,
+   because the fix turned out not to need a store at all; the store is what
+   makes the good case the ordinary one. Neither transport is asked to filter:
    `searchIndividualsAdvanced()` could do sex and a place *id* server-side,
    and neither maps onto what a phone can offer without a place index the
    stock floor does not publish. Worth revisiting only if a real tree makes
@@ -3472,34 +3599,40 @@ Both tools read the password from the terminal with echo disabled, or from
    Worth stating plainly because the alternative reading — "a delta is
    complete" — is what a client would assume.
 
-29. **The store is not encrypted, and that gates Phase 10c.**
-   `sync_eval.md` §6 #3 is emphatic and it is right: putting the tree on the
-   device is a real change in exposure — today the app holds only what was
-   fetched, in RAM, and a backed-up or shared phone would give up the whole
-   visible tree — and encryption at rest is *"a decision to take before the
-   first byte is written, not after"*. **No byte has been written on a
-   device**: nothing in the app constructs a store, so Phase 10b's stores exist
-   only in this machine's memory and in a test. That is deliberate, and it is
-   the condition on 10c: the composer may not start answering from a store
-   until the encryption question has an answer. The route is
-   `package:sqlite3` 3.x's build hooks (`sqlcipher_flutter_libs` is
-   end-of-life, and `sqlite3_flutter_libs` became a no-op at 0.6.0 for the
-   same reason), and the key belongs in the keystore the app already uses for
-   the password.
-   Two smaller halves of the same section, also unanswered: the store must be
-   dropped on **sign-out** and on any change in the access summary — the code
-   to drop it exists (`TreeSync.wipe`) and nothing calls it yet — and a
-   demoted reader's copy is stale *permissively*, which the stamp catches only
-   at the next sync.
+29. **The store is encrypted, and Phase 10c is no longer gated.** *(Was "the
+   store is not encrypted, and that gates Phase 10c".)* `sqlite3` 3.5.2 ships
+   pre-compiled SQLite3MultipleCiphers binaries beside the plain ones, so the
+   route `sync_eval.md` §6 named — build hooks — turned out to be four lines
+   of `pubspec.yaml` rather than a native toolchain step: no per-ABI build, no
+   OpenSSL, nothing new in CI. The key is 256 bits from `Random.secure`, one
+   per *connection* (site and account), kept in the same keystore as the
+   password and written `deviceOnly` so it cannot ride a backup to another
+   phone. `test/data/store_encryption_test.dart` asserts against a real file
+   that a name is not on the disk in the clear, that the header is not
+   `SQLite format 3`, and that an unkeyed, wrongly-keyed or other-account
+   open is refused. Both halves §6 asked for are also done: `TreeStore.destroy`
+   runs on sign-out and takes the file *and* the key, and a changed role
+   re-stamps on the next bind.
+   **What is still open, and is now the honest residue:** iOS. The store lives
+   in the documents directory, which iCloud backs up; the *key* no longer
+   travels, so a restored copy is unreadable ciphertext rather than a leak,
+   but the ciphertext still leaves the device. `NSURLIsExcludedFromBackupKey`
+   needs a platform channel and nobody ships iOS from this repo yet (§10 builds
+   APKs only). Android is closed: `allowBackup="false"`,
+   `fullBackupContent="false"` and a `data_extraction_rules.xml` that excludes
+   every domain from both cloud backup and device transfer.
 
-30. **Two sources of truth become "is it stale or is it wrong?"** The first
-   risk `sync_eval.md` §11 names, and the reason 10c needs more than a
-   staleness rule: every screen answered from a store owes the reader a
-   "synced at", and the diagnostics screen — which already says which
-   transport answered each capability — has to learn a third answer. A figure
-   from last night is not wrong, but a reader wondering about it has to be
-   told, and `live_check` now diffs all three so the discipline that has caught
-   fifteen bugs keeps working.
+30. **Two sources of truth became three, and the answer is in place — but it
+   is the risk to keep watching.** *(Narrowed once.)* `sync_eval.md` §11 #1
+   names it: every screen answered from a store owes the reader a "synced at",
+   and the diagnostics screen has to learn a third answer. Both are now built.
+   `Capability.sourceOf` is the single place that decides, so the screen and
+   the transports cannot disagree; the report says `individual=store` and a
+   `store: 1463 people, synced <iso>` line; and `SyncFreshness` states it in
+   words under the results it produced. `live_check` diffs all three.
+   Still worth watching, because none of that is *proof*: the honest test is
+   whether the next real bug report is diagnosable, and no real bug has been
+   filed against a store yet.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

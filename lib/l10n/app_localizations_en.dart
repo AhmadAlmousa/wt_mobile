@@ -810,4 +810,118 @@ class AppTextEn extends AppText {
 
   @override
   String get diagnosticsCopied => 'Report copied';
+
+  @override
+  String get diagnosticsFromStore => 'This device';
+
+  @override
+  String get diagnosticsStore => 'Offline copy';
+
+  @override
+  String get diagnosticsStoreNone => 'Not kept on this device';
+
+  @override
+  String diagnosticsStorePeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people',
+      one: '1 person',
+      zero: 'No people',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsStoreSynced(String when) {
+    return 'Last updated $when';
+  }
+
+  @override
+  String filterShowingAll(int shown, int total) {
+    return 'Showing $shown of $total';
+  }
+
+  @override
+  String get filterNoMatchesInTree => 'Nobody in this tree matches.';
+
+  @override
+  String get syncTitle => 'Offline copy';
+
+  @override
+  String get syncWhy =>
+      'Keeping this tree on your device makes every search and every person instant, and lets you read the tree with no signal at all.';
+
+  @override
+  String get syncWaitingForWifi => 'Waiting for Wi‑Fi';
+
+  @override
+  String get syncWaitingForWifiWhy =>
+      'The download will start on its own the next time you are on Wi‑Fi.';
+
+  @override
+  String get syncNow => 'Download now';
+
+  @override
+  String get syncSyncing => 'Downloading the tree…';
+
+  @override
+  String get syncReady => 'Ready to read offline';
+
+  @override
+  String get syncFailed => 'The download stopped early';
+
+  @override
+  String get syncFailedWhy =>
+      'Whatever arrived was kept. Trying again continues from where it stopped.';
+
+  @override
+  String get syncRetry => 'Try again';
+
+  @override
+  String get syncRemove => 'Remove the offline copy';
+
+  @override
+  String get syncRemoved => 'The offline copy was removed';
+
+  @override
+  String syncFromStoreNotice(String when) {
+    return 'Read from this device, updated $when';
+  }
+
+  @override
+  String get syncJustNow => 'just now';
+
+  @override
+  String syncMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes ago',
+      one: '1 minute ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours ago',
+      one: '1 hour ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: 'yesterday',
+    );
+    return '$_temp0';
+  }
 }

@@ -7,7 +7,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Keep in step with `kAppVersion` in lib/core/webtrees_client.dart, which puts
 # this number in the User-Agent every request carries. Site administrators read
 # that string in their logs, so it has to name the build they actually have.
-version: 0.20.0+23
+version: 0.21.0+24
 
 environment:
   sdk: ^3.12.2
@@ -65,6 +65,44 @@ dependencies:
   # its own isolate rather than on the one drawing the screen.
   drift: ^2.34.3
   drift_flutter: ^0.3.1
+  # Direct rather than transitive since Phase 10c: the store is opened with a
+  # `PRAGMA key`, which is this package's API, and the encrypted build is
+  # selected through this package's own build hooks (see `hooks:` below).
+  sqlite3: ^3.5.2
+  # Saying where the store file is, so it can be deleted on sign-out without
+  # opening it first.
+  path: ^1.9.0
+  # Whether the first sync should run now or wait (Phase 10c).
+  #
+  # A first sync is ~5 MB over the wire, which is nothing on wifi and is
+  # somebody else's data plan on a cellular network. This is the only way to
+  # tell the two apart, and it also reports the *change* — which is what makes
+  # "it will download next time you are on wifi" a promise the app can keep
+  # rather than one the reader has to come back and collect.
+  #
+  # Deliberately a hint and never a gate: the reader can always start it now.
+  connectivity_plus: ^7.3.1
+
+# Encryption at rest for the local store (Phase 10c).
+#
+# `sync_eval.md` §6 #3 calls this "a decision to take before the first byte is
+# written, not after", and it is the gate the whole phase sat behind: putting
+# 1,463 records on a device is a real change in exposure, because until now the
+# app held only what it had fetched, in RAM.
+#
+# `sqlite3` 3.5.2 ships pre-compiled SQLite3MultipleCiphers binaries alongside
+# the plain ones, verified by sha256 from its own sources, so this is a
+# *selection* rather than a native build — no toolchain step, no per-ABI
+# compilation, nothing new in CI. That is why the route named in §6 (build
+# hooks) turned out to cost almost nothing.
+#
+# `sqlite3mc` rather than `sqlcipher`: the SQLCipher build links OpenSSL on
+# Android, Linux and Windows and lags upstream SQLite, where this one carries
+# the current SQLite and needs no OpenSSL. Both answer `PRAGMA key`.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
 
 dev_dependencies:
   flutter_test:

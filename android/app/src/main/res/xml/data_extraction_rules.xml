@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 and later read this instead of android:allowBackup, and both have
+  to say the same thing or the answer depends on the OS version.
+
+  Nothing this app stores belongs off the device. The local store is one
+  reader's whole visible family tree; the keystore holds the key to it and the
+  site password. `sync_eval.md` §6 #3 is the reasoning, and it applies equally
+  to a cloud backup and to a transfer to a new phone — the second more so,
+  because the destination is a different device with a different keystore, so
+  a copied store would arrive unreadable anyway.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1488,6 +1488,150 @@ abstract class AppText {
   /// In en, this message translates to:
   /// **'Report copied'**
   String get diagnosticsCopied;
+
+  /// No description provided for @diagnosticsFromStore.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get diagnosticsFromStore;
+
+  /// No description provided for @diagnosticsStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline copy'**
+  String get diagnosticsStore;
+
+  /// No description provided for @diagnosticsStoreNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not kept on this device'**
+  String get diagnosticsStoreNone;
+
+  /// How many people this device's copy of the tree holds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No people} =1{1 person} other{{count} people}}'**
+  String diagnosticsStorePeople(int count);
+
+  /// No description provided for @diagnosticsStoreSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {when}'**
+  String diagnosticsStoreSynced(String when);
+
+  /// How many people survive the filter, when every match is already in hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total}'**
+  String filterShowingAll(int shown, int total);
+
+  /// No description provided for @filterNoMatchesInTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody in this tree matches.'**
+  String get filterNoMatchesInTree;
+
+  /// No description provided for @syncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline copy'**
+  String get syncTitle;
+
+  /// No description provided for @syncWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping this tree on your device makes every search and every person instant, and lets you read the tree with no signal at all.'**
+  String get syncWhy;
+
+  /// No description provided for @syncWaitingForWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for Wi‑Fi'**
+  String get syncWaitingForWifi;
+
+  /// No description provided for @syncWaitingForWifiWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'The download will start on its own the next time you are on Wi‑Fi.'**
+  String get syncWaitingForWifiWhy;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Download now'**
+  String get syncNow;
+
+  /// No description provided for @syncSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading the tree…'**
+  String get syncSyncing;
+
+  /// No description provided for @syncReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to read offline'**
+  String get syncReady;
+
+  /// No description provided for @syncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The download stopped early'**
+  String get syncFailed;
+
+  /// No description provided for @syncFailedWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Whatever arrived was kept. Trying again continues from where it stopped.'**
+  String get syncFailedWhy;
+
+  /// No description provided for @syncRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get syncRetry;
+
+  /// No description provided for @syncRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the offline copy'**
+  String get syncRemove;
+
+  /// No description provided for @syncRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'The offline copy was removed'**
+  String get syncRemoved;
+
+  /// No description provided for @syncFromStoreNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Read from this device, updated {when}'**
+  String syncFromStoreNotice(String when);
+
+  /// No description provided for @syncJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get syncJustNow;
+
+  /// No description provided for @syncMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute ago} other{{count} minutes ago}}'**
+  String syncMinutesAgo(int count);
+
+  /// No description provided for @syncHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour ago} other{{count} hours ago}}'**
+  String syncHoursAgo(int count);
+
+  /// No description provided for @syncDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{yesterday} other{{count} days ago}}'**
+  String syncDaysAgo(int count);
 }
 
 class _AppTextDelegate extends LocalizationsDelegate<AppText> {

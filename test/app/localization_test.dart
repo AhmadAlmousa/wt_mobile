@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/app/theme.dart';
 import 'package:webtrees_mobile/core/errors.dart';
+import 'package:webtrees_mobile/data/local/tree_store.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
 import 'package:webtrees_mobile/domain/notice.dart';
 import 'package:webtrees_mobile/features/shared/bidi.dart';
@@ -23,6 +24,7 @@ void main() {
 
       await tester.pumpWidget(
         WebtreesMobileApp(
+          treeStore: TreeStore.none(),
           session: session,
           settings: testSettings(locale: const Locale('ar')),
         ),
@@ -45,6 +47,7 @@ void main() {
 
       await tester.pumpWidget(
         WebtreesMobileApp(
+          treeStore: TreeStore.none(),
           session: session,
           settings: testSettings(locale: const Locale('ar')),
         ),
@@ -62,6 +65,7 @@ void main() {
 
       await tester.pumpWidget(
         WebtreesMobileApp(
+          treeStore: TreeStore.none(),
           session: session,
           settings: testSettings(locale: const Locale('ar')),
         ),
@@ -81,6 +85,7 @@ void main() {
 
       await tester.pumpWidget(
         WebtreesMobileApp(
+          treeStore: TreeStore.none(),
           session: session,
           settings: testSettings(locale: const Locale('en')),
         ),

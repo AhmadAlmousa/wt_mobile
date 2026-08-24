@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
+import 'package:webtrees_mobile/data/local/tree_store.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
 import 'package:webtrees_mobile/features/shared/message_panel.dart';
@@ -83,7 +84,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: settings),
+      WebtreesMobileApp(
+        session: session,
+        settings: settings,
+        treeStore: TreeStore.none(),
+      ),
     );
     await tester.pumpAndSettle();
 

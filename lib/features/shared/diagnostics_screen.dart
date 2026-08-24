@@ -113,11 +113,34 @@ class DiagnosticsScreen extends StatelessWidget {
             for (final source in diagnostics.sources)
               _Row(
                 label: _nameOf(source.capability, text),
-                value: source.fromModule
-                    ? text.diagnosticsFromModule
-                    : text.diagnosticsFromPages,
+                value: switch (source.readFrom) {
+                  ReadFrom.store => text.diagnosticsFromStore,
+                  ReadFrom.module => text.diagnosticsFromModule,
+                  ReadFrom.page => text.diagnosticsFromPages,
+                },
                 emphasis: source.fromModule,
               ),
+
+            const SizedBox(height: 24),
+            _Group(text.diagnosticsStore),
+            if (!diagnostics.hasStore)
+              _Row(
+                label: text.diagnosticsStore,
+                value: text.diagnosticsStoreNone,
+              )
+            else ...[
+              _Row(
+                label: text.diagnosticsStorePeople(diagnostics.storedPeople),
+                value: text.diagnosticsStoreSynced(
+                  // The exact instant, not "an hour ago": this screen is read
+                  // to file a bug, and the reader of that bug needs an
+                  // unambiguous time. The relative form belongs on the screen
+                  // the answer appeared on.
+                  diagnostics.syncedAt?.toLocal().toString() ?? '—',
+                ),
+                emphasis: true,
+              ),
+            ],
 
             if (diagnostics.findings.isNotEmpty) ...[
               const SizedBox(height: 24),

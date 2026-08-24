@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webtrees_mobile/app/app.dart';
 import 'package:webtrees_mobile/app/theme.dart';
+import 'package:webtrees_mobile/data/local/tree_store.dart';
 import 'package:webtrees_mobile/data/session_manager.dart';
 import 'package:webtrees_mobile/data/settings_store.dart';
 import 'package:webtrees_mobile/domain/dates.dart';
@@ -154,7 +155,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: settings),
+      WebtreesMobileApp(
+        session: session,
+        settings: settings,
+        treeStore: TreeStore.none(),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -295,7 +300,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: settings),
+      WebtreesMobileApp(
+        session: session,
+        settings: settings,
+        treeStore: TreeStore.none(),
+      ),
     );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'host');
@@ -702,9 +711,12 @@ void main() {
 
     expect(find.text('عبد الله الموسى'), findsOne);
     expect(find.text('خالد الموسى'), findsNothing);
-    // Says what it is doing, and against how many rows — the count is of the
-    // results loaded, because that is all the filter can see.
+    // Says what it is doing, and against how many rows. `Show more` was
+    // tapped and the site offered no further page, so those two rows are
+    // every match there is — and the bar drops the word "loaded", which was
+    // the apology `PROJECT.md` §9 #24 is about.
     expect(find.textContaining('Showing 1 of 2'), findsOne);
+    expect(find.textContaining('loaded'), findsNothing);
     expect(server.routes.length, asked, reason: 'no further request');
   });
 
@@ -733,9 +745,37 @@ void main() {
     await tester.pumpAndSettle();
 
     // Which is a different thing from a search that found nobody, and the
-    // difference is worth a sentence: another page may yet hold a match.
-    expect(find.textContaining('None of the results loaded'), findsOne);
+    // difference is worth a sentence.
+    //
+    // Every page has been fetched here, so the sentence is the *tree-wide*
+    // one: nothing further can arrive to change the answer. On a search still
+    // holding a further page it reads "None of the results loaded so far
+    // match", which is the version `PROJECT.md` §9 #24 apologises for and the
+    // next test pins down.
+    expect(find.textContaining('Nobody in this tree matches'), findsOne);
     expect(find.textContaining('Showing 0 of 2'), findsOne);
+  });
+
+  testWidgets('a filter over a part-loaded search says only that much', (
+    tester,
+  ) async {
+    await openTree(tester);
+    await search(tester, 'كثير');
+    // Deliberately *not* tapping `Show more`. The filter can only see the
+    // first page, so every count it states is a count of *those* rows — and
+    // the bar says "loaded" to admit it. That word is the apology
+    // `PROJECT.md` §9 #24 is about, and the test above is what removes it:
+    // once there is no further page, the same bar drops it.
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('الكويت، الكويت'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show 1 person'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Showing 1 of 1 loaded'), findsOne);
   });
 
   testWidgets('a new search starts unfiltered', (tester) async {
@@ -1022,7 +1062,11 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      WebtreesMobileApp(session: session, settings: testSettings()),
+      WebtreesMobileApp(
+        session: session,
+        settings: testSettings(),
+        treeStore: TreeStore.none(),
+      ),
     );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'host');

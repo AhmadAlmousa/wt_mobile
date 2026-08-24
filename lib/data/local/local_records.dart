@@ -42,7 +42,7 @@ final class LocalRecordsTransport implements RecordsTransport {
   const LocalRecordsTransport({
     required this.store,
     required this.online,
-    this.pageSize = 50,
+    this.pageSize = 2000,
   });
 
   final LocalStore store;
@@ -50,6 +50,25 @@ final class LocalRecordsTransport implements RecordsTransport {
   /// For the bytes and the tree-level charts a store does not hold.
   final RecordsTransport online;
 
+  /// How many people one search answers with.
+  ///
+  /// Far larger than the 50 either online transport pages at, and that is the
+  /// point rather than an optimisation. `PROJECT.md` §9 #24: the filters on
+  /// the search screen narrow *the rows in hand*, so on a paged transport "no
+  /// matches" can mean "none in the first fifty" — and the screen has to say
+  /// so. A store has the whole tree and can answer the whole question, so
+  /// handing the screen every match is what makes the filters tree-wide and
+  /// retires that apology.
+  ///
+  /// It costs almost nothing because [_refFrom] reads **columns**, not
+  /// payloads: every field of a `PersonRef` was derived at write time and
+  /// stored beside the record, so a thousand rows is one indexed `SELECT` and
+  /// no JSON at all.
+  ///
+  /// Not unbounded, though. `sync_eval.md` §8 warns that a 100,000-person tree
+  /// is not a phone-sized artefact, and a list widget is lazy but a `List` is
+  /// not. This is the ceiling until Phase 10f designs a real one, and
+  /// [SearchPage.hasMore] states honestly when it has been reached.
   final int pageSize;
 
   /// Whether this tree's copy is complete enough to answer from.
@@ -94,13 +113,35 @@ final class LocalRecordsTransport implements RecordsTransport {
     final rows = await select.get();
 
     return SearchPage(
-      people: [
-        for (final row in rows.take(pageSize))
-          personFrom(personFromPayload(row.payload)),
-      ],
+      people: [for (final row in rows.take(pageSize)) _refFrom(row)],
       hasMore: rows.length > pageSize,
     );
   }
+
+  /// One search row, out of the columns rather than out of the payload.
+  ///
+  /// Every field here was produced by `personFrom` when the record was
+  /// written and stored beside it, so this is the same value the payload
+  /// would decode to — and `local_store_test.dart` holds a stored record
+  /// against a directly-decoded one to keep it that way. Reading the columns
+  /// is what makes answering with the whole tree affordable: no JSON, and an
+  /// index to sort by.
+  static PersonRef _refFrom(StoredPerson row) => PersonRef(
+    xref: row.xref,
+    name: row.name,
+    alternateName: row.alternateName,
+    lifespan: row.lifespan,
+    sex: Sex.values.firstWhere(
+      (candidate) => candidate.name == row.sex,
+      orElse: () => Sex.unknown,
+    ),
+    isDeceased: row.deceased,
+    thumbnailUrl: row.thumbnailUrl,
+    birthYear: row.birthYear,
+    deathYear: row.deathYear,
+    birthPlace: row.birthPlace,
+    age: row.age,
+  );
 
   @override
   Future<IndividualRecord> individual(String tree, String xref) async {

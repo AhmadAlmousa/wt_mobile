@@ -6,6 +6,8 @@ import 'app/app.dart';
 import 'core/secret_store.dart';
 import 'core/unlock_gate.dart';
 import 'data/credential_store.dart';
+import 'data/local/store_key.dart';
+import 'data/local/tree_store.dart';
 import 'data/session_manager.dart';
 import 'data/settings_store.dart';
 
@@ -40,6 +42,12 @@ Future<void> main() async {
         ),
       ),
       settings: settings,
+      // The tree, on the device. Nothing is written until a reader opens a
+      // tree on a site that runs the sync wire, and nothing is written at all
+      // without a keystore to hold the key — `StoreKeys.obtain` refuses rather
+      // than falling back, because an unencrypted copy of somebody's whole
+      // family is exactly the exposure `sync_eval.md` §6 #3 is about.
+      treeStore: TreeStore(StoreKeys(secrets)),
     ),
   );
 }

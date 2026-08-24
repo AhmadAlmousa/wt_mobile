@@ -8,7 +8,21 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// without a keystore when the platform has none.
 abstract interface class SecretStore {
   Future<String?> read(String key);
-  Future<void> write(String key, String value);
+
+  /// Stores [value] under [key].
+  ///
+  /// [deviceOnly] asks the platform to keep the secret off backups and out of
+  /// a transfer to a new phone. It exists for one secret: the key to the local
+  /// store (`data/local/store_key.dart`). Encrypting the tree on disk buys
+  /// nothing if the key rides the same iCloud backup as the ciphertext, and a
+  /// key restored onto a *different* device is worse than useless — it would
+  /// open a copy of somebody's family on hardware they never put it on.
+  ///
+  /// The password is deliberately **not** device-only: restoring a phone and
+  /// finding the app still signed in is the behaviour a reader expects, and a
+  /// password is a secret they can retype. A tree is not.
+  Future<void> write(String key, String value, {bool deviceOnly = false});
+
   Future<void> delete(String key);
 
   /// Whether a value is stored, without retrieving it.
@@ -68,8 +82,19 @@ final class PlatformSecretStore implements SecretStore {
   Future<String?> read(String key) => _storage.read(key: key);
 
   @override
-  Future<void> write(String key, String value) =>
-      _storage.write(key: key, value: value);
+  Future<void> write(String key, String value, {bool deviceOnly = false}) =>
+      _storage.write(
+        key: key,
+        value: value,
+        iOptions: deviceOnly
+            // Keychain items with the default accessibility travel in an
+            // encrypted iCloud backup and can be restored onto another
+            // device. `ThisDevice` is what stops that.
+            ? const IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock_this_device,
+              )
+            : IOSOptions.defaultOptions,
+      );
 
   @override
   Future<void> delete(String key) => _storage.delete(key: key);
@@ -91,7 +116,11 @@ final class MemorySecretStore implements SecretStore {
   Future<String?> read(String key) async => _values[key];
 
   @override
-  Future<void> write(String key, String value) async => _values[key] = value;
+  Future<void> write(
+    String key,
+    String value, {
+    bool deviceOnly = false,
+  }) async => _values[key] = value;
 
   @override
   Future<void> delete(String key) async => _values.remove(key);

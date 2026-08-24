@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/capabilities.dart';
+import '../data/local/records_page.dart';
+import '../data/local/tree_store.dart';
 import '../data/module/module_api.dart';
 import '../data/module/module_charts.dart';
 import '../data/module/module_records.dart';
@@ -13,6 +16,7 @@ import '../data/stock/charts_repository.dart';
 import '../data/stock/media_cache.dart';
 import '../data/stock/records_repository.dart';
 import '../data/transport.dart';
+import '../domain/access.dart';
 import '../domain/charts.dart';
 import '../features/access/access_screen.dart';
 import '../features/auth/sign_in_screen.dart';
@@ -32,11 +36,21 @@ class WebtreesMobileApp extends StatefulWidget {
   const WebtreesMobileApp({
     required this.session,
     required this.settings,
+    required this.treeStore,
     super.key,
   });
 
   final SessionManager session;
   final SettingsStore settings;
+
+  /// This device's copy of a tree, and the policy around it.
+  ///
+  /// Owned above the shell so it survives navigation and is disposed exactly
+  /// once. The shell binds it to whichever tree is open and hands the composer
+  /// a transport over it — but only once `TreeStore` says the copy is
+  /// complete, which is the whole of the staleness rule `sync_eval.md` §10
+  /// asks for.
+  final TreeStore treeStore;
 
   @override
   State<WebtreesMobileApp> createState() => _WebtreesMobileAppState();
@@ -60,7 +74,17 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   /// Built per navigation rather than held, because the client is replaced
   /// whenever the app reconnects or signs in again — a cached repository would
   /// go on talking through a closed one.
-  RecordsTransport get _records {
+  RecordsTransport get _records =>
+      // Composed twice, over the same two sources: once as the thing the store
+      // falls back to for the bytes and the tree-level charts it cannot hold,
+      // and once as the thing the app reads. `local` is null unless a complete
+      // copy for *this* reader is open — everything that decides that lives in
+      // `TreeStore`, so by the time it reaches the composer it is decided.
+      _composed(local: widget.treeStore.transportOver(_composed));
+
+  /// The module where this site offers it, the site's own pages where it does
+  /// not, and optionally this device's copy above both.
+  CapabilityRecordsTransport _composed({RecordsTransport? local}) {
     final client = widget.session.client;
     final version = widget.session.instance?.version;
 
@@ -69,6 +93,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
       module: _capabilities.isPresent
           ? ModuleRecordsTransport(client, mediaCache: _media)
           : null,
+      local: local,
       capabilities: _capabilities,
     );
   }
@@ -98,6 +123,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     super.initState();
     widget.session.addListener(_onSessionChanged);
     widget.settings.addListener(_onSettingsChanged);
+    widget.treeStore.addListener(_onStoreChanged);
   }
 
   void _onSessionChanged() {
@@ -110,6 +136,95 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     _media.clear();
     _openedOnlyTree = false;
     _capabilities = ModuleCapabilities.none;
+    _access = null;
+    _boundTree = null;
+  }
+
+  /// The reader signed out, deliberately.
+  ///
+  /// Which is **not** the same as the session ending, and the difference is
+  /// the whole reason this is a separate path. webtrees expires a session on
+  /// an idle timer with no warning, and `SessionManager.withSession` re-signs
+  /// in silently; where it cannot, the app is signed out through no decision
+  /// of the reader's. Destroying the copy there would mean a ~5 MB
+  /// re-download every time a phone sat in a pocket too long.
+  ///
+  /// A deliberate sign-out is different, and `sync_eval.md` §6 #2 is about
+  /// that one: the store makes yesterday's permissions durable, so leaving has
+  /// to take the tree with it — the file *and* its key, because a deleted key
+  /// alone leaves ciphertext, which is close to destruction and is not it.
+  ///
+  /// An expired session leaves the copy where it is, which is safe: it is
+  /// encrypted under a key belonging to one account, so the next reader either
+  /// is that account — and inherits their own copy — or cannot open it at all.
+  void _onSignedOut() {
+    _access = null;
+    _boundTree = null;
+    unawaited(widget.treeStore.destroy());
+    _router.go(Routes.connect);
+  }
+
+  /// The copy became readable, or stopped being. Rebuilds the routes so the
+  /// composer is handed the store the moment it is worth reading — otherwise
+  /// a sync that finished while the reader was looking at a screen would not
+  /// take effect until they navigated away from it.
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// What the reader may see, as of the last time the account screen ran.
+  AccessSummary? _access;
+
+  /// Which tree the store is currently bound to, so binding is not attempted
+  /// on every rebuild of the search route.
+  String? _boundTree;
+
+  void _onAccessSummary(AccessSummary summary) {
+    _access = summary;
+    final bound = _boundTree;
+    // A role can change between sign-ins, and the copy is stamped with the old
+    // one. Re-binding is how the stamp gets re-checked, and `TreeSync` drops
+    // the copy when it no longer matches.
+    if (bound != null) unawaited(_bindStore(bound));
+  }
+
+  /// Points the store at [tree] and lets it decide whether to fill.
+  ///
+  /// Everything about *when* is `TreeStore`'s: on wifi it fills in the
+  /// background on first use, on a cellular network it waits and says so.
+  /// This method only supplies the four things that identify a copy — who,
+  /// which tree, which language, which module — and the wire to fill it from.
+  Future<void> _bindStore(String tree) async {
+    final connection = widget.session.connection;
+    final access = _access;
+    if (connection == null || access == null) return;
+
+    // Nothing to sync from. A site with no module, or one running a module
+    // older than the sync wire, keeps working exactly as it did — which is the
+    // floor this whole project stands on.
+    if (!_capabilities.has(Capability.records)) return;
+
+    final entry = access.trees.where((each) => each.name == tree);
+    if (entry.isEmpty) return;
+
+    _boundTree = tree;
+
+    await widget.treeStore.bind(
+      connection: connection,
+      tree: entry.first,
+      // The same tag the session asks the server to render in. It is half the
+      // stamp: every human-readable string in the store — fact labels, dates
+      // in six calendars, place names — was written by the server in one
+      // language, and a reader who switches is owed a different copy rather
+      // than a translated one (`sync_eval.md` §7).
+      language: SettingsStore.webtreesLanguageTag(
+        widget.settings.resolve(PlatformDispatcher.instance.locale),
+      ),
+      moduleVersion: _capabilities.moduleVersion,
+      source: ModuleSyncSource(ModuleApi(widget.session.client)),
+    );
+
+    await widget.treeStore.catchUp();
   }
 
   /// Asks the site whether it runs the mobile API module.
@@ -124,6 +239,10 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
     try {
       final found = await ModuleCapabilities.probe(widget.session.client);
       if (mounted && found.isPresent) setState(() => _capabilities = found);
+      // The capability probe and the access summary can land in either order,
+      // and the store needs both. Whichever is second does the binding.
+      final bound = _boundTree;
+      if (bound != null) unawaited(_bindStore(bound));
     } on Object {
       // Any failure means "no module", which is the default already in force.
     } finally {
@@ -214,21 +333,31 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
           session: widget.session,
           settings: widget.settings,
           capabilities: _capabilities,
-          onSignedOut: () => _router.go(Routes.connect),
+          onSignedOut: _onSignedOut,
           // Stacked, so a reader who chose one of several trees can go back
           // to the list with the system back gesture.
           onBrowseTree: (name, title) =>
               _router.push(Routes.searchIn(name), extra: title),
           onOnlyTree: _openOnlyTree,
+          onAccessSummary: _onAccessSummary,
+          treeStore: widget.treeStore,
         ),
       ),
       GoRoute(
         path: Routes.search,
         builder: (context, state) {
           final tree = state.pathParameters['tree']!;
+          // Opening a tree is what makes a copy of it worth having, and this
+          // is the one place every route into a tree passes through — a
+          // pushed card, the walk into an only tree, and a restored deep
+          // link alike. Guarded on the tree it is already bound to, so a
+          // rebuild costs nothing.
+          if (_boundTree != tree) unawaited(_bindStore(tree));
+
           return SearchScreen(
             session: widget.session,
             records: _records,
+            treeStore: widget.treeStore,
             tree: tree,
             // Only ever a label. The route still carries the tree's name,
             // so a link that arrives without a title still works.
@@ -355,6 +484,7 @@ class _WebtreesMobileAppState extends State<WebtreesMobileApp> {
   void dispose() {
     widget.session.removeListener(_onSessionChanged);
     widget.settings.removeListener(_onSettingsChanged);
+    widget.treeStore.removeListener(_onStoreChanged);
     _media.clear();
     _router.dispose();
     super.dispose();
