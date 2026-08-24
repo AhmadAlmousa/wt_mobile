@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import '../../core/response_status.dart';
 import '../../core/webtrees_client.dart';
 import '../../domain/charts.dart';
-import '../../domain/notice.dart';
 import '../../domain/records.dart';
 import '../stock/media_cache.dart';
 import '../transport.dart';
@@ -111,41 +110,14 @@ final class ModuleRecordsTransport implements RecordsTransport {
       probe: 'opening $xref',
     );
 
-    return IndividualRecord(
-      xref: stringOf(body['xref']) ?? xref,
-      name: stringOf(body['name']) ?? '',
-      alternateName: stringOf(body['alternateName']),
-      thumbnailUrl: stringOf(body['thumbnail']),
-      sex: sexFrom(stringOf(body['sex'])),
-      lifespan: stringOf(body['lifespan']),
-      isDeceased: body['deceased'] == true,
-      facts: factsFrom(body['facts']),
-      families: [
-        for (final family in listOf(body['families']))
-          if (family is Map<String, Object?>) familyFrom(family),
-      ],
-      // A section a site does not run answers null, not an empty list — the
-      // same distinction the stock path draws by seeing no tab at all. An
-      // empty list would say "this person has none", and a caution about a
-      // section the site never offered would appear on every record.
-      notes: [
-        for (final note in listOf(body['notes']))
-          if (note is Map<String, Object?>) noteFrom(note),
-      ],
-      sources: [
-        for (final source in listOf(body['sources']))
-          if (source is Map<String, Object?>) sourceFrom(source),
-      ],
-      media: [
-        for (final item in listOf(body['media']))
-          if (item is Map<String, Object?>) mediaFrom(item),
-      ],
+    return individualFrom(
+      body,
+      xref: xref,
       sections: [
         for (final section in listOf(body['sections']))
           if (section is String) section,
       ],
       charts: chartHandles(tree, xref, body['charts']),
-      warnings: const <Notice>[],
     );
   }
 

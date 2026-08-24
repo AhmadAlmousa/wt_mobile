@@ -288,6 +288,21 @@ The first sync is a few seconds of network and a few seconds of writing.
 | Peak memory, one page | not considered | under **16 MB** |
 | A page at a deep offset | `O(offset)` | **flat** — 0.26 s at 0 and at 1,400 |
 
+**And measured again in 10b, filling a real store from the real tree** — which
+is what the size row above was really asking about:
+
+| | Estimated | Measured, 1,463 real people |
+|---|---|---|
+| Full local copy | ~9 MB | **10.70 MB** on disk |
+| Filling it | a few seconds | **29.8 s** over the internet, 15 requests |
+| Reading one record | "a local read pays none" (§2) | **0.61 ms** |
+| Searching every name | impossible today | **12 ms** for 50 hits |
+| Walking the whole tree | impossible today | **541 ms**, 30 pages of 50 |
+
+10.70 MB against ~9 MB estimated: the payloads are 8.3 MB of it and the rest is
+the columns derived from them, the family-membership rows and their indexes.
+Still a third of one APK, and still the right trade.
+
 Three notes on reading that table. The 3.2 KB is a **floor**, not a
 correction: the bulk people carry a name, a sex, a birth and a death, where
 the eighteen measured above each have notes, a citation and two photographs at
@@ -417,8 +432,8 @@ Each phase is useful on its own and none of them requires the next.
 | | Phase | What it delivers |
 |---|---|---|
 | **10a** ✅ | `GET …/records?offset=&limit=&since=` in the module; a `token` derived from `MAX(change_id)` and the tree's counts | The wire, testable with `curl` before any client work — **built, module 1.3.0**, and it answered the question below: 8 requests, 6.8 s, 4.69 MB, 16 MB of memory |
-| **10b** | Drift schema, a `LocalRecordsTransport`, and the sync loop in an isolate | The store fills. Nothing reads it yet |
-| **10c** | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | Instant person and search — and **tree-wide filters**, which closes §9 #24 |
+| **10b** ✅ | Drift schema, a `LocalRecordsTransport`, and the sync loop off the UI isolate | The store fills. Nothing reads it yet — **built**: 1,463 real people in 30 requests into 10.70 MB, read back in 0.61 ms each |
+| **10c** | The composer prefers the store for `individual`, `individuals`, `family`; diagnostics say so; `live_check` diffs three ways | Instant person and search — and **tree-wide filters**, which closes §9 #24. **Gated on §6 #3**: no store on a device until encryption at rest has an answer. `live_check` already diffs three ways |
 | **10d** | Charts and timeline computed from the store | Nine of eleven capabilities local |
 | **10e** | Thumbnail blobs; a sync screen; the stamp and its invalidation rules | Genuinely offline |
 | **10f** | The ceiling for large trees (§8) | "Any webtrees instance" keeps meaning something |
@@ -428,7 +443,7 @@ it can be verified against both labs the same afternoon, and it answers the
 only question the rest depends on: does a real server hand over 1,463 records
 in eight requests without falling over.
 
-*Done, 2026-08-24, and the answer is yes.* Two things it changed about the
+*10a done, 2026-08-24, and the answer is yes.* Two things it changed about the
 rest of this document. The machinery it sits on was **not** quite the
 machinery §3 named — paging `SearchService` hands the same person over twice
 (`PROJECT.md` §7, bug 53), so the walk orders by xref and §8's deep-offset
@@ -436,6 +451,16 @@ worry goes away with it. And a delta is bigger than a changed record: a
 payload names a person's family, so renaming one man restates his whole
 household, which is why the endpoint expands every change two hops through
 `LinkedRecordService`. **10b is next, and nothing in it is blocked.**
+
+*10b done the same day.* Three things it changed about the plan above. The
+schema must not import Flutter — `path_provider` does, and a store that could
+only be opened by an app is a store no tool can check, which broke
+`live_check` the moment it was tried. The sync loop is **not** in an isolate of
+its own: fetching needs the session, which lives on the main isolate, and the
+part that would actually stall a screen — 1,463 SQLite writes — is already on
+drift's own background isolate, so an extra one would buy nothing. And 10c is
+now gated rather than merely next: §6 #3's encryption decision has to be taken
+before a store exists on a device, and after 10b none does.
 
 ---
 

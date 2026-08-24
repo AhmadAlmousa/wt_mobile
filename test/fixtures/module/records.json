@@ -1,0 +1,1147 @@
+{
+  "token": "v1.0.19.7",
+  "since": null,
+  "offset": 1,
+  "limit": 2,
+  "total": 19,
+  "hasMore": true,
+  "resync": false,
+  "sections": [
+    "personal_facts",
+    "relatives",
+    "sources_tab",
+    "notes",
+    "media",
+    "lightbox",
+    "tree",
+    "places"
+  ],
+  "charts": [
+    "menu-chart-ancestry",
+    "menu-chart-lifespan",
+    "menu-chart-descendants",
+    "menu-chart-statistics",
+    "menu-chart-timeline",
+    "menu-chart-pedigreemap",
+    "menu-chart-compact",
+    "menu-chart-relationship",
+    "menu-chart-familybook",
+    "menu-chart-hourglass",
+    "menu-chart-fanchart",
+    "menu-chart-tree",
+    "menu-chart-pedigree"
+  ],
+  "people": [
+    {
+      "xref": "X42",
+      "name": "عبد الله الموسى",
+      "alternateName": "Abdullah Almousa",
+      "sex": "male",
+      "deceased": true,
+      "lifespan": "١٣١٨–١٩٧٤",
+      "birthYear": 1318,
+      "deathYear": 1974,
+      "age": 75,
+      "birthPlace": "الكويت، الكويت",
+      "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+      "private": false,
+      "pending": null,
+      "facts": [
+        {
+          "tag": "BIRT",
+          "qualifiedTag": "INDI:BIRT",
+          "label": "الميلاد",
+          "origin": "self",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DHIJRI@ 21 DHUAQ 1318",
+            "text": "٢١ ذو القعدة ١٣١٨",
+            "qualifier": null,
+            "julianDay": [
+              2415456,
+              2415456
+            ],
+            "rendered": [
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "٢١ ذو القعدة ١٣١٨"
+              }
+            ]
+          },
+          "place": {
+            "full": "الكويت، الكويت",
+            "short": "الكويت، الكويت",
+            "gedcom": "الكويت, الكويت",
+            "latitude": null,
+            "longitude": null
+          },
+          "about": null,
+          "pending": null
+        },
+        {
+          "tag": "MARR",
+          "qualifiedTag": "FAM:MARR",
+          "label": "زواج",
+          "origin": "family",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DHIJRI@ 1343",
+            "text": "١٣٤٣",
+            "qualifier": null,
+            "julianDay": [
+              2424000,
+              2424353
+            ],
+            "rendered": [
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٤٣"
+              }
+            ]
+          },
+          "place": {
+            "full": "الكويت، الكويت",
+            "short": "الكويت، الكويت",
+            "gedcom": "الكويت, الكويت",
+            "latitude": null,
+            "longitude": null
+          },
+          "about": {
+            "xref": "X50",
+            "name": "سارة العنزي",
+            "alternateName": null,
+            "sex": "female",
+            "deceased": false,
+            "lifespan": "١٩٠٥–…",
+            "birthYear": 1905,
+            "deathYear": null,
+            "age": null,
+            "birthPlace": null,
+            "thumbnail": null,
+            "private": false
+          },
+          "pending": null
+        },
+        {
+          "tag": "DIV",
+          "qualifiedTag": "FAM:DIV",
+          "label": "طلاق",
+          "origin": "family",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DGREGORIAN@ 1940",
+            "text": "١٩٤٠ (١٣٥٩)",
+            "qualifier": null,
+            "julianDay": [
+              2429630,
+              2429995
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٤٠"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٥٩"
+              }
+            ]
+          },
+          "place": null,
+          "about": {
+            "xref": "X50",
+            "name": "سارة العنزي",
+            "alternateName": null,
+            "sex": "female",
+            "deceased": false,
+            "lifespan": "١٩٠٥–…",
+            "birthYear": 1905,
+            "deathYear": null,
+            "age": null,
+            "birthPlace": null,
+            "thumbnail": null,
+            "private": false
+          },
+          "pending": null
+        },
+        {
+          "tag": "MARR",
+          "qualifiedTag": "FAM:MARR",
+          "label": "زواج",
+          "origin": "family",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DGREGORIAN@ 1941",
+            "text": "١٩٤١ (١٣٦٠)",
+            "qualifier": null,
+            "julianDay": [
+              2429996,
+              2430360
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٤١"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٦٠"
+              }
+            ]
+          },
+          "place": null,
+          "about": {
+            "xref": "X51",
+            "name": "منيرة الصائغ",
+            "alternateName": null,
+            "sex": "female",
+            "deceased": false,
+            "lifespan": "١٩١٠–",
+            "birthYear": 1910,
+            "deathYear": null,
+            "age": 116,
+            "birthPlace": null,
+            "thumbnail": null,
+            "private": false
+          },
+          "pending": null
+        },
+        {
+          "tag": "OCCU",
+          "qualifiedTag": "INDI:OCCU",
+          "label": "وظيفة",
+          "origin": "self",
+          "secondary": false,
+          "value": "معلم",
+          "type": null,
+          "date": null,
+          "place": null,
+          "about": null,
+          "pending": null
+        },
+        {
+          "tag": "DEAT",
+          "qualifiedTag": "INDI:DEAT",
+          "label": "الوفاة",
+          "origin": "self",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DGREGORIAN@ 1974",
+            "text": "١٩٧٤ (١٣٩٤)",
+            "qualifier": null,
+            "julianDay": [
+              2442049,
+              2442413
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٧٤"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٩٤"
+              }
+            ]
+          },
+          "place": {
+            "full": "الكويت، الكويت",
+            "short": "الكويت، الكويت",
+            "gedcom": "الكويت, الكويت",
+            "latitude": null,
+            "longitude": null
+          },
+          "about": null,
+          "pending": null
+        }
+      ],
+      "families": [
+        {
+          "xref": "F1",
+          "label": "الوالدين والأشقاء",
+          "kind": "parents",
+          "spouses": [
+            {
+              "xref": "X7",
+              "name": "سليمان الموسى",
+              "alternateName": null,
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٨٧٠–١٩٤٠",
+              "birthYear": 1870,
+              "deathYear": 1940,
+              "age": 70,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X8",
+              "name": "لطيفة البقشي",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٨٧٥–١٩٤٥",
+              "birthYear": 1875,
+              "deathYear": 1945,
+              "age": 70,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            },
+            {
+              "xref": "X43",
+              "name": "نورة الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٩٠٣–١٩٨٢",
+              "birthYear": 1903,
+              "deathYear": 1980,
+              "age": 79,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [
+            {
+              "tag": "MARR",
+              "qualifiedTag": "FAM:MARR",
+              "label": "زواج",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DGREGORIAN@ 1899",
+                "text": "١٨٩٩ (١٣١٧)",
+                "qualifier": null,
+                "julianDay": [
+                  2414656,
+                  2415020
+                ],
+                "rendered": [
+                  {
+                    "calendar": "gregorian",
+                    "escape": "@#DGREGORIAN@",
+                    "text": "١٨٩٩"
+                  },
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣١٧"
+                  }
+                ]
+              },
+              "place": {
+                "full": "الكويت، الكويت",
+                "short": "الكويت، الكويت",
+                "gedcom": "الكويت, الكويت",
+                "latitude": null,
+                "longitude": null
+              },
+              "about": null,
+              "pending": null
+            }
+          ],
+          "endedInDivorce": false,
+          "pending": null
+        },
+        {
+          "xref": "F2",
+          "label": "الأسرة مع سارة العنزي",
+          "kind": "own",
+          "spouses": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            },
+            {
+              "xref": "X50",
+              "name": "سارة العنزي",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩٠٥–…",
+              "birthYear": 1905,
+              "deathYear": null,
+              "age": null,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X60",
+              "name": "محمد الموسى",
+              "alternateName": "Mohammed Almousa",
+              "sex": "male",
+              "deceased": false,
+              "lifespan": "١٩٣٠–",
+              "birthYear": 1930,
+              "deathYear": null,
+              "age": 96,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X61",
+              "name": "هيا الموسى",
+              "alternateName": "… الموسى الصائغ",
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩٣٢–",
+              "birthYear": 1932,
+              "deathYear": null,
+              "age": 94,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X63",
+              "name": "شيخة الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩٣٥–",
+              "birthYear": 1935,
+              "deathYear": null,
+              "age": 91,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X64",
+              "name": "راشد الموسى",
+              "alternateName": null,
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٩٢٨–١٩٩٠",
+              "birthYear": 1928,
+              "deathYear": 1990,
+              "age": 62,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [
+            {
+              "tag": "MARR",
+              "qualifiedTag": "FAM:MARR",
+              "label": "زواج",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DHIJRI@ 1343",
+                "text": "١٣٤٣",
+                "qualifier": null,
+                "julianDay": [
+                  2424000,
+                  2424353
+                ],
+                "rendered": [
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣٤٣"
+                  }
+                ]
+              },
+              "place": {
+                "full": "الكويت، الكويت",
+                "short": "الكويت، الكويت",
+                "gedcom": "الكويت, الكويت",
+                "latitude": null,
+                "longitude": null
+              },
+              "about": null,
+              "pending": null
+            },
+            {
+              "tag": "DIV",
+              "qualifiedTag": "FAM:DIV",
+              "label": "طلاق",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DGREGORIAN@ 1940",
+                "text": "١٩٤٠ (١٣٥٩)",
+                "qualifier": null,
+                "julianDay": [
+                  2429630,
+                  2429995
+                ],
+                "rendered": [
+                  {
+                    "calendar": "gregorian",
+                    "escape": "@#DGREGORIAN@",
+                    "text": "١٩٤٠"
+                  },
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣٥٩"
+                  }
+                ]
+              },
+              "place": null,
+              "about": null,
+              "pending": null
+            }
+          ],
+          "endedInDivorce": true,
+          "pending": null
+        },
+        {
+          "xref": "F3",
+          "label": "الأسرة مع منيرة الصائغ",
+          "kind": "own",
+          "spouses": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            },
+            {
+              "xref": "X51",
+              "name": "منيرة الصائغ",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩١٠–",
+              "birthYear": 1910,
+              "deathYear": null,
+              "age": 116,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X62",
+              "name": "سارة الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٩٤٥–٢٠٠١",
+              "birthYear": 1945,
+              "deathYear": 2001,
+              "age": 56,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [
+            {
+              "tag": "MARR",
+              "qualifiedTag": "FAM:MARR",
+              "label": "زواج",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DGREGORIAN@ 1941",
+                "text": "١٩٤١ (١٣٦٠)",
+                "qualifier": null,
+                "julianDay": [
+                  2429996,
+                  2430360
+                ],
+                "rendered": [
+                  {
+                    "calendar": "gregorian",
+                    "escape": "@#DGREGORIAN@",
+                    "text": "١٩٤١"
+                  },
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣٦٠"
+                  }
+                ]
+              },
+              "place": null,
+              "about": null,
+              "pending": null
+            }
+          ],
+          "endedInDivorce": false,
+          "pending": null
+        },
+        {
+          "xref": "F6",
+          "label": "الأسرة مع حصة الدوسري",
+          "kind": "own",
+          "spouses": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            },
+            {
+              "xref": "X65",
+              "name": "حصة الدوسري",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": null,
+              "birthYear": null,
+              "deathYear": null,
+              "age": null,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": true
+            }
+          ],
+          "children": [],
+          "facts": [],
+          "endedInDivorce": false,
+          "pending": null
+        },
+        {
+          "xref": "F7",
+          "label": "عبد الله الموسى + … …",
+          "kind": "own",
+          "spouses": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X66",
+              "name": "طلال الموسى",
+              "alternateName": null,
+              "sex": "male",
+              "deceased": false,
+              "lifespan": "١٩٤٦–",
+              "birthYear": 1946,
+              "deathYear": null,
+              "age": 80,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X67",
+              "name": "نوف الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩٤٨–",
+              "birthYear": 1948,
+              "deathYear": null,
+              "age": 78,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [],
+          "endedInDivorce": false,
+          "pending": null
+        }
+      ],
+      "notes": [
+        {
+          "label": "الميلاد",
+          "text": "سُجّل الميلاد بعد سنة من وقوعه.",
+          "xref": null,
+          "secondary": true,
+          "about": {
+            "xref": "X42",
+            "tag": "INDI"
+          },
+          "pending": null
+        },
+        {
+          "label": "ملاحظة مشتركة",
+          "text": "هاجر إلى الكويت في عام ١٩٢٠ وعمل في تجارة اللؤلؤ.\nهذه ملاحظة مشتركة يمكن لعدة أفراد الإشارة إليها.",
+          "xref": "N1",
+          "secondary": false,
+          "about": {
+            "xref": "X42",
+            "tag": "INDI"
+          },
+          "pending": null
+        }
+      ],
+      "sources": [
+        {
+          "label": "الميلاد",
+          "title": "سجل قيد العائلة",
+          "xref": "S1",
+          "details": [
+            "تفاصيل الإقتباس: الصفحة ٤٢",
+            "مصداقية البيانت: الأدلة الأساسية"
+          ],
+          "secondary": true,
+          "pending": null
+        }
+      ],
+      "media": [
+        {
+          "xref": "M2",
+          "title": "شهادة الميلاد",
+          "note": null,
+          "files": [
+            {
+              "title": "شهادة الميلاد",
+              "format": "png",
+              "mimeType": "image/png",
+              "isImage": true,
+              "width": 800,
+              "height": 800,
+              "fit": "contain",
+              "url": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M2&fact_id=bd43fa9f7389c15eebb991062c2c1b0c&w=800&h=800&fit=contain&mark=0&s=b6f206ea8d2916e086c9ba634dbb2674",
+              "download": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-download&xref=M2&fact_id=bd43fa9f7389c15eebb991062c2c1b0c&disposition=inline&mark=0"
+            }
+          ],
+          "pending": null,
+          "label": "الميلاد",
+          "secondary": true
+        },
+        {
+          "xref": "M1",
+          "title": "صورة عبد الله",
+          "note": null,
+          "files": [
+            {
+              "title": "صورة عبد الله",
+              "format": "jpeg",
+              "mimeType": "image/jpeg",
+              "isImage": true,
+              "width": 800,
+              "height": 800,
+              "fit": "contain",
+              "url": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=800&h=800&fit=contain&mark=0&s=5dd9de9f16441e8617af6d251c0f8f34",
+              "download": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-download&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&disposition=inline&mark=0"
+            }
+          ],
+          "pending": null,
+          "label": "كائن وسائط",
+          "secondary": false
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "xref": "X43",
+      "name": "نورة الموسى",
+      "alternateName": null,
+      "sex": "female",
+      "deceased": true,
+      "lifespan": "١٩٠٣–١٩٨٢",
+      "birthYear": 1903,
+      "deathYear": 1980,
+      "age": 79,
+      "birthPlace": null,
+      "thumbnail": null,
+      "private": false,
+      "pending": null,
+      "facts": [
+        {
+          "tag": "BIRT",
+          "qualifiedTag": "INDI:BIRT",
+          "label": "الميلاد",
+          "origin": "self",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DGREGORIAN@ 1903",
+            "text": "١٩٠٣ (١٣٢١)",
+            "qualifier": null,
+            "julianDay": [
+              2416116,
+              2416480
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٠٣"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٢١"
+              }
+            ]
+          },
+          "place": null,
+          "about": null,
+          "pending": null
+        },
+        {
+          "tag": "MARR",
+          "qualifiedTag": "FAM:MARR",
+          "label": "زواج",
+          "origin": "family",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "@#DGREGORIAN@ 1925",
+            "text": "١٩٢٥ (١٣٤٣)",
+            "qualifier": null,
+            "julianDay": [
+              2424152,
+              2424516
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "١٩٢٥"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "١٣٤٣"
+              }
+            ]
+          },
+          "place": null,
+          "about": {
+            "xref": "X52",
+            "name": "خالد الصائغ",
+            "alternateName": null,
+            "sex": "male",
+            "deceased": false,
+            "lifespan": "١٩٠٠–…",
+            "birthYear": 1900,
+            "deathYear": null,
+            "age": null,
+            "birthPlace": null,
+            "thumbnail": null,
+            "private": false
+          },
+          "pending": null
+        },
+        {
+          "tag": "DEAT",
+          "qualifiedTag": "INDI:DEAT",
+          "label": "الوفاة",
+          "origin": "self",
+          "secondary": false,
+          "value": null,
+          "type": null,
+          "date": {
+            "gedcom": "BET @#DGREGORIAN@ 1980 AND @#DGREGORIAN@ 1982",
+            "text": "بين ١٩٨٠ و ١٩٨٢ (١٤٠٠)",
+            "qualifier": "BET",
+            "julianDay": [
+              2444240,
+              2445335
+            ],
+            "rendered": [
+              {
+                "calendar": "gregorian",
+                "escape": "@#DGREGORIAN@",
+                "text": "بين ١٩٨٠ و ١٩٨٢"
+              },
+              {
+                "calendar": "hijri",
+                "escape": "@#DHIJRI@",
+                "text": "بين ١٤٠٠ و ١٤٠٢"
+              }
+            ]
+          },
+          "place": null,
+          "about": null,
+          "pending": null
+        }
+      ],
+      "families": [
+        {
+          "xref": "F1",
+          "label": "الوالدين والأشقاء",
+          "kind": "parents",
+          "spouses": [
+            {
+              "xref": "X7",
+              "name": "سليمان الموسى",
+              "alternateName": null,
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٨٧٠–١٩٤٠",
+              "birthYear": 1870,
+              "deathYear": 1940,
+              "age": 70,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X8",
+              "name": "لطيفة البقشي",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٨٧٥–١٩٤٥",
+              "birthYear": 1875,
+              "deathYear": 1945,
+              "age": 70,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X42",
+              "name": "عبد الله الموسى",
+              "alternateName": "Abdullah Almousa",
+              "sex": "male",
+              "deceased": true,
+              "lifespan": "١٣١٨–١٩٧٤",
+              "birthYear": 1318,
+              "deathYear": 1974,
+              "age": 75,
+              "birthPlace": "الكويت، الكويت",
+              "thumbnail": "http://lab.invalid/index.php?route=%2Ftree%2Fmain%2Fmedia-thumbnail&xref=M1&fact_id=afcfd7c8c8e7b5b5e4627271a49ff48d&w=160&h=160&fit=contain&mark=0&s=2053b37cf1179f6bed2f054055d7da2f",
+              "private": false
+            },
+            {
+              "xref": "X43",
+              "name": "نورة الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٩٠٣–١٩٨٢",
+              "birthYear": 1903,
+              "deathYear": 1980,
+              "age": 79,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [
+            {
+              "tag": "MARR",
+              "qualifiedTag": "FAM:MARR",
+              "label": "زواج",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DGREGORIAN@ 1899",
+                "text": "١٨٩٩ (١٣١٧)",
+                "qualifier": null,
+                "julianDay": [
+                  2414656,
+                  2415020
+                ],
+                "rendered": [
+                  {
+                    "calendar": "gregorian",
+                    "escape": "@#DGREGORIAN@",
+                    "text": "١٨٩٩"
+                  },
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣١٧"
+                  }
+                ]
+              },
+              "place": {
+                "full": "الكويت، الكويت",
+                "short": "الكويت، الكويت",
+                "gedcom": "الكويت, الكويت",
+                "latitude": null,
+                "longitude": null
+              },
+              "about": null,
+              "pending": null
+            }
+          ],
+          "endedInDivorce": false,
+          "pending": null
+        },
+        {
+          "xref": "F4",
+          "label": "الأسرة مع خالد الصائغ",
+          "kind": "own",
+          "spouses": [
+            {
+              "xref": "X52",
+              "name": "خالد الصائغ",
+              "alternateName": null,
+              "sex": "male",
+              "deceased": false,
+              "lifespan": "١٩٠٠–…",
+              "birthYear": 1900,
+              "deathYear": null,
+              "age": null,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            },
+            {
+              "xref": "X43",
+              "name": "نورة الموسى",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": true,
+              "lifespan": "١٩٠٣–١٩٨٢",
+              "birthYear": 1903,
+              "deathYear": 1980,
+              "age": 79,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "children": [
+            {
+              "xref": "X70",
+              "name": "فاطمة الصائغ",
+              "alternateName": null,
+              "sex": "female",
+              "deceased": false,
+              "lifespan": "١٩٢٨–",
+              "birthYear": 1928,
+              "deathYear": null,
+              "age": 98,
+              "birthPlace": null,
+              "thumbnail": null,
+              "private": false
+            }
+          ],
+          "facts": [
+            {
+              "tag": "MARR",
+              "qualifiedTag": "FAM:MARR",
+              "label": "زواج",
+              "origin": "family",
+              "secondary": false,
+              "value": null,
+              "type": null,
+              "date": {
+                "gedcom": "@#DGREGORIAN@ 1925",
+                "text": "١٩٢٥ (١٣٤٣)",
+                "qualifier": null,
+                "julianDay": [
+                  2424152,
+                  2424516
+                ],
+                "rendered": [
+                  {
+                    "calendar": "gregorian",
+                    "escape": "@#DGREGORIAN@",
+                    "text": "١٩٢٥"
+                  },
+                  {
+                    "calendar": "hijri",
+                    "escape": "@#DHIJRI@",
+                    "text": "١٣٤٣"
+                  }
+                ]
+              },
+              "place": null,
+              "about": null,
+              "pending": null
+            }
+          ],
+          "endedInDivorce": false,
+          "pending": null
+        }
+      ],
+      "notes": [],
+      "sources": [],
+      "media": [],
+      "warnings": []
+    }
+  ],
+  "deleted": []
+}

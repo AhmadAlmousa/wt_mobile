@@ -6,7 +6,9 @@
 # which:
 #
 # - **analyze** — the static rules the project holds itself to. It has never
-#   been allowed to be dirty, and now nothing can quietly make it so.
+#   been allowed to be dirty, and now nothing can quietly make it so. It also
+#   regenerates what is generated — localizations and the Drift store — and
+#   fails if the committed files disagree.
 # - **test** — the suite. Formatting is checked here too: `dart format` is the
 #   arbiter of layout in this codebase, and a diff that is half reformatted is
 #   a diff nobody can read.
@@ -48,6 +50,13 @@ jobs:
       # the generated Dart have not drifted apart.
       - run: flutter gen-l10n
       - run: git diff --exit-code lib/l10n
+      # The same argument for the store's generated code, which arrived with
+      # Drift in Phase 10b: `sync_eval.md` §9 accepted code generation as the
+      # one honest cost of the choice, on the condition that CI notices a
+      # generated file disagreeing with the source it came from. Nothing else
+      # would — the app compiles perfectly well against a stale one.
+      - run: dart run build_runner build
+      - run: git diff --exit-code lib/data/local
       - run: flutter analyze
 
   test:

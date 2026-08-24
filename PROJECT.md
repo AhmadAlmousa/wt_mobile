@@ -875,19 +875,39 @@ webtrees_mobile/
                chart_parser · charts_repository · media_cache
       module/  module_api · module_decode · module_records
                module_charts · module_access
+      local/   store (the schema) · store_open (the only Flutter in here)
+               records_page · sync · local_records
     domain/    instance · access · records · charts · dates · notice
     features/  launch · connect · auth · access · browse · charts · shared
   server/webtrees-mobile-api/   the optional webtrees module (PHP)
     src/Compat/                 the whole 2.2-vs-2.3 surface: eleven methods
     src/Http/                   Json · ApiException · middleware · handlers
     src/Presenters/             person · fact · date · place · family · media
-    src/Support/                parameter validation · the relationship graph
+    src/Support/                parameter validation · one whole record
+                                the sync fingerprint · the relationship graph
 ```
 
 `data/transport.dart` says what the app needs from an instance;
 `data/capabilities.dart` decides, **per capability**, which implementation
 answers it. A site with no module — which is every real site today — takes the
 stock path for everything, and that is the floor rather than a fallback.
+
+`data/local/` is a **third implementation of the same interfaces**, not a
+cache bolted to the side. That was `sync_eval.md` §10's finding and it held:
+the screens depend on `RecordsTransport`, the composer already chooses per
+capability, and chart screens already take opaque *handles* from whoever
+minted them — so a store answers by implementing the interface and no screen
+changes. Two things pass straight through it, and neither is a shortcoming: a
+thumbnail's bytes, because a signed URL is not an authorization token and
+`MediaFileThumbnail` checks the viewer before the signature; and the tree's
+statistics, which are read from the page on purpose.
+
+`data/module/module_decode.dart` has one entry point for a whole record, used
+by the module transport *and* by the store. That is what makes "the store
+cannot disagree with the server about what a record says" a property of the
+code: the store keeps the endpoint's own bytes and decodes them with the same
+function — the client-side twin of `RecordComposer`, which is why
+`/individual` and `/records` cannot disagree either.
 
 `data/stock/chart_box.dart` is shared on purpose: `chart-box` is the one piece
 of markup every part of webtrees agrees on — the relatives tab, a pedigree, a
@@ -959,8 +979,8 @@ Legend: ✅ done · 🚧 in progress · ⏸ deferred · ⬜ not started
 | **9a** | Relationships drawn: a path as a family tree, and the direction each step runs | ✅ |
 | **9b** | Narrowing a page of search results — sex, age or year of birth, birthplace | ✅ |
 | **10a** | The sync wire: the whole tree in pages, then only what changed | ✅ — module `/records`, measured on 1,469 people |
-| **10b** | Drift schema, a local transport, the sync loop in an isolate | ⬜ |
-| **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ⬜ — closes §9 #24 |
+| **10b** | Drift schema, a local transport, the sync loop off the UI isolate | ✅ — the store fills from the real tree; nothing composes it yet |
+| **10c** | The store answers `individual`, `individuals`, `family` — **tree-wide filters** | ⬜ — closes §9 #24, gated on §9 #29 |
 | **10d–f** | Charts and timeline from the store · thumbnail blobs and a sync screen · a ceiling for large trees | ⬜ — `sync_eval.md` §12 |
 | **v2** | Offline sync · editing · moderation · device tokens | ⬜ — the read-only module is done; §8 of `api_eval.md` covers the rest |
 
@@ -1006,7 +1026,7 @@ the parser behind it stays, fixtures and all, and stays tested.
 | `relationship` | how many paths, the site's own phrase for the whole relationship, each step's word and person, and which way each step runs | the real tree | ✅ |
 | `timeline` | which events, in what order | the real tree | ✅ |
 | `statistics` | the figures both state — and the module answers **four** sections where the page publishes seventeen | the real tree | ❌ **read from the page** |
-| `records` | the whole tree in pages, then a delta: every record identical to the one `/individual` answers, nobody handed over twice, a fingerprint that refuses what it cannot follow | both labs, 19 people and then 1,469 | ⏸ **nothing composes it yet** — Phase 10b is the client |
+| `records` | the whole tree in pages, then a delta: every record identical to the one `/individual` answers, nobody handed over twice, a fingerprint that refuses what it cannot follow | both labs, 19 people and then 1,469 — **and the real tree: 1,463 people in 30 requests, filling a real store** | ⏸ **nothing composes it yet** — Phase 10c is where the composer may prefer it |
 
 All of them have now been run against **`tree.almou.sa`** — the real
 1,463-person tree with the module installed — as well as against both labs on
@@ -2414,6 +2434,86 @@ Phase 10a is deliberately server-side. What checks it is `tool/check_module.py`
 and asserts a stale fingerprint is refused, and both labs run end to end on
 both webtrees versions with every check passing.
 
+### 2026-08-24 (later still) — Phase 10b: the tree, on the device
+
+The module was updated on `tree.almou.sa`, which closed the one outstanding
+action in §9 #18 and made the first thing worth doing a real-tree run rather
+than a new feature. It passes, whole: **1,463 people, 40 records diffed field
+by field with no differences**, and the two things the instance's old 1.0.1
+could not say — a relationship's direction and a timeline event's calendar
+conversion — now agree with the page. Then Phase 10b, which `sync_eval.md` §12
+scoped as *"the store fills; nothing reads it yet"*.
+
+**It fills, from the real tree**: 1,463 records in 30 requests, 37.7 s, into a
+Drift database with 13,701 membership rows across 438 families. Every record
+read back out of it is identical to the one `/individual` answers, compared as
+raw payloads rather than as decoded objects — and the second sync costs **one
+request and writes nothing**.
+
+Four decisions worth the words:
+
+- **A record is stored as the module sent it.** `payload` holds the endpoint's
+  own JSON verbatim and every other column is derived from it for the sake of a
+  `WHERE`. So the store is not a second model of a record that could disagree
+  with the first; it is the same bytes, indexed. `module_decode.dart` grew one
+  entry point for a whole record and both the module transport and the store
+  use it — the client-side twin of `RecordComposer`, which is what makes
+  `/individual` and `/records` incapable of disagreeing on the server.
+- **The schema does not import Flutter.** Saying where the file lives needs
+  `path_provider`, which needs Flutter, and the first attempt put that in
+  `store.dart` — which broke `tool/live_check.dart` outright, because it runs
+  on the Dart VM. So the executor is handed in and `store_open.dart` is the one
+  file with an engine behind it. The tool now fills a *real* store from a real
+  server, which is the third column `sync_eval.md` §10 asked for.
+- **live_check uses the app's own sync engine.** The Phase 10a version of that
+  section was a second implementation of the walk, written in the tool. It is
+  now the shipping `TreeSync` with a `SyncSource` wrapped around it to watch
+  what goes past — because a check that reimplements the thing it checks drifts
+  away from it, and the drift is invisible.
+- **Membership rows are kept per stating person.** The module states, per
+  person, every family they belong to with *all* of its spouses and children —
+  the subject included — so a membership needs no inference at all, which is
+  the ambiguity §7 bug 50 came from. A family of four is therefore stated four
+  times, and the row remembers by whom: a delta re-sends one person, and only
+  that person's statements may be replaced. Four times 438 families is 13,701
+  rows on the real tree, which SQLite does not notice.
+
+Measured against `tree.almou.sa`, filling a file-backed store:
+
+| | |
+|---|---|
+| Filling it | 1,463 people, 15 requests at `limit=100`, **29.8 s** |
+| On disk | **10.70 MB** — `sync_eval.md` §8 estimated ~9 MB |
+| Reading a whole record back | **0.61 ms** |
+| Searching the whole tree by name | **12 ms** for 50 hits |
+| Walking all 1,463 in pages of 50 | **541 ms** |
+
+The last three are the point of the whole phase, and they are the numbers
+`sync_eval.md` §2 predicted mattered: not the request *count*, which was never
+high, but the round trip every tap pays. 0.61 ms against a network fetch is a
+different kind of application — and 12 ms to look at every name in the tree at
+once is a question the app has never been able to ask (§9 #24).
+
+**What is deliberately absent is the reason 10c is gated.** `sync_eval.md` §6
+says encryption at rest is *"a decision to take before the first byte is
+written, not after"*, and no byte has been written on a device: nothing in the
+app constructs a store, so the only stores that exist are in this machine's
+memory and in a test. That is the honest place to stop, and §9 #29 is the gate.
+
+Sixteen new tests, all against a real SQLite database in memory and a scripted
+server — because the behaviour worth testing is not "does the endpoint answer"
+but what happens when a page fails halfway, when a record is deleted, when the
+reader changes, and when the server says the copy cannot be caught up. A live
+run produces none of those on demand. One of them reads a **captured** page
+from a running 2.2.6 lab, which is the first module fixture in this project not
+written from the design (§9 #26).
+
+Released as **0.20.0**. **620 tests** green (604 → 620) plus 14 goldens,
+analyzer clean, both labs walked on both webtrees versions, and the real tree
+end to end. CI grew a step: `build_runner` runs there and the
+build fails if the committed generated file disagrees with its source, which
+was the price `sync_eval.md` §9 named for choosing Drift and is now paid.
+
 ---
 
 ## 7. Bugs found, and what they taught
@@ -2949,15 +3049,21 @@ WEBTREES_PASSWORD=... dart run tool/live_check.dart --url tree.almou.sa --user m
 # which events and in what order; and the statistics by the figures both
 # state — with coverage reported beside them, because a transport can be
 # right and still say less (§9 #23).
-# Then `=== Sync ===`, which walks the *whole* tree through the module's
-# records endpoint: it is the only check that pages far enough to have found
-# bug 53, and it diffs every record it receives against the single-record
-# endpoint, holds the fingerprint to the whole walk, and asks the server to
-# refuse three fingerprints it cannot follow.
+# Then `=== Sync ===`, which fills a real local store from the tree using the
+# app's **own** sync engine — not a loop written in the tool, because a check
+# that reimplements the thing it checks drifts away from it. It is the only
+# check that pages far enough to have found bug 53; it diffs every record the
+# store kept against the single-record endpoint, which is the third column
+# `sync_eval.md` §10 asks for; and it holds the fingerprint to the whole walk
+# and asks the server to refuse three it cannot follow.
 
-flutter test          # 604 tests, plus 14 goldens
+flutter test          # 620 tests, plus 14 goldens
 flutter analyze       # must stay clean
 dart format lib test tool   # CI fails if this changes anything
+
+# The store's schema is generated. CI regenerates it and fails on a diff: the
+# app compiles perfectly well against a stale one, so nothing else would say.
+dart run build_runner build
 
 # Pictures of the parts a person judges rather than asserts on: avatars with
 # and without the mourning ribbon, a person in a list, a parted couple, the
@@ -3229,11 +3335,17 @@ Both tools read the password from the terminal with echo disabled, or from
    married name that is a subtag rather than a name (§7, bug 48), a burial the
    module did not count as a death (49), and two families whose couple the
    HTML could not state (50). Three were the module's and one the parser's,
-   and all are fixed here. Two differences remain on the instance and are not
-   faults: it runs module **1.0.1**, so its relationship wording and its
-   timeline dates are the ones this session fixed. *Updating the module there
-   is the one outstanding action*, and it is not something this machine can
-   do.
+   and all are fixed here. Two differences remained on the instance and were
+   not faults: it ran module **1.0.1**, so its relationship wording and its
+   timeline dates were the ones that session fixed.
+   **Closed 2026-08-24: the instance now runs 1.3.0**, and a full run against
+   it passes — 40 records diffed field by field with no differences, the
+   relationship direction and the timeline conversion now agreeing with the
+   page, and the sync endpoint handing over all 1,463 records into a real
+   store. What that does *not* close is the rest of this entry: still one
+   account, one tree, a reader whose role is Member, and no manager's view, no
+   pending edits, no notes/sources/media tabs (this site runs none of the
+   three) and no photograph this account may see.
    Two things remain true regardless: running two transports doubles the
    meaningful test surface for as long as both exist, which is forever; and no
    capability is cleared until its endpoint has passed live against real data
@@ -3359,6 +3471,35 @@ Both tools read the password from the terminal with echo disabled, or from
    walk is the only thing that closes it, and it is what `resync` exists for.
    Worth stating plainly because the alternative reading — "a delta is
    complete" — is what a client would assume.
+
+29. **The store is not encrypted, and that gates Phase 10c.**
+   `sync_eval.md` §6 #3 is emphatic and it is right: putting the tree on the
+   device is a real change in exposure — today the app holds only what was
+   fetched, in RAM, and a backed-up or shared phone would give up the whole
+   visible tree — and encryption at rest is *"a decision to take before the
+   first byte is written, not after"*. **No byte has been written on a
+   device**: nothing in the app constructs a store, so Phase 10b's stores exist
+   only in this machine's memory and in a test. That is deliberate, and it is
+   the condition on 10c: the composer may not start answering from a store
+   until the encryption question has an answer. The route is
+   `package:sqlite3` 3.x's build hooks (`sqlcipher_flutter_libs` is
+   end-of-life, and `sqlite3_flutter_libs` became a no-op at 0.6.0 for the
+   same reason), and the key belongs in the keystore the app already uses for
+   the password.
+   Two smaller halves of the same section, also unanswered: the store must be
+   dropped on **sign-out** and on any change in the access summary — the code
+   to drop it exists (`TreeSync.wipe`) and nothing calls it yet — and a
+   demoted reader's copy is stale *permissively*, which the stamp catches only
+   at the next sync.
+
+30. **Two sources of truth become "is it stale or is it wrong?"** The first
+   risk `sync_eval.md` §11 names, and the reason 10c needs more than a
+   staleness rule: every screen answered from a store owes the reader a
+   "synced at", and the diagnostics screen — which already says which
+   transport answered each capability — has to learn a third answer. A figure
+   from last night is not wrong, but a reader wondering about it has to be
+   told, and `live_check` now diffs all three so the discipline that has caught
+   fifteen bugs keeps working.
 
 Related: the full plan lives at `~/.claude/plans/warm-drifting-umbrella.md`.
 

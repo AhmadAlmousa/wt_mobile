@@ -17,11 +17,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cookie_jar/cookie_jar.dart';
+import 'package:drift/native.dart';
 import 'package:webtrees_mobile/core/errors.dart';
 import 'package:webtrees_mobile/core/webtrees_client.dart';
 import 'package:webtrees_mobile/core/webtrees_url.dart';
 import 'package:webtrees_mobile/data/access_probe.dart';
 import 'package:webtrees_mobile/data/instance_probe.dart';
+import 'package:webtrees_mobile/data/local/local_records.dart';
+import 'package:webtrees_mobile/data/local/records_page.dart';
+import 'package:webtrees_mobile/data/local/store.dart';
+import 'package:webtrees_mobile/data/local/sync.dart';
 import 'package:webtrees_mobile/data/module/module_access.dart';
 import 'package:webtrees_mobile/data/module/module_api.dart';
 import 'package:webtrees_mobile/data/module/module_charts.dart';
@@ -1025,129 +1030,166 @@ Future<void> main(List<String> args) async {
         );
       }
 
-      // Phase 10a: the wire a local copy of the tree would be filled from.
-      // Checked here rather than in the app because there is no client for it
-      // yet — the point of this phase is to find out whether a real server
-      // hands over a whole tree in a handful of requests before anything is
-      // built on the assumption that it does.
+      // Phases 10a and 10b: the wire a local copy of the tree is filled
+      // from, and the store it fills. Deliberately one walk serving both —
+      // and deliberately the app's *own* sync engine rather than a loop
+      // written here, because a check that reimplements the thing it checks
+      // drifts away from it.
       if (capabilities.has('records')) {
         stdout.writeln('\n=== Sync ===');
-        final api = ModuleApi(client);
 
-        Future<Map<String, Object?>> records(Map<String, String> query) =>
-            api.tree(
-              tree.name,
-              '/records',
-              query: query,
-              probe: 'syncing ${tree.name}',
-            );
-
-        const limit = 50;
-        final walked = <String, Map<String, Object?>>{};
-        final started = DateTime.now();
-        var pages = 0;
-        var repeated = 0;
-        var bytes = 0;
-        var offset = 0;
-        String? token;
-        String? drifted;
-
-        while (true) {
-          final page = await records({'offset': '$offset', 'limit': '$limit'});
-          pages++;
-          final stated = page['token'];
-          if (stated is String) {
-            token ??= stated;
-            // Rule 1 of the endpoint: a tree edited mid-walk states a
-            // different fingerprint on a later page, and a client that stored
-            // the last one would believe it had a record it never received.
-            if (stated != token) drifted = stated;
-          }
-          for (final person in _listOf(page['people'])) {
-            if (person is! Map<String, Object?>) continue;
-            final xref = person['xref'];
-            if (xref is! String) continue;
-            if (walked.containsKey(xref)) repeated++;
-            walked[xref] = person;
-            bytes += utf8.encode(jsonEncode(person)).length;
-          }
-          if (page['hasMore'] != true) break;
-          offset += limit;
-        }
-
-        final elapsed = DateTime.now().difference(started);
-        report(
-          'the whole tree, $limit at a time',
-          '${walked.length} people in $pages request(s), '
-              '${elapsed.inMilliseconds} ms, '
-              '${bytes ~/ (walked.isEmpty ? 1 : walked.length)} B/person',
-          ok: walked.isNotEmpty,
+        final watched = _WatchedSource(ModuleSyncSource(ModuleApi(client)));
+        final store = LocalStore.forTesting(NativeDatabase.memory());
+        final stamp = StoreStamp(
+          tree: tree.name,
+          username: access.account.username,
+          role: tree.role,
+          language: language,
+          moduleVersion: capabilities.moduleVersion,
         );
-        // The trap the stock autocomplete falls into and the name-ordered
-        // walk inherits: paging counts rows and a page counts people, so
-        // somebody with two names arrives twice (PROJECT.md §7, bug 53).
-        report(
-          'nobody handed over twice',
-          repeated == 0 ? 'yes' : '$repeated repeated',
-          ok: repeated == 0,
+        final sync = TreeSync(
+          store: store,
+          source: watched,
+          stamp: stamp,
+          pageSize: 50,
         );
-        report(
-          'the fingerprint held for the whole walk',
-          drifted == null ? token ?? '(none)' : 'moved to $drifted',
-          ok: drifted == null && token != null,
-        );
+        final local = LocalRecordsTransport(store: store, online: stock);
 
-        // A page of records has to *be* the record the app already reads, or
-        // a local store would answer something subtly different from the
-        // server it was filled from.
-        final sample = int.tryParse(options['sample'] ?? '') ?? 0;
-        var compared = 0;
-        var differing = 0;
-        for (final xref in walked.keys.take(sample > 0 ? sample : 5)) {
-          final one = await api.tree(
-            tree.name,
-            '/individual/$xref',
-            probe: 'opening $xref',
-          );
-          // The two fields a page of records states once for the tree
-          // instead of once per person.
-          one.remove('sections');
-          one.remove('charts');
-          final where = _firstDifference(one, walked[xref]);
-          compared++;
-          if (where != null) {
-            differing++;
-            stdout.writeln('  FAIL  $xref differs at $where');
-          }
-        }
-        report(
-          'each record identical to /individual',
-          '$compared compared, $differing different',
-          ok: differing == 0,
-        );
-        failures += differing;
+        try {
+          final started = DateTime.now();
+          final filled = await sync.run();
+          final elapsed = DateTime.now().difference(started);
 
-        final again = await records({'since': token ?? '', 'limit': '1'});
-        report(
-          'nothing changed since that fingerprint',
-          '${_listOf(again['people']).length} record(s), '
-              '${_listOf(again['deleted']).length} tombstone(s)',
-          ok: _listOf(again['people']).isEmpty && again['resync'] != true,
-        );
+          final rows = await store.select(store.storedPeople).get();
+          final members = await store.select(store.storedMemberships).get();
 
-        for (final bogus in const [
-          'v1.999999999.0.0',
-          'not-a-token',
-          'v1.0.1',
-        ]) {
-          final answer = await records({'since': bogus, 'limit': '1'});
           report(
-            'a fingerprint this tree cannot follow ("$bogus")',
-            answer['resync'] == true
-                ? 'asks for a fresh walk'
-                : 'accepted, which would leave a stale copy',
-            ok: answer['resync'] == true,
+            'the whole tree, 50 at a time',
+            '${rows.length} people in ${filled.requests} request(s), '
+                '${elapsed.inMilliseconds} ms, '
+                '${watched.bytes ~/ (rows.isEmpty ? 1 : rows.length)} B/person',
+            ok: rows.isNotEmpty && filled.complete,
           );
+          // The trap the stock autocomplete falls into and the name-ordered
+          // walk inherits: paging counts rows and a page counts people, so
+          // somebody with two names arrives twice (PROJECT.md §7, bug 53).
+          // The store would hide it — a primary key deduplicates silently —
+          // so it is counted on the way in.
+          report(
+            'nobody handed over twice',
+            watched.received == rows.length
+                ? 'yes'
+                : '${watched.received - rows.length} repeated',
+            ok: watched.received == rows.length,
+          );
+          report(
+            'the fingerprint held for the whole walk',
+            watched.drifted
+                ? 'moved during the walk — a delta was run'
+                : watched.tokens.isEmpty
+                ? '(none)'
+                : watched.tokens.first,
+            ok: watched.tokens.isNotEmpty,
+          );
+          report(
+            'the store knows who is in which family',
+            '${members.length} membership(s) across '
+                '${members.map((row) => row.familyXref).toSet().length} '
+                'famil(ies) — what a chart is a walk over',
+            ok: members.isNotEmpty,
+          );
+          report(
+            'the copy is answerable',
+            await local.isComplete(tree.name) ? 'yes' : 'still filling',
+            ok: await local.isComplete(tree.name),
+          );
+
+          // A record read back out of the store has to be the record the
+          // server answers — the third column `sync_eval.md` §10 asks for.
+          // Compared as raw payloads rather than as decoded records, because
+          // that is what the store actually keeps and a decoded comparison
+          // could agree while a field nothing reads yet had been lost.
+          final sample = int.tryParse(options['sample'] ?? '') ?? 0;
+          var compared = 0;
+          var differing = 0;
+          for (final row in rows.take(sample > 0 ? sample : 5)) {
+            final fresh = await ModuleApi(client).tree(
+              tree.name,
+              '/individual/${row.xref}',
+              probe: 'opening ${row.xref}',
+            );
+            // The two fields a page of records states once for the tree.
+            fresh.remove('sections');
+            fresh.remove('charts');
+
+            compared++;
+            final where = _firstDifference(
+              fresh,
+              personFromPayload(row.payload),
+            );
+            if (where != null) {
+              differing++;
+              stdout.writeln('  FAIL  ${row.xref} differs at $where');
+            }
+          }
+          report(
+            'each stored record identical to /individual',
+            '$compared compared, $differing different',
+            ok: differing == 0,
+          );
+          failures += differing;
+
+          // And the decoded record, which is what a screen would be given:
+          // the two fields that do not live in the payload have to come back
+          // from the tree's own row.
+          final subject = rows.first.xref;
+          final fromStore = await local.individual(tree.name, subject);
+          final fromModule = await module.individual(tree.name, subject);
+          report(
+            'a stored record decodes to the same record',
+            'facts ${fromStore.facts.length}/${fromModule.facts.length} · '
+                'families ${_families(fromStore) == _families(fromModule)} · '
+                'sections ${fromStore.sections.length}/'
+                '${fromModule.sections.length} · '
+                'charts ${fromStore.charts.length}/${fromModule.charts.length}',
+            ok:
+                fromStore.facts.length == fromModule.facts.length &&
+                _families(fromStore) == _families(fromModule) &&
+                fromStore.sections.length == fromModule.sections.length &&
+                fromStore.charts.length == fromModule.charts.length,
+          );
+
+          // The daily sync: one request, nothing to write.
+          final before = watched.requests;
+          final again = await sync.run();
+          report(
+            'nothing changed since that fingerprint',
+            '${watched.requests - before} request(s), '
+                '${again.written} written, ${again.deleted} removed',
+            ok: again.written == 0 && again.deleted == 0 && !again.startedFresh,
+          );
+
+          for (final bogus in const [
+            'v1.999999999.0.0',
+            'not-a-token',
+            'v1.0.1',
+          ]) {
+            final answer = await watched.records(
+              tree.name,
+              offset: 0,
+              limit: 1,
+              since: bogus,
+            );
+            report(
+              'a fingerprint this tree cannot follow ("$bogus")',
+              answer.resync
+                  ? 'asks for a fresh walk'
+                  : 'accepted, which would leave a stale copy',
+              ok: answer.resync,
+            );
+          }
+        } finally {
+          await store.close();
         }
       }
     }
@@ -1405,6 +1447,52 @@ int _generationsIn(ChartData chart) {
       .fold(1, (deepest, depth) => depth > deepest ? depth : deepest);
 }
 
+/// Watches every page the sync engine asks for.
+///
+/// The engine is the thing being checked, so it is used as it ships and
+/// observed from outside: what came back, how big it was, and whether the
+/// server's fingerprint moved while the tree was being read.
+final class _WatchedSource implements SyncSource {
+  _WatchedSource(this._inner);
+
+  final SyncSource _inner;
+
+  final tokens = <String>[];
+
+  /// Records handed over, before the store's primary key deduplicates them.
+  var received = 0;
+  var requests = 0;
+  var bytes = 0;
+
+  bool get drifted => tokens.toSet().length > 1;
+
+  @override
+  Future<RecordsPage> records(
+    String tree, {
+    required int offset,
+    required int limit,
+    String? since,
+  }) async {
+    final page = await _inner.records(
+      tree,
+      offset: offset,
+      limit: limit,
+      since: since,
+    );
+
+    requests++;
+    if (since == null) {
+      tokens.add(page.token);
+      received += page.people.length;
+      for (final person in page.people) {
+        bytes += utf8.encode(jsonEncode(person)).length;
+      }
+    }
+
+    return page;
+  }
+}
+
 /// Where two decoded payloads first disagree, as a readable path.
 ///
 /// Dart compares maps by identity, and a sync check that reported only
@@ -1436,8 +1524,6 @@ String? _firstDifference(Object? left, Object? right, [String path = '']) {
 
   return left == right ? null : '$path ($left vs $right)';
 }
-
-List<Object?> _listOf(Object? value) => value is List ? value : const [];
 
 String _readPassword(String username) {
   final fromEnvironment = Platform.environment['WEBTREES_PASSWORD'];

@@ -7,7 +7,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Keep in step with `kAppVersion` in lib/core/webtrees_client.dart, which puts
 # this number in the User-Agent every request carries. Site administrators read
 # that string in their logs, so it has to name the build they actually have.
-version: 0.19.0+22
+version: 0.20.0+23
 
 environment:
   sdk: ^3.12.2
@@ -53,6 +53,18 @@ dependencies:
   pdf: ^3.13.0
   share_plus: ^13.3.0
   path_provider: ^2.1.6
+  # Keeping the tree on the device (Phase 10). `sync_eval.md` §9 chose Drift
+  # over ObjectBox for one reason that is not speed: its store *is* SQLite, a
+  # format a server could one day write, and ObjectBox's is not — so this
+  # choice leaves a door open that the faster one closes forever. The data is
+  # relational (people, families, links, facts), a chart is a recursive walk
+  # and a filter is a `WHERE`, which is SQL's home ground.
+  #
+  # `drift_flutter` is only the platform glue: it says where the file lives and
+  # opens it with `NativeDatabase.createInBackground`, so every query runs on
+  # its own isolate rather than on the one drawing the screen.
+  drift: ^2.34.3
+  drift_flutter: ^0.3.1
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +77,13 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   shared_preferences_platform_interface: ^2.4.2
+  # The one honest cost of Drift, named in `sync_eval.md` §9 before it was
+  # accepted: this project had no code generation until now. `dart run
+  # build_runner build` regenerates `lib/data/local/store.g.dart`, and CI has
+  # to run it — a generated file that disagrees with its source is a failure
+  # nothing else catches.
+  drift_dev: ^2.34.5
+  build_runner: ^2.15.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

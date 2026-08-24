@@ -10,8 +10,60 @@ library;
 
 import '../../domain/charts.dart';
 import '../../domain/dates.dart';
+import '../../domain/notice.dart';
 import '../../domain/records.dart';
 import '../../domain/statistics.dart';
+
+/// Reads one whole record.
+///
+/// Shared by the two things that answer a record: the module transport, which
+/// has just fetched one, and the local store, which kept the same bytes (see
+/// `data/local/store.dart`). One decoder rather than two is what makes "the
+/// store cannot disagree with the server about what a record says" a property
+/// of the code instead of a promise.
+///
+/// [sections] and [charts] are passed in rather than read from [json],
+/// because they describe the *tree* and not the person: a page of records from
+/// the sync endpoint states them once for the whole page, and a store keeps
+/// them once for the whole tree.
+IndividualRecord individualFrom(
+  Map<String, Object?> json, {
+  required String xref,
+  required List<String> sections,
+  required Map<ChartKind, String> charts,
+}) => IndividualRecord(
+  xref: stringOf(json['xref']) ?? xref,
+  name: stringOf(json['name']) ?? '',
+  alternateName: stringOf(json['alternateName']),
+  thumbnailUrl: stringOf(json['thumbnail']),
+  sex: sexFrom(stringOf(json['sex'])),
+  lifespan: stringOf(json['lifespan']),
+  isDeceased: json['deceased'] == true,
+  facts: factsFrom(json['facts']),
+  families: [
+    for (final family in listOf(json['families']))
+      if (family is Map<String, Object?>) familyFrom(family),
+  ],
+  // A section a site does not run answers null, not an empty list — the same
+  // distinction the stock path draws by seeing no tab at all. An empty list
+  // would say "this person has none", and a caution about a section the site
+  // never offered would appear on every record.
+  notes: [
+    for (final note in listOf(json['notes']))
+      if (note is Map<String, Object?>) noteFrom(note),
+  ],
+  sources: [
+    for (final source in listOf(json['sources']))
+      if (source is Map<String, Object?>) sourceFrom(source),
+  ],
+  media: [
+    for (final item in listOf(json['media']))
+      if (item is Map<String, Object?>) mediaFrom(item),
+  ],
+  sections: sections,
+  charts: charts,
+  warnings: const <Notice>[],
+);
 
 /// Reads one person reference.
 PersonRef personFrom(Map<String, Object?> json) => PersonRef(
